@@ -160,19 +160,6 @@ export default function AdminBrandsManager() {
                 <p className="text-xs text-slate-400 leading-relaxed">{brand.description || 'No description provided.'}</p>
               </div>
 
-              {/* Linked services */}
-              {brand.associatedServices && brand.associatedServices.length > 0 && (
-                <div className="pt-4 border-t border-slate-800 flex flex-wrap gap-1.5 mt-2">
-                  {brand.associatedServices.map((serv, idx) => (
-                    <span 
-                      key={idx}
-                      className="text-[9px] bg-slate-950 border border-slate-850 text-slate-350 px-2 py-0.5 rounded uppercase font-bold"
-                    >
-                      {serv}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
           ))}
         </div>
