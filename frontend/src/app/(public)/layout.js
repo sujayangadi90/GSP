@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { cmsApi } from '@/utils/api';
+import { cmsApi, serviceApi } from '@/utils/api';
 import { Phone, Mail, Clock, Menu, X, ArrowUp } from 'lucide-react';
 
 export default function PublicLayout({ children }) {
@@ -21,6 +21,7 @@ export default function PublicLayout({ children }) {
     }
   });
 
+  const [categories, setCategories] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -36,7 +37,12 @@ export default function PublicLayout({ children }) {
           }));
         }
       })
-      .catch((err) => console.log('CMS fetch failed, using fallback copy:', err));
+    
+    serviceApi.getCategories()
+      .then((data) => {
+        setCategories(data.filter(c => c.isActive !== false));
+      })
+      .catch((err) => console.log('Categories load failed in footer:', err));
 
     const handleScroll = () => {
       setScrolled(window.scrollY > 40);
@@ -193,10 +199,15 @@ export default function PublicLayout({ children }) {
           <div className="flex flex-col gap-4">
             <h4 className="font-bold text-white text-sm uppercase tracking-wider">Primary Categories</h4>
             <div className="flex flex-col gap-2.5 text-sm text-neutral-400">
-              <Link href="/services/home-appliances" className="hover:text-teal-400 transition-colors">Home Appliances</Link>
-              <Link href="/services/cleaning-pest-control" className="hover:text-teal-400 transition-colors">Cleaning & Pest Control</Link>
-              <Link href="/services/renewable-energy" className="hover:text-teal-400 transition-colors">Renewable Energy</Link>
-              <Link href="/services/water-solutions" className="hover:text-teal-400 transition-colors">Water Purifiers & Solutions</Link>
+              {categories.map((cat) => (
+                <Link 
+                  key={cat._id}
+                  href={`/services/${cat.slug}`} 
+                  className="hover:text-teal-400 transition-colors"
+                >
+                  {cat.name}
+                </Link>
+              ))}
             </div>
           </div>
 
