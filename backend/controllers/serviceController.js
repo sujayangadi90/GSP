@@ -19,7 +19,7 @@ const getCategories = async (req, res) => {
 // @route   POST /api/services/categories
 // @access  Private (Admin)
 const createCategory = async (req, res) => {
-  const { name, slug, description, isActive, order } = req.body;
+  const { name, slug, description, isActive, order, image } = req.body;
 
   try {
     const exists = await ServiceCategory.findOne({ slug });
@@ -32,7 +32,8 @@ const createCategory = async (req, res) => {
       slug, 
       description, 
       isActive, 
-      order: order !== undefined ? Number(order) : 0 
+      order: order !== undefined ? Number(order) : 0,
+      image: image || ''
     });
     res.status(201).json(category);
   } catch (error) {
@@ -44,7 +45,7 @@ const createCategory = async (req, res) => {
 // @route   PUT /api/services/categories/:id
 // @access  Private (Admin)
 const updateCategory = async (req, res) => {
-  const { name, slug, description, isActive, order } = req.body;
+  const { name, slug, description, isActive, order, image } = req.body;
 
   try {
     const category = await ServiceCategory.findById(req.params.id);
@@ -54,6 +55,7 @@ const updateCategory = async (req, res) => {
       category.description = description !== undefined ? description : category.description;
       category.isActive = isActive !== undefined ? isActive : category.isActive;
       category.order = order !== undefined ? Number(order) : category.order;
+      category.image = image !== undefined ? image : category.image;
 
       const updated = await category.save();
       res.json(updated);

@@ -12,7 +12,8 @@ import {
   MailWarning, 
   LogOut, 
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  GraduationCap
 } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
@@ -67,7 +68,8 @@ export default function AdminLayout({ children }) {
     { name: 'Services & Cats', path: '/admin/services', icon: Cpu },
     { name: 'Brands Manager', path: '/admin/brands', icon: Bookmark },
     { name: 'Testimonials', path: '/admin/testimonials', icon: MessageSquare },
-    { name: 'Lead Inquiries', path: '/admin/inquiries', icon: MailWarning }
+    { name: 'Lead Inquiries', path: '/admin/inquiries', icon: MailWarning },
+    { name: 'Training Leads', path: '/admin/training-leads', icon: GraduationCap }
   ];
 
   return (

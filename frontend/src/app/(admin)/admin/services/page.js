@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { serviceApi } from '@/utils/api';
-import { Plus, Trash, Edit, AlertCircle, Settings, Check, X, RefreshCw } from 'lucide-react';
+import { serviceApi, uploadApi } from '@/utils/api';
+import { Plus, Trash, Edit, AlertCircle, Settings, Check, X, RefreshCw, Upload, Image as ImageIcon } from 'lucide-react';
 
 export default function AdminServicesManager() {
   const [categories, setCategories] = useState([]);
@@ -10,17 +10,55 @@ export default function AdminServicesManager() {
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState({ type: '', text: '' });
 
-  const [catForm, setCatForm] = useState({ name: '', slug: '', description: '', isActive: true, order: 0 });
+  const [catForm, setCatForm] = useState({ name: '', slug: '', description: '', isActive: true, order: 0, image: '' });
   const [editingCatId, setEditingCatId] = useState(null);
   const [showCatModal, setShowCatModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const getCategoryImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+    return `${baseUrl}${imagePath}`;
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await uploadApi.uploadFile(file);
+      setCatForm((prev) => ({ ...prev, image: res.path }));
+      triggerAlert('success', 'Category image uploaded successfully!');
+    } catch (err) {
+      triggerAlert('error', err.message || 'Image upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Form states - Service
   const [servForm, setServForm] = useState({
     category: '', name: '', slug: '', shortDescription: '', detailedDescription: '',
-    featuresString: '', benefitsString: '', serviceTypesString: '', isActive: true
+    featuresString: '', benefitsString: '', serviceTypesString: '', isActive: true, image: ''
   });
   const [editingServId, setEditingServId] = useState(null);
   const [showServModal, setShowServModal] = useState(false);
+
+  const handleServiceImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await uploadApi.uploadFile(file);
+      setServForm((prev) => ({ ...prev, image: res.path }));
+      triggerAlert('success', 'Service image uploaded successfully!');
+    } catch (err) {
+      triggerAlert('error', err.message || 'Image upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const fetchAll = async () => {
     setLoading(true);
@@ -59,7 +97,7 @@ export default function AdminServicesManager() {
         await serviceApi.createCategory(catForm);
         triggerAlert('success', 'Category created successfully!');
       }
-      setCatForm({ name: '', slug: '', description: '', isActive: true, order: 0 });
+      setCatForm({ name: '', slug: '', description: '', isActive: true, order: 0, image: '' });
       setEditingCatId(null);
       setShowCatModal(false);
       fetchAll();
@@ -74,7 +112,8 @@ export default function AdminServicesManager() {
       slug: cat.slug,
       description: cat.description || '',
       isActive: cat.isActive !== false,
-      order: cat.order || 0
+      order: cat.order || 0,
+      image: cat.image || ''
     });
     setEditingCatId(cat._id);
     setShowCatModal(true);
@@ -105,6 +144,7 @@ export default function AdminServicesManager() {
       category: servForm.category,
       name: servForm.name,
       slug: servForm.slug,
+      image: servForm.image,
       shortDescription: servForm.shortDescription,
       detailedDescription: servForm.detailedDescription,
       features,
@@ -134,6 +174,7 @@ export default function AdminServicesManager() {
       category: serv.category ? serv.category._id : '',
       name: serv.name,
       slug: serv.slug,
+      image: serv.image || '',
       shortDescription: serv.shortDescription,
       detailedDescription: serv.detailedDescription || '',
       featuresString: (serv.features || []).join('\n'),
@@ -161,6 +202,7 @@ export default function AdminServicesManager() {
       category: categories[0] ? categories[0]._id : '',
       name: '',
       slug: '',
+      image: '',
       shortDescription: '',
       detailedDescription: '',
       featuresString: '',
@@ -187,7 +229,7 @@ export default function AdminServicesManager() {
             <span>Add Service</span>
           </button>
           <button 
-            onClick={() => { setCatForm({ name: '', slug: '', description: '', isActive: true }); setEditingCatId(null); setShowCatModal(true); }}
+            onClick={() => { setCatForm({ name: '', slug: '', description: '', isActive: true, order: 0, image: '' }); setEditingCatId(null); setShowCatModal(true); }}
             className="bg-slate-800 hover:bg-slate-750 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center gap-1.5 border border-slate-750 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -315,7 +357,7 @@ export default function AdminServicesManager() {
       {/* MODAL 1: CATEGORY WRITER */}
       {showCatModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-850 p-6 sm:p-8 rounded-3xl max-w-md w-full text-left shadow-2xl flex flex-col gap-5">
+          <div className="bg-slate-900 border border-slate-850 p-6 sm:p-8 rounded-3xl max-w-md w-full text-left shadow-2xl flex flex-col gap-5 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h4 className="font-bold text-white">{editingCatId ? 'Edit Category' : 'Create Category'}</h4>
               <button onClick={() => setShowCatModal(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
@@ -371,6 +413,37 @@ export default function AdminServicesManager() {
                 />
               </div>
 
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-400 uppercase tracking-wider">Category Image (Square)</label>
+                <div className="flex items-center gap-4 bg-slate-950 p-4 rounded-xl border border-slate-850">
+                  <div className="w-16 h-16 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden flex items-center justify-center relative flex-shrink-0">
+                    {catForm.image ? (
+                      <img 
+                        src={getCategoryImageUrl(catForm.image)} 
+                        alt="Category Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="w-6 h-6 text-slate-600" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] cursor-pointer flex items-center gap-1 w-max">
+                      <Upload className="w-3 h-3" />
+                      <span>{uploading ? 'Uploading...' : 'Choose Square Image'}</span>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={uploading}
+                      />
+                    </label>
+                    <span className="text-[10px] text-slate-500">JPG, PNG (Recommended: 1:1 Aspect Ratio)</span>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center gap-2 pt-2">
                 <input 
                   type="checkbox"
@@ -384,7 +457,8 @@ export default function AdminServicesManager() {
 
               <button 
                 type="submit"
-                className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-4"
+                disabled={uploading}
+                className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-4 disabled:opacity-50"
               >
                 <span>{editingCatId ? 'Save Changes' : 'Create Category'}</span>
               </button>
@@ -396,7 +470,7 @@ export default function AdminServicesManager() {
       {/* MODAL 2: SERVICE WRITER */}
       {showServModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-850 p-6 sm:p-8 rounded-3xl max-w-lg w-full text-left shadow-2xl flex flex-col gap-5 my-8">
+          <div className="bg-slate-900 border border-slate-850 p-6 sm:p-8 rounded-3xl max-w-lg w-full text-left shadow-2xl flex flex-col gap-5 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h4 className="font-bold text-white">{editingServId ? 'Edit Service' : 'Add Service'}</h4>
               <button onClick={() => setShowServModal(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
@@ -498,6 +572,37 @@ export default function AdminServicesManager() {
                     placeholder="e.g. Lower power draws&#10;30-day warranty guarantee"
                     className="w-full bg-slate-950 border border-slate-850 p-3 rounded-xl focus:outline-none focus:border-teal-500 text-white resize-none"
                   />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-400 uppercase tracking-wider">Service Image (Square)</label>
+                <div className="flex items-center gap-4 bg-slate-950 p-4 rounded-xl border border-slate-850">
+                  <div className="w-16 h-16 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden flex items-center justify-center relative flex-shrink-0">
+                    {servForm.image ? (
+                      <img 
+                        src={getCategoryImageUrl(servForm.image)} 
+                        alt="Service Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="w-6 h-6 text-slate-600" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] cursor-pointer flex items-center gap-1 w-max">
+                      <Upload className="w-3 h-3" />
+                      <span>{uploading ? 'Uploading...' : 'Choose Square Image'}</span>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleServiceImageUpload}
+                        className="hidden"
+                        disabled={uploading}
+                      />
+                    </label>
+                    <span className="text-[10px] text-slate-500">JPG, PNG (Recommended: 1:1 Aspect Ratio)</span>
+                  </div>
                 </div>
               </div>
 

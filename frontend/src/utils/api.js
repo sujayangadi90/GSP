@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 const getHeaders = () => {
   const headers = {
@@ -168,5 +168,17 @@ export const uploadApi = {
       method: 'POST',
       body: formData,
     });
+  },
+};
+
+export const trainingApi = {
+  submitLead: (data) => 
+    apiCall('/training/leads', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getLeads: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/training/leads?${query}`, { method: 'GET' });
   },
 };

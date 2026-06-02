@@ -42,6 +42,13 @@ export default function CategoryDetailPage({ params }) {
     loadCategoryData();
   }, [categorySlug]);
 
+  const getServiceImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+    return `${baseUrl}${imagePath}`;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -106,8 +113,16 @@ export default function CategoryDetailPage({ params }) {
                 >
                   <div className="p-8 text-left">
                     <div className="flex justify-between items-start mb-6">
-                      <div className="w-10 h-10 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center">
-                        <Settings className="w-5 h-5" />
+                      <div className="w-24 h-24 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {service.image ? (
+                          <img 
+                            src={getServiceImageUrl(service.image)} 
+                            alt={service.name} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Settings className="w-10 h-10" />
+                        )}
                       </div>
                       <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 border border-neutral-200 px-2 py-1 rounded bg-slate-50">
                         {category.name}

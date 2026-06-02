@@ -78,6 +78,13 @@ export default function HomePage() {
     );
   }
 
+  const getCategoryImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+    return `${baseUrl}${imagePath}`;
+  };
+
   return (
     <div className="flex flex-col overflow-x-hidden">
       {/* 1. Rich Hero Section */}
@@ -186,8 +193,16 @@ export default function HomePage() {
                 className="group relative bg-white border border-neutral-200/60 p-8 rounded-2xl shadow-sm hover:shadow-xl hover:border-teal-500/20 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
               >
                 <div className="flex flex-col gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center group-hover:bg-teal-500 group-hover:text-white transition-colors duration-300">
-                    <Settings className="w-6 h-6" />
+                  <div className="w-24 h-24 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center overflow-hidden group-hover:bg-teal-500 group-hover:text-white transition-colors duration-300 flex-shrink-0">
+                    {category.image ? (
+                      <img 
+                        src={getCategoryImageUrl(category.image)} 
+                        alt={category.name} 
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <Settings className="w-10 h-10" />
+                    )}
                   </div>
                   <h3 className="text-xl font-extrabold text-slate-900 group-hover:text-teal-600 transition-colors">
                     {category.name}
