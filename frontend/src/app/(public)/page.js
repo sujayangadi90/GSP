@@ -253,17 +253,12 @@ export default function HomePage() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white text-slate-900 border-t border-neutral-100">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-5 relative">
-            <div className="relative bg-gradient-to-br from-slate-100 to-slate-200 p-12 rounded-3xl shadow-inner border border-neutral-200 flex flex-col items-center justify-center text-center overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(20,184,166,0.05),transparent_40%)]"></div>
-              <span className="text-7xl font-extrabold text-teal-600 tracking-tight select-none">
-                {cms.about_us.experienceYears}
-              </span>
-              <span className="text-xs uppercase font-extrabold tracking-widest text-slate-500 mt-2">
-                Years of Excellence
-              </span>
-              <p className="text-sm text-slate-600 mt-4 leading-relaxed max-w-xs">
-                Serving Gadag, Betageri, and surrounding municipal circles with trust and unmatched warranty packages.
-              </p>
+            <div className="relative w-full max-w-md mx-auto aspect-[16/10] rounded-3xl overflow-hidden shadow-lg border border-neutral-200">
+              <img 
+                src="/10plus.png" 
+                alt="10+ Years of Excellence" 
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
 

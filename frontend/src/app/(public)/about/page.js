@@ -81,17 +81,12 @@ export default function AboutPage() {
             </p>
           </div>
           
-          <div className="lg:col-span-5 bg-gradient-to-tr from-teal-550/5 to-cyan-550/5 border border-teal-500/10 p-10 rounded-3xl flex flex-col items-center justify-center text-center">
-            <span className="text-7xl font-extrabold text-teal-600 leading-none">
-              {about_us.experienceYears}
-            </span>
-            <span className="text-sm uppercase tracking-widest font-extrabold text-slate-500 mt-2">
-              Years of Experience
-            </span>
-            <div className="w-16 h-1 bg-teal-500 rounded my-6"></div>
-            <p className="text-sm text-slate-500 italic max-w-xs">
-              "We take pride in our service excellence and honest technician callouts."
-            </p>
+          <div className="lg:col-span-5 relative w-full max-w-md mx-auto aspect-[16/10] rounded-3xl overflow-hidden shadow-lg border border-neutral-200">
+            <img 
+              src="/10plus.png" 
+              alt="10+ Years of Excellence" 
+              className="w-full h-full object-cover"
+            />
           </div>
         </div>
       </section>
