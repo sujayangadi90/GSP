@@ -13,7 +13,8 @@ import {
   LogOut, 
   ShieldCheck,
   UserCheck,
-  GraduationCap
+  GraduationCap,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
@@ -64,6 +65,7 @@ export default function AdminLayout({ children }) {
 
   const sidebarLinks = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'Banner Images', path: '/admin/banners', icon: ImageIcon },
     { name: 'CMS Editor', path: '/admin/cms', icon: Settings },
     { name: 'Services & Cats', path: '/admin/services', icon: Cpu },
     { name: 'Brands Manager', path: '/admin/brands', icon: Bookmark },

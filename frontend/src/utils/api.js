@@ -182,3 +182,23 @@ export const trainingApi = {
     return apiCall(`/training/leads?${query}`, { method: 'GET' });
   },
 };
+
+export const bannerApi = {
+  getBanners: () =>
+    apiCall('/banners', { method: 'GET' }),
+  getAllBanners: () =>
+    apiCall('/banners/all', { method: 'GET' }),
+  createBanner: (data) =>
+    apiCall('/banners', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateBanner: (id, data) =>
+    apiCall(`/banners/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteBanner: (id) =>
+    apiCall(`/banners/${id}`, { method: 'DELETE' }),
+};
+

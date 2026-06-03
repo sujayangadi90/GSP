@@ -32,6 +32,7 @@ app.use('/api/testimonials', require('./routes/testimonialRoutes'));
 app.use('/api/inquiries', require('./routes/inquiryRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/training', require('./routes/trainingRoutes'));
+app.use('/api/banners', require('./routes/bannerRoutes'));
 
 // Fallback base route
 app.get('/', (req, res) => {

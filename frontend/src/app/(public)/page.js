@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { cmsApi, serviceApi, brandApi, testimonialApi } from '@/utils/api';
+import { cmsApi, serviceApi, brandApi, testimonialApi, bannerApi } from '@/utils/api';
 import { Shield, Settings, Zap, Smile, ArrowRight, Star, Heart, CheckCircle } from 'lucide-react';
 
 export default function HomePage() {
@@ -35,14 +35,19 @@ export default function HomePage() {
   const [testimonials, setTestimonials] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch active banners for homepage
+  const [banners, setBanners] = useState([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const [cmsData, catData, brandData, testData] = await Promise.all([
+        const [cmsData, catData, brandData, testData, bannerData] = await Promise.all([
           cmsApi.getContent(),
           serviceApi.getCategories(),
           brandApi.getBrands(),
-          testimonialApi.getTestimonials()
+          testimonialApi.getTestimonials(),
+          bannerApi.getBanners().catch(() => []) // Safely load banners
         ]);
 
         if (cmsData.hero) {
@@ -57,6 +62,7 @@ export default function HomePage() {
         setCategories(catData.filter(c => c.isActive !== false));
         setBrands(brandData);
         setTestimonials(testData);
+        setBanners(bannerData || []);
       } catch (err) {
         console.log('Error loading home data:', err);
       } finally {
@@ -66,6 +72,15 @@ export default function HomePage() {
 
     loadAll();
   }, []);
+
+  // Slider Auto Rotation logic (rotate every 4 seconds)
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % banners.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
 
   if (loading) {
     return (
@@ -85,89 +100,102 @@ export default function HomePage() {
     return `${baseUrl}${imagePath}`;
   };
 
+  const handlePrevSlide = () => {
+    if (banners.length === 0) return;
+    setCurrentSlide((prev) => (prev === 0 ? banners.length - 1 : prev - 1));
+  };
+
+  const handleNextSlide = () => {
+    if (banners.length === 0) return;
+    setCurrentSlide((prev) => (prev + 1) % banners.length);
+  };
+
   return (
     <div className="flex flex-col overflow-x-hidden">
-      {/* 1. Rich Hero Section */}
-      <section className="relative bg-slate-900 text-white overflow-hidden py-24 lg:py-32 px-4 sm:px-6 lg:px-8">
-        {/* Dynamic Abstract Gradient Backgrounds */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(20,184,166,0.15),transparent_60%)]"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(6,182,212,0.15),transparent_50%)]"></div>
-        
-        {/* Decorative Grid Pattern */}
-        <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
-
-        <div className="max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-7 flex flex-col items-start gap-6 text-left">
-            <span className="bg-teal-500/20 text-teal-300 border border-teal-500/30 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider">
-              Gadag's Leading Multi-Service Hub
-            </span>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight">
-              {cms.hero.title}
-            </h1>
-            <p className="text-lg sm:text-xl text-slate-300 max-w-2xl leading-relaxed">
-              {cms.hero.subtitle}
-            </p>
-            <div className="flex flex-wrap gap-4 mt-2">
+      {/* Dynamic Banner Slider Section */}
+      <section className="relative w-full bg-slate-950 overflow-hidden aspect-[4/3] md:aspect-[1900/760] min-h-[260px] sm:min-h-[320px]">
+        {banners.length === 0 ? (
+          // Case 5: If no banner exists, show a default placeholder banner
+          <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white p-8 text-center">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(20,184,166,0.15),transparent_60%)]"></div>
+            <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
+            <div className="relative z-10 flex flex-col items-center gap-4 max-w-3xl">
+              <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">Your Trusted Partner for Expert Services</h1>
+              <p className="text-sm sm:text-lg text-slate-300">Professional Appliance Repair, Solar Systems, Water Solutions & Cleanings in Gadag & Surrounding Areas.</p>
               <Link 
                 href="/contact" 
-                className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-4 rounded-full shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30 hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-2 group"
+                className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-3.5 rounded-full shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30 transition-all duration-300 flex items-center gap-2 mt-4"
               >
-                <span>{cms.hero.ctaText}</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <span>Enquire Now</span>
+                <ArrowRight className="w-5 h-5" />
               </Link>
-              <Link 
-                href="/services" 
-                className="bg-slate-800 hover:bg-slate-750 text-white font-semibold px-8 py-4 rounded-full border border-slate-700 transition-all duration-300"
-              >
-                Explore Services
-              </Link>
-            </div>
-
-            {/* Quick Metrics Bar */}
-            <div className="grid grid-cols-3 gap-6 sm:gap-8 pt-6 border-t border-slate-800 mt-6 w-full max-w-lg">
-              <div>
-                <span className="block text-2xl sm:text-3xl font-extrabold text-teal-400">10k+</span>
-                <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Happy Clients</span>
-              </div>
-              <div>
-                <span className="block text-2xl sm:text-3xl font-extrabold text-teal-400">100%</span>
-                <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Genuine Parts</span>
-              </div>
-              <div>
-                <span className="block text-2xl sm:text-3xl font-extrabold text-teal-400">24/7</span>
-                <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Lead Intake</span>
-              </div>
             </div>
           </div>
+        ) : (
+          <>
+            {/* Banner list */}
+            <div className="relative w-full h-full flex transition-transform duration-500 ease-in-out" style={{ height: '100%' }}>
+              {banners.map((banner, idx) => (
+                <div 
+                  key={banner._id} 
+                  className={`absolute inset-0 w-full h-full transition-opacity duration-700 ease-in-out ${idx === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                >
+                  {/* Banner Image covers full area without distortion */}
+                  <img 
+                    src={getCategoryImageUrl(banner.image)} 
+                    alt={banner.title} 
+                    className="w-full h-full object-cover select-none"
+                  />
+                  {/* Dark overlay for readability */}
+                  <div className="absolute inset-0 bg-slate-950/45 md:bg-slate-950/30"></div>
+                  
+                  {/* CTA overlay positioned at the lower region */}
+                  <div className="absolute bottom-10 sm:bottom-14 md:bottom-20 lg:bottom-24 left-6 sm:left-12 md:left-20 lg:left-32 z-20">
+                    <Link 
+                      href="/contact" 
+                      className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-extrabold px-6 py-2.5 sm:px-8 sm:py-3.5 rounded-full shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30 hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-2 w-fit text-xs sm:text-sm group border border-white/10"
+                    >
+                      <span>Enquire Now</span>
+                      <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-          <div className="lg:col-span-5 relative flex justify-center">
-            {/* Visual Premium Card */}
-            <div className="relative bg-gradient-to-tr from-teal-600/10 to-cyan-500/10 border border-slate-700/50 p-8 rounded-3xl backdrop-blur-sm max-w-md w-full shadow-2xl flex flex-col gap-6">
-              <div className="flex justify-between items-center">
-                <div className="flex gap-1 text-yellow-400">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 fill-current" />
+            {/* Navigation buttons: Displayed only if there's more than one banner */}
+            {banners.length > 1 && (
+              <>
+                <button 
+                  onClick={handlePrevSlide} 
+                  className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-2 sm:p-3 rounded-full bg-slate-900/60 hover:bg-teal-500/90 text-white transition-all backdrop-blur-sm cursor-pointer shadow-lg hover:scale-105 border border-white/10"
+                  aria-label="Previous Slide"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+                <button 
+                  onClick={handleNextSlide} 
+                  className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-2 sm:p-3 rounded-full bg-slate-900/60 hover:bg-teal-500/90 text-white transition-all backdrop-blur-sm cursor-pointer shadow-lg hover:scale-105 border border-white/10"
+                  aria-label="Next Slide"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+
+                {/* Pagination Indicators / Dots */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-2">
+                  {banners.map((_, idx) => (
+                    <button 
+                      key={idx}
+                      onClick={() => setCurrentSlide(idx)}
+                      className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${idx === currentSlide ? 'bg-teal-400 w-6' : 'bg-white/50 hover:bg-white'}`}
+                      aria-label={`Go to slide ${idx + 1}`}
+                    ></button>
                   ))}
                 </div>
-                <span className="text-xs text-teal-400 font-bold bg-teal-400/10 px-2.5 py-1 rounded-full">Top Rated</span>
-              </div>
-              
-              <p className="text-slate-300 italic text-sm leading-relaxed">
-                "Outstanding cooling service for our multi-split systems. Fast diagnostics, honest pricing, and highly reliable engineers."
-              </p>
-
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-800">
-                <div className="w-10 h-10 rounded-full bg-teal-500 text-white font-bold flex items-center justify-center shadow-lg">
-                  SM
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-white">Suresh M. Hegde</h4>
-                  <p className="text-xs text-slate-400">Gadag Resident</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+              </>
+            )}
+          </>
+        )}
       </section>
 
       {/* 2. Services Highlights */}
