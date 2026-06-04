@@ -33,6 +33,7 @@ app.use('/api/inquiries', require('./routes/inquiryRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/training', require('./routes/trainingRoutes'));
 app.use('/api/banners', require('./routes/bannerRoutes'));
+app.use('/api/awards', require('./routes/awardRoutes'));
 
 // Fallback base route
 app.get('/', (req, res) => {

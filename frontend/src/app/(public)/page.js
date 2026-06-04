@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { cmsApi, serviceApi, brandApi, testimonialApi, bannerApi } from '@/utils/api';
-import { Shield, Settings, Zap, Smile, ArrowRight, Star, Heart, CheckCircle } from 'lucide-react';
+import { cmsApi, serviceApi, brandApi, testimonialApi, bannerApi, awardsApi } from '@/utils/api';
+import { Shield, Settings, Zap, Smile, ArrowRight, Star, Heart, CheckCircle, Trophy, X } from 'lucide-react';
 
 export default function HomePage() {
   const [cms, setCms] = useState({
@@ -39,15 +39,22 @@ export default function HomePage() {
   const [banners, setBanners] = useState([]);
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  // Fetch active awards
+  const [awards, setAwards] = useState([]);
+  const [awardsStartIndex, setAwardsStartIndex] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(3);
+  const [selectedAwardImage, setSelectedAwardImage] = useState(null);
+
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const [cmsData, catData, brandData, testData, bannerData] = await Promise.all([
+        const [cmsData, catData, brandData, testData, bannerData, awardsData] = await Promise.all([
           cmsApi.getContent(),
           serviceApi.getCategories(),
           brandApi.getBrands(),
           testimonialApi.getTestimonials(),
-          bannerApi.getBanners().catch(() => []) // Safely load banners
+          bannerApi.getBanners().catch(() => []), // Safely load banners
+          awardsApi.getAwards().catch(() => []) // Safely load awards
         ]);
 
         if (cmsData.hero) {
@@ -63,6 +70,7 @@ export default function HomePage() {
         setBrands(brandData);
         setTestimonials(testData);
         setBanners(bannerData || []);
+        setAwards(awardsData || []);
       } catch (err) {
         console.log('Error loading home data:', err);
       } finally {
@@ -81,6 +89,51 @@ export default function HomePage() {
     }, 4000);
     return () => clearInterval(interval);
   }, [banners]);
+
+  // Awards responsive visible count logic
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 640) {
+        setVisibleCount(1);
+      } else if (window.innerWidth < 1024) {
+        setVisibleCount(2);
+      } else {
+        setVisibleCount(3);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Awards Auto Rotation logic (rotate every 5 seconds)
+  useEffect(() => {
+    if (awards.length <= visibleCount) return;
+    const interval = setInterval(() => {
+      setAwardsStartIndex((prev) => (prev + 1) % awards.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [awards, visibleCount]);
+
+  const handlePrevAward = () => {
+    setAwardsStartIndex((prev) => (prev === 0 ? awards.length - 1 : prev - 1));
+  };
+
+  const handleNextAward = () => {
+    setAwardsStartIndex((prev) => (prev + 1) % awards.length);
+  };
+
+  const getSlicedAwards = () => {
+    if (awards.length <= visibleCount) {
+      return awards;
+    }
+    const sliced = [];
+    for (let i = 0; i < visibleCount; i++) {
+      const index = (awardsStartIndex + i) % awards.length;
+      sliced.push(awards[index]);
+    }
+    return sliced;
+  };
 
   if (loading) {
     return (
@@ -354,6 +407,66 @@ export default function HomePage() {
         </section>
       )}
 
+      {/* 5.5 Awards Section */}
+      {awards.length > 0 && (
+        <section id="awards" className="py-20 px-4 sm:px-6 lg:px-8 bg-white text-slate-900 border-b border-neutral-100 scroll-mt-20">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center max-w-3xl mx-auto mb-16 flex flex-col items-center gap-3">
+              <span className="text-teal-600 font-bold text-xs uppercase tracking-widest bg-teal-50 px-3.5 py-1.5 rounded-full border border-teal-100 flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Accredited Excellence</span>
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
+                Awards & Certifications
+              </h2>
+              <p className="text-slate-600 leading-relaxed text-sm sm:text-base">
+                Showcasing our accredited recognitions, professional certifications, and industry milestones that reflect our commitment to quality.
+              </p>
+            </div>
+
+            <div className="relative w-full overflow-hidden px-2 sm:px-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
+                {getSlicedAwards().map((award) => (
+                  <div 
+                    key={award._id} 
+                    onClick={() => setSelectedAwardImage(getCategoryImageUrl(award.image))}
+                    className="group relative bg-white border border-neutral-200/70 p-3 rounded-2xl shadow-sm hover:shadow-xl hover:border-teal-500/20 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer w-full max-w-[280px] aspect-[1086/1448] overflow-hidden flex items-center justify-center bg-slate-50/50"
+                  >
+                    <img 
+                      src={getCategoryImageUrl(award.image)} 
+                      alt="Award" 
+                      className="w-full h-full object-cover rounded-xl group-hover:scale-102 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center rounded-2xl">
+                      <span className="bg-white/95 text-teal-600 text-xs font-extrabold tracking-wider px-4 py-2 rounded-full shadow-lg backdrop-blur-xs transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">View Larger</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {awards.length > visibleCount && (
+                <>
+                  <button 
+                    onClick={handlePrevAward} 
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-30 p-2 sm:p-2.5 rounded-full bg-slate-900/10 hover:bg-teal-500 text-slate-700 hover:text-white transition-all cursor-pointer shadow border border-neutral-200/30"
+                    aria-label="Previous Award"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"></path></svg>
+                  </button>
+                  <button 
+                    onClick={handleNextAward} 
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-30 p-2 sm:p-2.5 rounded-full bg-slate-900/10 hover:bg-teal-500 text-slate-700 hover:text-white transition-all cursor-pointer shadow border border-neutral-200/30"
+                    aria-label="Next Award"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path></svg>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 6. Testimonials Section */}
       {testimonials.length > 0 && (
         <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-50 text-slate-900 border-b border-neutral-200">
@@ -417,6 +530,28 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      {/* Lightbox Modal */}
+      {selectedAwardImage && (
+        <div 
+          className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setSelectedAwardImage(null)}
+        >
+          <div className="relative max-w-2xl max-h-[85vh] w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="absolute -top-12 right-0 text-white hover:text-teal-400 p-2 transition-colors cursor-pointer"
+              onClick={() => setSelectedAwardImage(null)}
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img 
+              src={selectedAwardImage} 
+              alt="Award Full Size" 
+              className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl border border-white/10"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

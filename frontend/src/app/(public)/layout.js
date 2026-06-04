@@ -102,6 +102,7 @@ export default function PublicLayout({ children }) {
           <nav className="hidden md:flex items-center gap-8 font-medium text-slate-600">
             <Link href="/" className="hover:text-teal-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-teal-500 hover:after:w-full after:transition-all">Home</Link>
             <Link href="/about" className="hover:text-teal-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-teal-500 hover:after:w-full after:transition-all">About Us</Link>
+            <Link href="/#awards" className="hover:text-teal-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-teal-500 hover:after:w-full after:transition-all">Awards</Link>
             <Link href="/services" className="hover:text-teal-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-teal-500 hover:after:w-full after:transition-all">Services</Link>
             <Link href="/contact" className="hover:text-teal-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-teal-500 hover:after:w-full after:transition-all">Contact Us</Link>
             
@@ -135,6 +136,13 @@ export default function PublicLayout({ children }) {
               className="text-lg font-semibold text-slate-800 hover:text-teal-600 py-1 transition-colors"
             >
               About Us
+            </Link>
+            <Link 
+              href="/#awards" 
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-lg font-semibold text-slate-800 hover:text-teal-600 py-1 transition-colors"
+            >
+              Awards
             </Link>
             <Link 
               href="/services" 

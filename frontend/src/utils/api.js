@@ -202,3 +202,22 @@ export const bannerApi = {
     apiCall(`/banners/${id}`, { method: 'DELETE' }),
 };
 
+export const awardsApi = {
+  getAwards: () =>
+    apiCall('/awards', { method: 'GET' }),
+  getAllAwards: () =>
+    apiCall('/awards/all', { method: 'GET' }),
+  createAward: (data) =>
+    apiCall('/awards', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateAward: (id, data) =>
+    apiCall(`/awards/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteAward: (id) =>
+    apiCall(`/awards/${id}`, { method: 'DELETE' }),
+};
+
