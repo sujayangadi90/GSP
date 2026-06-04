@@ -104,6 +104,7 @@ export default function PublicLayout({ children }) {
             <Link href="/about" className="hover:text-teal-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-teal-500 hover:after:w-full after:transition-all">About Us</Link>
             <Link href="/#awards" className="hover:text-teal-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-teal-500 hover:after:w-full after:transition-all">Awards</Link>
             <Link href="/services" className="hover:text-teal-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-teal-500 hover:after:w-full after:transition-all">Services</Link>
+            <Link href="/gallery" className="hover:text-teal-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-teal-500 hover:after:w-full after:transition-all">Gallery</Link>
             <Link href="/contact" className="hover:text-teal-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-teal-500 hover:after:w-full after:transition-all">Contact Us</Link>
             
             <Link href="/contact" className="bg-gradient-to-r from-teal-600 to-cyan-500 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:shadow-lg hover:shadow-teal-500/25 hover:-translate-y-0.5 transition-all duration-300">
@@ -150,6 +151,13 @@ export default function PublicLayout({ children }) {
               className="text-lg font-semibold text-slate-800 hover:text-teal-600 py-1 transition-colors"
             >
               Services
+            </Link>
+            <Link 
+              href="/gallery" 
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-lg font-semibold text-slate-800 hover:text-teal-600 py-1 transition-colors"
+            >
+              Gallery
             </Link>
             <Link 
               href="/contact" 

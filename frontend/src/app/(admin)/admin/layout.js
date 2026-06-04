@@ -68,6 +68,7 @@ export default function AdminLayout({ children }) {
     { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Banner Images', path: '/admin/banners', icon: ImageIcon },
     { name: 'Awards', path: '/admin/awards', icon: Trophy },
+    { name: 'Gallery', path: '/admin/gallery', icon: ImageIcon },
     { name: 'CMS Editor', path: '/admin/cms', icon: Settings },
     { name: 'Services & Cats', path: '/admin/services', icon: Cpu },
     { name: 'Brands Manager', path: '/admin/brands', icon: Bookmark },

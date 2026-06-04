@@ -34,6 +34,7 @@ app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/training', require('./routes/trainingRoutes'));
 app.use('/api/banners', require('./routes/bannerRoutes'));
 app.use('/api/awards', require('./routes/awardRoutes'));
+app.use('/api/gallery', require('./routes/galleryRoutes'));
 
 // Fallback base route
 app.get('/', (req, res) => {

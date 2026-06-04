@@ -221,3 +221,22 @@ export const awardsApi = {
     apiCall(`/awards/${id}`, { method: 'DELETE' }),
 };
 
+export const galleryApi = {
+  getGalleryImages: () =>
+    apiCall('/gallery', { method: 'GET' }),
+  getAllGalleryImages: () =>
+    apiCall('/gallery/all', { method: 'GET' }),
+  createGalleryImage: (data) =>
+    apiCall('/gallery', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateGalleryImage: (id, data) =>
+    apiCall(`/gallery/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteGalleryImage: (id) =>
+    apiCall(`/gallery/${id}`, { method: 'DELETE' }),
+};
+
