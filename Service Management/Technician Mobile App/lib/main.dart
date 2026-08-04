@@ -39,11 +39,12 @@ class AuthWrapper extends StatefulWidget {
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
+const String _apiUrl = 'https://app.globalservicepoint.com/api';
+
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _isLoading = true;
   String? _token;
   Map<String, dynamic>? _userData;
-  String _apiUrl = 'http://10.0.2.2:5050/api';
 
   @override
   void initState() {
@@ -55,29 +56,23 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     final userJson = prefs.getString('user');
-    final savedApiUrl = prefs.getString('api_url');
     
     setState(() {
       _token = token;
       if (userJson != null) {
         _userData = jsonDecode(userJson);
       }
-      if (savedApiUrl != null) {
-        _apiUrl = savedApiUrl;
-      }
       _isLoading = false;
     });
   }
 
-  Future<void> _saveLogin(String token, Map<String, dynamic> user, String apiUrl) async {
+  Future<void> _saveLogin(String token, Map<String, dynamic> user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', token);
     await prefs.setString('user', jsonEncode(user));
-    await prefs.setString('api_url', apiUrl);
     setState(() {
       _token = token;
       _userData = user;
-      _apiUrl = apiUrl;
     });
   }
 
@@ -100,7 +95,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
     
     if (_token == null || _userData == null) {
-      return LoginScreen(onLoginSuccess: _saveLogin, initialApiUrl: _apiUrl);
+      return LoginScreen(onLoginSuccess: _saveLogin);
     }
     
     return DashboardScreen(
@@ -113,10 +108,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
 }
 
 class LoginScreen extends StatefulWidget {
-  final Function(String, Map<String, dynamic>, String) onLoginSuccess;
-  final String initialApiUrl;
+  final Function(String, Map<String, dynamic>) onLoginSuccess;
 
-  const LoginScreen({super.key, required this.onLoginSuccess, required this.initialApiUrl});
+  const LoginScreen({super.key, required this.onLoginSuccess});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -126,15 +120,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
-  late TextEditingController _apiUrlController;
   bool _isLoading = false;
   String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _apiUrlController = TextEditingController(text: widget.initialApiUrl);
-  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -146,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('${_apiUrlController.text}/auth/login'),
+        Uri.parse('$_apiUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': _codeController.text.trim(),
@@ -160,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (data['role'] != 'technician') {
           throw Exception('Only technician credentials can sign in here.');
         }
-        widget.onLoginSuccess(data['token'], data, _apiUrlController.text);
+        widget.onLoginSuccess(data['token'], data);
       } else {
         setState(() {
           _errorMessage = data['message'] ?? 'Login failed. Please verify credentials.';
@@ -168,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Network error: Make sure database/backend is active at: ${_apiUrlController.text}';
+        _errorMessage = 'Network error: Make sure database/backend is active at: $_apiUrl';
       });
     } finally {
       setState(() {
@@ -236,18 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                   ),
                   validator: (val) => val == null || val.isEmpty ? 'Enter password' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _apiUrlController,
-                  decoration: const InputDecoration(
-                    labelText: 'API Gateway Endpoint',
-                    prefixIcon: Icon(Icons.settings),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                  ),
-                  validator: (val) => val == null || val.isEmpty ? 'Enter API Endpoint' : null,
-                ),
-                const SizedBox(height: 24),
+                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _submit,
                   style: ElevatedButton.styleFrom(
