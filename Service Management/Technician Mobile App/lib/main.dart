@@ -223,7 +223,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                   ),
                   validator: (val) => val == null || val.isEmpty ? 'Enter password' : null,
-                 const SizedBox(height: 24),
+                ),
+                const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _submit,
                   style: ElevatedButton.styleFrom(
