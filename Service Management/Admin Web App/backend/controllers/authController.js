@@ -22,9 +22,9 @@ const loginUser = async (req, res) => {
     // Check if the username looks like an email or a code
     let user;
     if (username.includes('@')) {
-      user = await User.findOne({ email: username });
+      user = await User.findOne({ email: username.trim().toLowerCase() });
     } else {
-      user = await User.findOne({ code: username });
+      user = await User.findOne({ code: username.trim().toUpperCase() });
     }
 
     if (!user) {
