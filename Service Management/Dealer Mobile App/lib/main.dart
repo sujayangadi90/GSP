@@ -517,8 +517,6 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   final _custCity = TextEditingController();
   final _custPincode = TextEditingController();
 
-  final _prodCategory = TextEditingController();
-  final _prodName = TextEditingController();
   final _prodModel = TextEditingController();
   final _prodSerial = TextEditingController();
   final _prodInvoice = TextEditingController();
@@ -530,6 +528,51 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   String _priority = 'medium';
   File? _selectedInvoice;
   final _picker = ImagePicker();
+
+  // Dynamic lists and selection states
+  List<dynamic> _appliances = [];
+  List<dynamic> _brands = [];
+  String? _selectedApplianceId;
+  String? _selectedApplianceName;
+  String? _selectedBrandName;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAppliances();
+  }
+
+  Future<void> _fetchAppliances() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/appliances?active=true'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _appliances = jsonDecode(res.body);
+        });
+      }
+    } catch (e) {
+      print('Error fetching appliances: $e');
+    }
+  }
+
+  Future<void> _fetchBrands(String applianceId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/brands?appliance=$applianceId&active=true'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _brands = jsonDecode(res.body);
+        });
+      }
+    } catch (e) {
+      print('Error fetching brands: $e');
+    }
+  }
 
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
@@ -559,8 +602,8 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
       request.fields['customer[city]'] = _custCity.text.trim();
       request.fields['customer[pincode]'] = _custPincode.text.trim();
 
-      request.fields['product[category]'] = _prodCategory.text.trim();
-      request.fields['product[name]'] = _prodName.text.trim();
+      request.fields['product[category]'] = _selectedApplianceName ?? '';
+      request.fields['product[name]'] = _selectedBrandName ?? '';
       request.fields['product[modelNumber]'] = _prodModel.text.trim();
       request.fields['product[serialNumber]'] = _prodSerial.text.trim();
       request.fields['product[invoiceNumber]'] = _prodInvoice.text.trim();
@@ -629,8 +672,57 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                   
                   const SizedBox(height: 24),
                   _buildSectionHeader('Product Information'),
-                  _buildTextField(_prodCategory, 'Product Category (e.g. AC, TV)'),
-                  _buildTextField(_prodName, 'Product Name'),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedApplianceId,
+                      decoration: const InputDecoration(
+                        labelText: 'Select Appliance',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                      ),
+                      items: _appliances.map<DropdownMenuItem<String>>((app) {
+                        return DropdownMenuItem<String>(
+                          value: app['_id'] as String,
+                          child: Text(app['name'] as String),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          final selectedApp = _appliances.firstWhere((app) => app['_id'] == val);
+                          setState(() {
+                            _selectedApplianceId = val;
+                            _selectedApplianceName = selectedApp['name'] as String;
+                            _brands = [];
+                            _selectedBrandName = null;
+                          });
+                          _fetchBrands(val);
+                        }
+                      },
+                      validator: (val) => val == null ? 'Please select an appliance' : null,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedBrandName,
+                      decoration: const InputDecoration(
+                        labelText: 'Select Brand',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                      ),
+                      items: _brands.map<DropdownMenuItem<String>>((brand) {
+                        return DropdownMenuItem<String>(
+                          value: brand['name'] as String,
+                          child: Text(brand['name'] as String),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedBrandName = val;
+                        });
+                      },
+                      validator: (val) => val == null ? 'Please select a brand' : null,
+                    ),
+                  ),
                   _buildTextField(_prodModel, 'Model Number'),
                   _buildTextField(_prodSerial, 'Serial Number', required: false),
                   _buildTextField(_prodInvoice, 'Invoice Number', required: false),

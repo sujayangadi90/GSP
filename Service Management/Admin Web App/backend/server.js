@@ -28,6 +28,9 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/dealers', require('./routes/dealerRoutes'));
 app.use('/api/technicians', require('./routes/technicianRoutes'));
 app.use('/api/tickets', require('./routes/ticketRoutes'));
+app.use('/api/appliances', require('./routes/applianceRoutes'));
+app.use('/api/brands', require('./routes/brandRoutes'));
+app.use('/api/followups', require('./routes/followUpRoutes'));
 
 // Fallback base route
 app.get('/', (req, res) => {

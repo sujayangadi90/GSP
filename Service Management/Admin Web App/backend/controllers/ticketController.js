@@ -1,5 +1,8 @@
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
+const Appliance = require('../models/Appliance');
+const Brand = require('../models/Brand');
+const FollowUp = require('../models/FollowUp');
 
 // @desc    Create a new request (Installation or Service)
 // @route   POST /api/tickets
@@ -290,6 +293,37 @@ const closeTicket = async (req, res) => {
     });
 
     const updatedTicket = await ticket.save();
+
+    // Auto-generate follow-up record
+    try {
+      const applianceName = ticket.product.category || '';
+      const brandName = ticket.product.name || '';
+
+      const appliance = await Appliance.findOne({ name: { $regex: new RegExp(`^${applianceName.trim()}$`, 'i') } });
+      let followUpDays = 90; // Default if not found
+
+      if (appliance) {
+        const brand = await Brand.findOne({
+          appliance: appliance._id,
+          name: { $regex: new RegExp(`^${brandName.trim()}$`, 'i') }
+        });
+        if (brand) {
+          followUpDays = brand.followUpDays;
+        }
+      }
+
+      const dueAt = new Date();
+      dueAt.setDate(dueAt.getDate() + followUpDays);
+
+      await FollowUp.create({
+        ticket: ticket._id,
+        dueAt,
+        status: 'new'
+      });
+    } catch (followUpError) {
+      console.error('Failed to auto-create follow-up:', followUpError.message);
+    }
+
     res.json(updatedTicket);
   } catch (error) {
     res.status(500).json({ message: error.message });

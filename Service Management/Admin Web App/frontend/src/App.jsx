@@ -18,7 +18,13 @@ import {
   X,
   TrendingUp,
   MapPin,
-  ClipboardList
+  ClipboardList,
+  Settings,
+  Layers,
+  Calendar,
+  Trash2,
+  Edit,
+  Power
 } from 'lucide-react';
 
 const API_BASE = '/api';
@@ -52,6 +58,22 @@ export default function App() {
   const [assignNotes, setAssignNotes] = useState('');
   const [verificationForm, setVerificationForm] = useState({ status: 'approved', reason: '' });
   const [closureRemarks, setClosureRemarks] = useState('');
+
+  // Sidebar / Submenu states
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Settings: Appliances & Brands states
+  const [appliances, setAppliances] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [applianceForm, setApplianceForm] = useState(null); // null or { id?, name }
+  const [brandForm, setBrandForm] = useState(null); // null or { id?, name, applianceId, followUpDays }
+
+  // Follow-ups states
+  const [followUps, setFollowUps] = useState([]);
+  const [followUpFilters, setFollowUpFilters] = useState({
+    fromDate: new Date().toISOString().split('T')[0],
+    toDate: new Date().toISOString().split('T')[0]
+  });
 
   // Filters & Searches
   const [dealerSearch, setDealerSearch] = useState('');
@@ -156,12 +178,143 @@ export default function App() {
     }
   };
 
+  const fetchAppliances = async () => {
+    try {
+      const data = await apiFetch('/appliances');
+      setAppliances(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchBrands = async () => {
+    try {
+      const data = await apiFetch('/brands');
+      setBrands(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchFollowUps = async () => {
+    try {
+      const data = await apiFetch(`/followups?fromDate=${followUpFilters.fromDate}&toDate=${followUpFilters.toDate}`);
+      setFollowUps(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Run searches / filters trigger reload
   useEffect(() => {
     if (user) {
-      fetchData();
+      if (activeTab === 'appliances_brands') {
+        fetchAppliances();
+        fetchBrands();
+      } else if (activeTab === 'followups') {
+        fetchFollowUps();
+      } else {
+        fetchData();
+      }
     }
-  }, [dealerSearch, techSearch, ticketFilters, activeTab]);
+  }, [dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters]);
+
+  // Appliance Actions
+  const saveAppliance = async (e) => {
+    e.preventDefault();
+    try {
+      if (applianceForm.id) {
+        await apiFetch(`/appliances/${applianceForm.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name: applianceForm.name })
+        });
+      } else {
+        await apiFetch('/appliances', {
+          method: 'POST',
+          body: JSON.stringify({ name: applianceForm.name })
+        });
+      }
+      setApplianceForm(null);
+      fetchAppliances();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const toggleApplianceStatus = async (id) => {
+    try {
+      await apiFetch(`/appliances/${id}/toggle`, { method: 'PATCH' });
+      fetchAppliances();
+      fetchBrands();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const deleteAppliance = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this appliance? This will fail if brands are linked.')) return;
+    try {
+      await apiFetch(`/appliances/${id}`, { method: 'DELETE' });
+      fetchAppliances();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Brand Actions
+  const saveBrand = async (e) => {
+    e.preventDefault();
+    try {
+      if (brandForm.id) {
+        await apiFetch(`/brands/${brandForm.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name: brandForm.name, followUpDays: brandForm.followUpDays })
+        });
+      } else {
+        await apiFetch('/brands', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: brandForm.name,
+            applianceId: brandForm.applianceId,
+            followUpDays: brandForm.followUpDays
+          })
+        });
+      }
+      setBrandForm(null);
+      fetchBrands();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const toggleBrandStatus = async (id) => {
+    try {
+      await apiFetch(`/brands/${id}/toggle`, { method: 'PATCH' });
+      fetchBrands();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const deleteBrand = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this brand?')) return;
+    try {
+      await apiFetch(`/brands/${id}`, { method: 'DELETE' });
+      fetchBrands();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Follow-up Actions
+  const markFollowUpClosed = async (id) => {
+    try {
+      await apiFetch(`/followups/${id}/close`, { method: 'PATCH' });
+      fetchFollowUps();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   // Dealer actions
   const saveDealer = async (e) => {
@@ -385,6 +538,38 @@ export default function App() {
             <Wrench className="w-5 h-5" />
             Manage Technicians
           </button>
+          <button
+            onClick={() => setActiveTab('followups')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'followups' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <Calendar className="w-5 h-5" />
+            Follow-ups
+          </button>
+          <div>
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            >
+              <span className="flex items-center gap-3">
+                <Settings className="w-5 h-5" />
+                Settings
+              </span>
+              <span>
+                {settingsOpen ? '▲' : '▼'}
+              </span>
+            </button>
+            {(settingsOpen || activeTab === 'appliances_brands') && (
+              <div className="pl-6 mt-1 space-y-1">
+                <button
+                  onClick={() => setActiveTab('appliances_brands')}
+                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'appliances_brands' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                >
+                  <Layers className="w-4 h-4" />
+                  Appliances & Brands
+                </button>
+              </div>
+            )}
+          </div>
         </aside>
 
         {/* Dashboard / Workspace Area */}
@@ -800,6 +985,231 @@ export default function App() {
             </div>
           )}
 
+          {/* Settings Tab (Appliances & Brands) */}
+          {activeTab === 'appliances_brands' && (
+            <div className="space-y-8">
+              <div>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight">Appliances & Brands Master</h1>
+                <p className="text-slate-400 mt-1">Manage categories of appliances and their associated brands & follow-up policies</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Appliances Panel */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-violet-400" />
+                      Appliance Categories
+                    </h3>
+                    <button
+                      onClick={() => setApplianceForm({ name: '' })}
+                      className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" /> Add Appliance
+                    </button>
+                  </div>
+
+                  <div className="divide-y divide-slate-800 max-h-[500px] overflow-y-auto">
+                    {appliances.length === 0 ? (
+                      <p className="text-slate-500 py-6 text-center text-sm">No appliances added yet</p>
+                    ) : (
+                      appliances.map(app => (
+                        <div key={app._id} className="py-3 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition duration-150">
+                          <div>
+                            <p className="text-sm font-bold text-white">{app.name}</p>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${app.isActive ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+                              {app.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setApplianceForm({ id: app._id, name: app.name })}
+                              className="text-slate-400 hover:text-white p-1"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => toggleApplianceStatus(app._id)}
+                              className={`p-1 ${app.isActive ? 'text-emerald-500' : 'text-red-500'}`}
+                            >
+                              <Power className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteAppliance(app._id)}
+                              className="text-red-500 hover:text-red-400 p-1"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Brands Panel */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <SlidersHorizontal className="w-5 h-5 text-indigo-400" />
+                      Brand Configurations
+                    </h3>
+                    <button
+                      disabled={appliances.length === 0}
+                      onClick={() => setBrandForm({ name: '', applianceId: appliances[0]?._id, followUpDays: 90 })}
+                      className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4" /> Add Brand
+                    </button>
+                  </div>
+
+                  <div className="divide-y divide-slate-800 max-h-[500px] overflow-y-auto">
+                    {brands.length === 0 ? (
+                      <p className="text-slate-500 py-6 text-center text-sm">No brands added yet</p>
+                    ) : (
+                      brands.map(b => (
+                        <div key={b._id} className="py-3 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition duration-150">
+                          <div>
+                            <p className="text-sm font-bold text-white">{b.name}</p>
+                            <p className="text-xs text-slate-400">Appliance: {b.appliance?.name || 'N/A'}</p>
+                            <p className="text-xs text-violet-400 font-medium">Follow-up: {b.followUpDays} Days</p>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${b.isActive ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+                              {b.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setBrandForm({ id: b._id, name: b.name, followUpDays: b.followUpDays })}
+                              className="text-slate-400 hover:text-white p-1"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => toggleBrandStatus(b._id)}
+                              className={`p-1 ${b.isActive ? 'text-emerald-500' : 'text-red-500'}`}
+                            >
+                              <Power className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteBrand(b._id)}
+                              className="text-red-500 hover:text-red-400 p-1"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Follow-ups Tab */}
+          {activeTab === 'followups' && (
+            <div className="space-y-8">
+              <div>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight">Follow-ups Dashboard</h1>
+                <p className="text-slate-400 mt-1">Manage scheduled customer follow-up actions</p>
+              </div>
+
+              {/* Filters */}
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-wrap gap-4 items-end shadow-xl">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">From Date</label>
+                  <input
+                    type="date"
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    value={followUpFilters.fromDate}
+                    onChange={e => setFollowUpFilters({ ...followUpFilters, fromDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">To Date</label>
+                  <input
+                    type="date"
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    value={followUpFilters.toDate}
+                    onChange={e => setFollowUpFilters({ ...followUpFilters, toDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Listing Table */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800/50 border-b border-slate-800">
+                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Due Date</th>
+                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</th>
+                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Mobile</th>
+                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Appliance</th>
+                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Brand</th>
+                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Address</th>
+                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {followUps.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="p-8 text-center text-slate-500 text-sm">No follow-ups found for the selected date range.</td>
+                        </tr>
+                      ) : (
+                        followUps.map(f => (
+                          <tr key={f._id} className="hover:bg-slate-800/20 transition">
+                            <td className="p-4 text-sm font-semibold text-slate-200">
+                              {new Date(f.dueAt).toLocaleDateString('en-GB')}
+                            </td>
+                            <td className="p-4 text-sm text-white font-medium">
+                              {f.ticket?.customer?.name || 'N/A'}
+                            </td>
+                            <td className="p-4 text-sm text-slate-300">
+                              {f.ticket?.customer?.mobile || 'N/A'}
+                            </td>
+                            <td className="p-4 text-sm text-slate-300">
+                              {f.ticket?.product?.category || 'N/A'}
+                            </td>
+                            <td className="p-4 text-sm text-slate-300">
+                              {f.ticket?.product?.name || 'N/A'}
+                            </td>
+                            <td className="p-4 text-sm text-slate-400 truncate max-w-xs">
+                              {f.ticket?.customer?.address || 'N/A'}
+                            </td>
+                            <td className="p-4 text-sm">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${f.status === 'new' ? 'bg-violet-950 text-violet-300' : 'bg-emerald-950 text-emerald-400'}`}>
+                                {f.status === 'new' ? 'New' : 'Closed'}
+                              </span>
+                            </td>
+                            <td className="p-4 text-sm text-right space-x-2">
+                              {f.ticket && (
+                                <button
+                                  onClick={() => setSelectedTicket(f.ticket)}
+                                  className="text-xs font-bold text-violet-400 hover:text-violet-300 cursor-pointer"
+                                >
+                                  View Ticket
+                                </button>
+                              )}
+                              {f.status === 'new' && (
+                                <button
+                                  onClick={() => markFollowUpClosed(f._id)}
+                                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold cursor-pointer"
+                                >
+                                  Mark Closed
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
@@ -1120,6 +1530,87 @@ export default function App() {
         </div>
       )}
 
+      {/* Appliance Form Modal */}
+      {applianceForm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+              <h3 className="font-bold text-white">{applianceForm.id ? 'Edit Appliance Name' : 'Add New Appliance'}</h3>
+              <button onClick={() => setApplianceForm(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={saveAppliance} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Appliance Name</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Washing Machine"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                  value={applianceForm.name}
+                  onChange={e => setApplianceForm({ ...applianceForm, name: e.target.value })}
+                />
+              </div>
+              <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 py-2.5 rounded-lg text-sm font-bold text-white transition">
+                {applianceForm.id ? 'Save Changes' : 'Create Appliance'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Brand Form Modal */}
+      {brandForm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+              <h3 className="font-bold text-white">{brandForm.id ? 'Edit Brand Config' : 'Add Brand Configuration'}</h3>
+              <button onClick={() => setBrandForm(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={saveBrand} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Brand Name</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Samsung"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                  value={brandForm.name}
+                  onChange={e => setBrandForm({ ...brandForm, name: e.target.value })}
+                />
+              </div>
+              {!brandForm.id && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Select Appliance Category</label>
+                  <select
+                    required
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                    value={brandForm.applianceId}
+                    onChange={e => setBrandForm({ ...brandForm, applianceId: e.target.value })}
+                  >
+                    {appliances.map(app => (
+                      <option key={app._id} value={app._id}>{app.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Follow-up Days</label>
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                  value={brandForm.followUpDays}
+                  onChange={e => setBrandForm({ ...brandForm, followUpDays: e.target.value })}
+                />
+              </div>
+              <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 py-2.5 rounded-lg text-sm font-bold text-white transition">
+                {brandForm.id ? 'Save Configuration' : 'Create Brand'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
