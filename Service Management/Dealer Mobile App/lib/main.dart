@@ -515,7 +515,6 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   final _custMobile = TextEditingController();
   final _custAlt = TextEditingController();
   final _custAddress = TextEditingController();
-  final _custCity = TextEditingController();
   final _custPincode = TextEditingController();
 
   final _prodModel = TextEditingController();
@@ -533,14 +532,33 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   // Dynamic lists and selection states
   List<dynamic> _appliances = [];
   List<dynamic> _brands = [];
+  List<dynamic> _cities = [];
   String? _selectedApplianceId;
   String? _selectedApplianceName;
   String? _selectedBrandName;
+  String? _selectedCity;
 
   @override
   void initState() {
     super.initState();
     _fetchAppliances();
+    _fetchCities();
+  }
+
+  Future<void> _fetchCities() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/cities?active=true'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _cities = jsonDecode(res.body);
+        });
+      }
+    } catch (e) {
+      print('Error fetching cities: $e');
+    }
   }
 
   Future<void> _fetchAppliances() async {
@@ -600,7 +618,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
       request.fields['customer[mobile]'] = _custMobile.text.trim();
       request.fields['customer[alternateMobile]'] = _custAlt.text.trim();
       request.fields['customer[address]'] = _custAddress.text.trim();
-      request.fields['customer[city]'] = _custCity.text.trim();
+      request.fields['customer[city]'] = _selectedCity ?? '';
       request.fields['customer[pincode]'] = _custPincode.text.trim();
 
       request.fields['product[category]'] = _selectedApplianceName ?? '';
@@ -698,7 +716,28 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                     },
                   ),
                   _buildTextField(_custAddress, 'Address'),
-                  _buildTextField(_custCity, 'City'),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedCity,
+                      decoration: const InputDecoration(
+                        labelText: 'Select City *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                      ),
+                      items: _cities.map<DropdownMenuItem<String>>((city) {
+                        return DropdownMenuItem<String>(
+                          value: city['name'] as String,
+                          child: Text(city['name'] as String),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedCity = val;
+                        });
+                      },
+                      validator: (val) => val == null || val.isEmpty ? 'Please select a city' : null,
+                    ),
+                  ),
                   _buildTextField(_custPincode, 'Pincode', keyboardType: TextInputType.number),
                   
                   const SizedBox(height: 24),

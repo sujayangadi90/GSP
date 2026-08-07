@@ -31,6 +31,7 @@ app.use('/api/tickets', require('./routes/ticketRoutes'));
 app.use('/api/appliances', require('./routes/applianceRoutes'));
 app.use('/api/brands', require('./routes/brandRoutes'));
 app.use('/api/followups', require('./routes/followUpRoutes'));
+app.use('/api/cities', require('./routes/cityRoutes'));
 
 // Fallback base route
 app.get('/', (req, res) => {

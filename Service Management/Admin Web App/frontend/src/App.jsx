@@ -100,6 +100,8 @@ export default function App() {
   const [brands, setBrands] = useState([]);
   const [applianceForm, setApplianceForm] = useState(null); // null or { id?, name }
   const [brandForm, setBrandForm] = useState(null); // null or { id?, name, applianceId, followUpDays }
+  const [cities, setCities] = useState([]);
+  const [cityForm, setCityForm] = useState(null); // null or { id?, name }
 
   // Follow-ups states
   const [followUps, setFollowUps] = useState([]);
@@ -229,6 +231,15 @@ export default function App() {
     }
   };
 
+  const fetchCities = async () => {
+    try {
+      const data = await apiFetch('/cities');
+      setCities(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchFollowUps = async () => {
     try {
       const data = await apiFetch(`/followups?fromDate=${followUpFilters.fromDate}&toDate=${followUpFilters.toDate}`);
@@ -244,10 +255,13 @@ export default function App() {
       if (activeTab === 'appliances_brands') {
         fetchAppliances();
         fetchBrands();
+      } else if (activeTab === 'cities') {
+        fetchCities();
       } else if (activeTab === 'followups') {
         fetchFollowUps();
       } else {
         fetchData();
+        fetchCities();
       }
     }
   }, [dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters]);
@@ -334,6 +348,47 @@ export default function App() {
     try {
       await apiFetch(`/brands/${id}`, { method: 'DELETE' });
       fetchBrands();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // City Actions
+  const saveCity = async (e) => {
+    e.preventDefault();
+    try {
+      if (cityForm.id) {
+        await apiFetch(`/cities/${cityForm.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name: cityForm.name })
+        });
+      } else {
+        await apiFetch('/cities', {
+          method: 'POST',
+          body: JSON.stringify({ name: cityForm.name })
+        });
+      }
+      setCityForm(null);
+      fetchCities();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const toggleCityStatus = async (id) => {
+    try {
+      await apiFetch(`/cities/${id}/toggle`, { method: 'PATCH' });
+      fetchCities();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const deleteCity = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this city?')) return;
+    try {
+      await apiFetch(`/cities/${id}`, { method: 'DELETE' });
+      fetchCities();
     } catch (err) {
       alert(err.message);
     }
@@ -673,7 +728,7 @@ export default function App() {
                 {settingsOpen ? '▲' : '▼'}
               </span>
             </button>
-            {(settingsOpen || activeTab === 'appliances_brands') && (
+            {(settingsOpen || activeTab === 'appliances_brands' || activeTab === 'cities') && (
               <div className="pl-6 mt-1 space-y-1">
                 <button
                   onClick={() => setActiveTab('appliances_brands')}
@@ -681,6 +736,13 @@ export default function App() {
                 >
                   <Layers className="w-4 h-4" />
                   Appliances & Brands
+                </button>
+                <button
+                  onClick={() => setActiveTab('cities')}
+                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'cities' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                >
+                  <MapPin className="w-4 h-4" />
+                  Cities
                 </button>
               </div>
             )}
@@ -1231,6 +1293,71 @@ export default function App() {
             </div>
           )}
 
+          {/* Cities Settings Tab */}
+          {activeTab === 'cities' && (
+            <div className="space-y-8">
+              <div>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight">Cities Master Settings</h1>
+                <p className="text-slate-400 mt-1">Manage target coverage cities for installations & support tickets</p>
+              </div>
+
+              <div className="max-w-2xl bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-violet-400" />
+                    Coverage Cities
+                  </h3>
+                  <button
+                    onClick={() => setCityForm({ name: '' })}
+                    className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" /> Add City
+                  </button>
+                </div>
+
+                <div className="divide-y divide-slate-800 max-h-[500px] overflow-y-auto">
+                  {cities.length === 0 ? (
+                    <p className="text-slate-500 py-6 text-center text-sm">No cities added yet</p>
+                  ) : (
+                    cities.map(city => (
+                      <div key={city._id} className="py-3 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition duration-150">
+                        <div>
+                          <p className="text-sm font-bold text-white">{city.name}</p>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${city.isActive ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+                            {city.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setCityForm({ id: city._id, name: city.name })}
+                            className="p-1.5 hover:bg-slate-850 rounded-lg text-slate-400 hover:text-slate-200 transition"
+                            title="Edit City"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => toggleCityStatus(city._id)}
+                            className={`p-1.5 hover:bg-slate-850 rounded-lg transition ${city.isActive ? 'text-amber-500 hover:text-amber-400' : 'text-emerald-500 hover:text-emerald-400'}`}
+                            title={city.isActive ? 'Deactivate' : 'Activate'}
+                          >
+                            <Power className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteCity(city._id)}
+                            className="p-1.5 hover:bg-slate-850 rounded-lg text-red-400 hover:text-red-300 transition"
+                            title="Delete City"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Follow-ups Tab */}
           {activeTab === 'followups' && (
             <div className="space-y-8">
@@ -1759,6 +1886,34 @@ export default function App() {
         </div>
       )}
 
+      {/* City Form Modal */}
+      {cityForm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+              <h3 className="font-bold text-white">{cityForm.id ? 'Edit City' : 'Add New City'}</h3>
+              <button onClick={() => setCityForm(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={saveCity} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">City Name</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Mumbai"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                  value={cityForm.name}
+                  onChange={e => setCityForm({ ...cityForm, name: e.target.value })}
+                />
+              </div>
+              <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 py-2.5 rounded-lg text-sm font-bold text-white transition">
+                {cityForm.id ? 'Save Changes' : 'Create City'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Raise Request Modal */}
       {createRequestOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -1882,16 +2037,20 @@ export default function App() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1">City *</label>
-                    <input 
+                    <select 
                       required 
-                      type="text" 
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer"
                       value={newRequestForm.customer.city}
                       onChange={e => setNewRequestForm({ 
                         ...newRequestForm, 
                         customer: { ...newRequestForm.customer, city: e.target.value } 
                       })}
-                    />
+                    >
+                      <option value="">-- Choose City --</option>
+                      {cities.filter(c => c.isActive).map(c => (
+                        <option key={c._id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
