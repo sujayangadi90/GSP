@@ -103,15 +103,12 @@ export default function App() {
   const [cities, setCities] = useState([]);
   const [cityForm, setCityForm] = useState(null); // null or { id?, name }
   const [customers, setCustomers] = useState([]);
-  const [selectedCustomerHistory, setSelectedCustomerHistory] = useState(null);
-  const [customerTicketsHistory, setCustomerTicketsHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [selectedDealerHistory, setSelectedDealerHistory] = useState(null);
-  const [dealerTicketsHistory, setDealerTicketsHistory] = useState([]);
-  const [dealerHistoryLoading, setDealerHistoryLoading] = useState(false);
-  const [selectedTechHistory, setSelectedTechHistory] = useState(null);
-  const [techTicketsHistory, setTechTicketsHistory] = useState([]);
-  const [techHistoryLoading, setTechHistoryLoading] = useState(false);
+  // History page states
+  const [historyTabBack, setHistoryTabBack] = useState('');
+  const [historyContext, setHistoryContext] = useState(''); // 'customer', 'dealer', 'technician'
+  const [historyEntity, setHistoryEntity] = useState(null);
+  const [historyTickets, setHistoryTickets] = useState([]);
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
 
   // Follow-ups states
   const [followUps, setFollowUps] = useState([]);
@@ -269,42 +266,29 @@ export default function App() {
     }
   };
 
-  const fetchCustomerHistory = async (customer) => {
-    setSelectedCustomerHistory(customer);
-    setHistoryLoading(true);
+  const viewHistory = async (type, entity, backTab) => {
+    setHistoryContext(type);
+    setHistoryEntity(entity);
+    setHistoryTabBack(backTab);
+    setHistoryTickets([]);
+    setHistorySearchQuery('');
+    setActiveTab('history_view');
+    setLoading(true);
     try {
-      const data = await apiFetch(`/tickets?customerMobile=${customer.mobile}`);
-      setCustomerTicketsHistory(data);
+      let url = '';
+      if (type === 'customer') {
+        url = `/tickets?customerMobile=${entity.mobile}`;
+      } else if (type === 'dealer') {
+        url = `/tickets?dealer=${entity._id}`;
+      } else if (type === 'technician') {
+        url = `/tickets?technician=${entity._id}`;
+      }
+      const data = await apiFetch(url);
+      setHistoryTickets(data);
     } catch (err) {
       alert(err.message);
     } finally {
-      setHistoryLoading(false);
-    }
-  };
-
-  const fetchDealerHistory = async (dealer) => {
-    setSelectedDealerHistory(dealer);
-    setDealerHistoryLoading(true);
-    try {
-      const data = await apiFetch(`/tickets?dealer=${dealer._id}`);
-      setDealerTicketsHistory(data);
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setDealerHistoryLoading(false);
-    }
-  };
-
-  const fetchTechHistory = async (tech) => {
-    setSelectedTechHistory(tech);
-    setTechHistoryLoading(true);
-    try {
-      const data = await apiFetch(`/tickets?technician=${tech._id}`);
-      setTechTicketsHistory(data);
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setTechHistoryLoading(false);
+      setLoading(false);
     }
   };
 
@@ -1159,7 +1143,7 @@ export default function App() {
                         Edit Details
                       </button>
                       <button
-                        onClick={() => fetchDealerHistory(dealer)}
+                        onClick={() => viewHistory('dealer', dealer, 'dealers')}
                         className="text-xs text-amber-450 hover:text-amber-350 font-bold cursor-pointer"
                       >
                         History
@@ -1242,7 +1226,7 @@ export default function App() {
                         Edit Details
                       </button>
                       <button
-                        onClick={() => fetchTechHistory(tech)}
+                        onClick={() => viewHistory('technician', tech, 'technicians')}
                         className="text-xs text-amber-450 hover:text-amber-350 font-bold cursor-pointer"
                       >
                         History
@@ -1517,7 +1501,7 @@ export default function App() {
                             </td>
                             <td className="py-4 px-6 text-center">
                               <button
-                                onClick={() => fetchCustomerHistory(cust)}
+                                onClick={() => viewHistory('customer', cust, 'customers')}
                                 className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1.5 cursor-pointer transition shadow-sm"
                               >
                                 <Eye className="w-4 h-4" /> History
@@ -1529,6 +1513,152 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Inline History View Page */}
+          {activeTab === 'history_view' && (
+            <div className="space-y-8">
+              {/* Back Navigation & Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <button 
+                    onClick={() => setActiveTab(historyTabBack || 'dashboard')}
+                    className="flex items-center gap-2 text-violet-400 hover:text-violet-355 text-sm font-bold transition cursor-pointer"
+                  >
+                    <span>←</span> Back to {historyTabBack ? historyTabBack.charAt(0).toUpperCase() + historyTabBack.slice(1) : 'Dashboard'}
+                  </button>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                    {historyContext === 'customer' && <UserCheck className="w-8 h-8 text-violet-400" />}
+                    {historyContext === 'dealer' && <Users className="w-8 h-8 text-violet-400" />}
+                    {historyContext === 'technician' && <Wrench className="w-8 h-8 text-violet-400" />}
+                    History: {historyEntity?.name}
+                  </h1>
+                  <p className="text-slate-400 text-sm">
+                    {historyContext === 'customer' && `Mobile: ${historyEntity?.mobile} | Address: ${historyEntity?.address}, ${historyEntity?.city} (PIN: ${historyEntity?.pincode})`}
+                    {historyContext === 'dealer' && `Dealer Code: ${historyEntity?.code} | City: ${historyEntity?.city} | Mobile: ${historyEntity?.mobile} | Contact: ${historyEntity?.contactPerson}`}
+                    {historyContext === 'technician' && `Technician Code: ${historyEntity?.code} | Mobile: ${historyEntity?.mobile} | Email: ${historyEntity?.email}`}
+                  </p>
+                </div>
+
+                {/* Sub-search Inside History */}
+                <div className="relative w-full md:w-80">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <Search className="w-5 h-5 text-slate-400" />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search history by ticket, category..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-violet-600 focus:border-transparent transition"
+                    value={historySearchQuery}
+                    onChange={e => setHistorySearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Stats Counters inside history */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                  <span className="text-slate-500 text-xs font-semibold uppercase">Total Requests</span>
+                  <p className="text-2xl font-bold text-white mt-1">{historyTickets.length}</p>
+                </div>
+                <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                  <span className="text-emerald-500/80 text-xs font-semibold uppercase">Completed</span>
+                  <p className="text-2xl font-bold text-emerald-400 mt-1">
+                    {historyTickets.filter(t => t.status === 'completed').length}
+                  </p>
+                </div>
+                <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                  <span className="text-amber-500/80 text-xs font-semibold uppercase">In Progress / Assigned</span>
+                  <p className="text-2xl font-bold text-amber-400 mt-1">
+                    {historyTickets.filter(t => t.status === 'assigned' || t.status === 'in_progress').length}
+                  </p>
+                </div>
+                <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                  <span className="text-yellow-500/80 text-xs font-semibold uppercase">Pending Verification</span>
+                  <p className="text-2xl font-bold text-yellow-400 mt-1">
+                    {historyTickets.filter(t => t.status === 'pending' || t.status === 'verification_pending').length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Requests List */}
+              <div className="space-y-4">
+                {historyTickets.filter(t => {
+                  const s = historySearchQuery.toLowerCase();
+                  return (
+                    (t.ticketNumber && t.ticketNumber.toLowerCase().includes(s)) ||
+                    (t.product?.category && t.product.category.toLowerCase().includes(s)) ||
+                    (t.product?.name && t.product.name.toLowerCase().includes(s)) ||
+                    (t.customer?.name && t.customer.name.toLowerCase().includes(s)) ||
+                    (t.status && t.status.toLowerCase().includes(s))
+                  );
+                }).length === 0 ? (
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl py-16 text-center text-slate-500 text-sm">
+                    No matching service or repair requests found.
+                  </div>
+                ) : (
+                  historyTickets.filter(t => {
+                    const s = historySearchQuery.toLowerCase();
+                    return (
+                      (t.ticketNumber && t.ticketNumber.toLowerCase().includes(s)) ||
+                      (t.product?.category && t.product.category.toLowerCase().includes(s)) ||
+                      (t.product?.name && t.product.name.toLowerCase().includes(s)) ||
+                      (t.customer?.name && t.customer.name.toLowerCase().includes(s)) ||
+                      (t.status && t.status.toLowerCase().includes(s))
+                    );
+                  }).map(ticket => (
+                    <div key={ticket._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 hover:shadow-xl transition duration-150">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-black text-white">{ticket.ticketNumber}</span>
+                          <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${
+                            ticket.type === 'installation' ? 'bg-cyan-950 text-cyan-400 border border-cyan-900/50' : 'bg-amber-950 text-amber-400 border border-amber-900/50'
+                          }`}>
+                            {ticket.type}
+                          </span>
+                        </div>
+                        <span className={`text-xs px-3 py-1.5 rounded-xl font-bold uppercase ${
+                          ticket.status === 'completed' ? 'bg-emerald-950 text-emerald-400' :
+                          ticket.status === 'pending' ? 'bg-yellow-950 text-yellow-400' :
+                          ticket.status === 'assigned' ? 'bg-blue-950 text-blue-400' :
+                          'bg-slate-800 text-slate-400'
+                        }`}>
+                          {ticket.status}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                        <div className="space-y-1">
+                          <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Customer Details</p>
+                          <p className="text-white font-bold">{ticket.customer?.name}</p>
+                          <p className="text-slate-450">{ticket.customer?.mobile} | {ticket.customer?.city}</p>
+                          <p className="text-slate-450 text-xs truncate max-w-xs">{ticket.customer?.address}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Product & Device</p>
+                          <p className="text-white font-bold">{ticket.product?.category} - {ticket.product?.name}</p>
+                          <p className="text-slate-450 font-mono text-xs">Model: {ticket.product?.modelNumber || '—'}</p>
+                          <p className="text-slate-450 font-mono text-xs">Serial: {ticket.product?.serialNumber || '—'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Partner Assignments</p>
+                          <p className="text-white font-medium">Dealer: {ticket.dealer?.name || '—'}</p>
+                          <p className="text-slate-450">Tech: {ticket.assignedTechnician?.name || 'Unassigned'}</p>
+                          <p className="text-slate-500 text-xs">Created: {new Date(ticket.createdAt).toLocaleString()}</p>
+                        </div>
+                      </div>
+
+                      {ticket.serviceDetails?.description && (
+                        <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800 text-sm">
+                          <p className="text-slate-500 text-xs font-bold mb-1.5 uppercase">Issue Description:</p>
+                          <p className="text-slate-300 italic font-mono">"{ticket.serviceDetails.description}"</p>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
