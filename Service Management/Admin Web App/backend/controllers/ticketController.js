@@ -48,7 +48,7 @@ const createTicket = async (req, res) => {
 // @access  Private
 const getTickets = async (req, res) => {
   try {
-    const { status, type, dealer, technician, city, search } = req.query;
+    const { status, type, dealer, technician, city, search, customerMobile } = req.query;
     let query = {};
 
     // For dealers, restrict to their own tickets
@@ -63,6 +63,7 @@ const getTickets = async (req, res) => {
     // Applying filters
     if (status) query.status = status;
     if (type) query.type = type;
+    if (customerMobile) query['customer.mobile'] = customerMobile;
     if (dealer && req.user.role === 'admin') query.dealer = dealer;
     if (technician && req.user.role === 'admin') query.assignedTechnician = technician;
     if (city) query['customer.city'] = { $regex: city, $options: 'i' };

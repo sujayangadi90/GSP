@@ -103,6 +103,9 @@ export default function App() {
   const [cities, setCities] = useState([]);
   const [cityForm, setCityForm] = useState(null); // null or { id?, name }
   const [customers, setCustomers] = useState([]);
+  const [selectedCustomerHistory, setSelectedCustomerHistory] = useState(null);
+  const [customerTicketsHistory, setCustomerTicketsHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Follow-ups states
   const [followUps, setFollowUps] = useState([]);
@@ -257,6 +260,19 @@ export default function App() {
       setCustomers(data);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const fetchCustomerHistory = async (customer) => {
+    setSelectedCustomerHistory(customer);
+    setHistoryLoading(true);
+    try {
+      const data = await apiFetch(`/tickets?customerMobile=${customer.mobile}`);
+      setCustomerTicketsHistory(data);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -1425,14 +1441,13 @@ export default function App() {
                         <th className="py-4 px-6">Alternate Mobile</th>
                         <th className="py-4 px-6">City</th>
                         <th className="py-4 px-6">Address</th>
-                        <th className="py-4 px-6 text-center">Requests Raised</th>
-                        <th className="py-4 px-6">Last Active</th>
+                        <th className="py-4 px-6 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 text-slate-200">
                       {filteredCustomers.length === 0 ? (
                         <tr>
-                          <td colSpan="7" className="py-12 text-center text-slate-500 text-sm">
+                          <td colSpan="6" className="py-12 text-center text-slate-500 text-sm">
                             No customers found.
                           </td>
                         </tr>
@@ -1457,16 +1472,12 @@ export default function App() {
                               {cust.address} (PIN: {cust.pincode})
                             </td>
                             <td className="py-4 px-6 text-center">
-                              <span className="inline-flex items-center justify-center bg-violet-950 text-violet-400 text-xs font-bold px-2.5 py-1 rounded-full border border-violet-900/50">
-                                {cust.ticketCount}
-                              </span>
-                            </td>
-                            <td className="py-4 px-6 text-sm text-slate-400">
-                              {cust.lastTicketDate ? new Date(cust.lastTicketDate).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              }) : '—'}
+                              <button
+                                onClick={() => fetchCustomerHistory(cust)}
+                                className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1.5 cursor-pointer transition shadow-sm"
+                              >
+                                <Eye className="w-4 h-4" /> History
+                              </button>
                             </td>
                           </tr>
                         ))
@@ -2393,6 +2404,88 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Customer History Modal */}
+      {selectedCustomerHistory && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+              <div>
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-violet-400" />
+                  Service History for {selectedCustomerHistory.name}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Mobile: {selectedCustomerHistory.mobile} | Address: {selectedCustomerHistory.address}, {selectedCustomerHistory.city}</p>
+              </div>
+              <button 
+                onClick={() => setSelectedCustomerHistory(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+              {historyLoading ? (
+                <div className="text-center py-12 text-slate-500">Loading history...</div>
+              ) : customerTicketsHistory.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">No repairs or installations registered for this customer.</div>
+              ) : (
+                <div className="space-y-4">
+                  {customerTicketsHistory.map(ticket => (
+                    <div key={ticket._id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-extrabold text-white">{ticket.ticketNumber}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            ticket.type === 'installation' ? 'bg-cyan-950 text-cyan-400 border border-cyan-900/50' : 'bg-amber-950 text-amber-400 border border-amber-900/50'
+                          }`}>
+                            {ticket.type}
+                          </span>
+                        </div>
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase ${
+                          ticket.status === 'completed' ? 'bg-emerald-950 text-emerald-400' :
+                          ticket.status === 'pending' ? 'bg-yellow-950 text-yellow-400' :
+                          ticket.status === 'assigned' ? 'bg-blue-950 text-blue-400' :
+                          'bg-slate-800 text-slate-400'
+                        }`}>
+                          {ticket.status}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        <div>
+                          <p className="text-slate-450 font-semibold mb-1">Product Details</p>
+                          <p className="text-white font-medium">{ticket.product?.category} - {ticket.product?.name}</p>
+                          <p className="text-slate-500 font-mono">Model: {ticket.product?.modelNumber || '—'}</p>
+                          <p className="text-slate-500 font-mono">Serial: {ticket.product?.serialNumber || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-450 font-semibold mb-1">Service Agent / Dealer</p>
+                          <p className="text-white font-medium">{ticket.dealer?.name || '—'}</p>
+                          <p className="text-slate-500">Technician: {ticket.assignedTechnician?.name || 'Unassigned'}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-450 font-semibold mb-1">Request Info</p>
+                          <p className="text-slate-400">Created: {new Date(ticket.createdAt).toLocaleDateString()}</p>
+                          {ticket.preferredVisitDate && <p className="text-slate-400">Preferred Date: {new Date(ticket.preferredVisitDate).toLocaleDateString()}</p>}
+                        </div>
+                      </div>
+
+                      {ticket.serviceDetails?.description && (
+                        <div className="bg-slate-900/40 p-2.5 rounded-lg border border-slate-800/40 text-xs">
+                          <p className="text-slate-400 font-semibold mb-1">Issue Description:</p>
+                          <p className="text-slate-300 italic">"{ticket.serviceDetails.description}"</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
