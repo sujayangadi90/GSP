@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -664,8 +665,38 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                 children: [
                   _buildSectionHeader('Customer Information'),
                   _buildTextField(_custName, 'Customer Name'),
-                  _buildTextField(_custMobile, 'Mobile Number', keyboardType: TextInputType.phone),
-                  _buildTextField(_custAlt, 'Alternate Number (Optional)', keyboardType: TextInputType.phone, required: false),
+                  _buildTextField(
+                    _custMobile,
+                    'Mobile Number',
+                    keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                    validator: (val) {
+                      if (val == null || val.isEmpty) return 'Field required';
+                      if (val.length != 10) return 'Must be exactly 10 digits';
+                      return null;
+                    },
+                  ),
+                  _buildTextField(
+                    _custAlt,
+                    'Alternate Number (Optional)',
+                    keyboardType: TextInputType.phone,
+                    required: false,
+                    maxLength: 10,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                    validator: (val) {
+                      if (val != null && val.isNotEmpty && val.length != 10) {
+                        return 'Must be exactly 10 digits';
+                      }
+                      return null;
+                    },
+                  ),
                   _buildTextField(_custAddress, 'Address'),
                   _buildTextField(_custCity, 'City'),
                   _buildTextField(_custPincode, 'Pincode', keyboardType: TextInputType.number),
@@ -803,6 +834,9 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
     bool required = true,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
+    int? maxLength,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -810,11 +844,14 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
         controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
+        maxLength: maxLength,
+        inputFormatters: inputFormatters,
         decoration: InputDecoration(
           labelText: label,
+          counterText: '', // Hide default character counter
           border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
         ),
-        validator: required ? (val) => val == null || val.isEmpty ? 'Field required' : null : null,
+        validator: validator ?? (required ? (val) => val == null || val.isEmpty ? 'Field required' : null : null),
       ),
     );
   }

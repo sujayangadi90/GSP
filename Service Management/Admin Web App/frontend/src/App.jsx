@@ -1360,7 +1360,18 @@ export default function App() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Mobile Number</label>
-                  <input required type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" value={dealerForm.mobile} onChange={e => setDealerForm({...dealerForm, mobile: e.target.value})} />
+                  <input 
+                    required 
+                    type="text" 
+                    maxLength={10}
+                    placeholder="10 digit mobile"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" 
+                    value={dealerForm.mobile} 
+                    onChange={e => setDealerForm({
+                      ...dealerForm, 
+                      mobile: e.target.value.replace(/\D/g, '').slice(0, 10)
+                    })} 
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Email (Username)</label>
@@ -1405,7 +1416,18 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Mobile Number</label>
-                <input required type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" value={techForm.mobile} onChange={e => setTechForm({...techForm, mobile: e.target.value})} />
+                <input 
+                  required 
+                  type="text" 
+                  maxLength={10}
+                  placeholder="10 digit mobile"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" 
+                  value={techForm.mobile} 
+                  onChange={e => setTechForm({
+                    ...techForm, 
+                    mobile: e.target.value.replace(/\D/g, '').slice(0, 10)
+                  })} 
+                />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Email Address</label>
@@ -1819,12 +1841,13 @@ export default function App() {
                       required 
                       type="tel" 
                       pattern="[0-9]{10}"
+                      maxLength={10}
                       placeholder="10 digit mobile"
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
                       value={newRequestForm.customer.mobile}
                       onChange={e => setNewRequestForm({ 
                         ...newRequestForm, 
-                        customer: { ...newRequestForm.customer, mobile: e.target.value } 
+                        customer: { ...newRequestForm.customer, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) } 
                       })}
                     />
                   </div>
@@ -1832,11 +1855,13 @@ export default function App() {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Alternate Mobile</label>
                     <input 
                       type="tel" 
+                      maxLength={10}
+                      placeholder="10 digit mobile"
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
                       value={newRequestForm.customer.alternateMobile}
                       onChange={e => setNewRequestForm({ 
                         ...newRequestForm, 
-                        customer: { ...newRequestForm.customer, alternateMobile: e.target.value } 
+                        customer: { ...newRequestForm.customer, alternateMobile: e.target.value.replace(/\D/g, '').slice(0, 10) } 
                       })}
                     />
                   </div>
