@@ -329,8 +329,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: _loadJobs,
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: widget.onLogout,
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(
+                    user: widget.user,
+                    role: 'Technician Partner',
+                    onLogout: widget.onLogout,
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -856,6 +867,141 @@ class JobHistoryScreen extends StatelessWidget {
               );
             },
           ),
+    );
+  }
+}
+
+class ProfileScreen extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final String role;
+  final VoidCallback? onLogout;
+
+  const ProfileScreen({
+    super.key,
+    required this.user,
+    required this.role,
+    this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          children: [
+            const SizedBox(height: 16),
+            CircleAvatar(
+              radius: 48,
+              backgroundColor: Colors.purple.shade900,
+              child: Text(
+                (user['name'] ?? 'U').substring(0, 1).toUpperCase(),
+                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              user['name'] ?? 'No Name',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, py: 4),
+              decoration: BoxDecoration(
+                color: Colors.purple.shade900.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.purpleAccent.withOpacity(0.5)),
+              ),
+              child: Text(
+                role.toUpperCase(),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.purpleAccent),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Card(
+              color: Colors.grey.shade900.withOpacity(0.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.grey.shade800),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    _buildInfoRow(Icons.badge, 'Partner Code', user['code'] ?? '—'),
+                    const Divider(color: Colors.grey),
+                    _buildInfoRow(Icons.email, 'Email Address', user['email'] ?? '—'),
+                    const Divider(color: Colors.grey),
+                    _buildInfoRow(Icons.phone, 'Mobile Number', user['mobile'] ?? '—'),
+                    if (user['contactPerson'] != null) ...[
+                      const Divider(color: Colors.grey),
+                      _buildInfoRow(Icons.person, 'Contact Person', user['contactPerson']),
+                    ],
+                    if (user['address'] != null) ...[
+                      const Divider(color: Colors.grey),
+                      _buildInfoRow(Icons.location_on, 'Address', user['address']),
+                    ],
+                    if (user['city'] != null) ...[
+                      const Divider(color: Colors.grey),
+                      _buildInfoRow(Icons.location_city, 'City', user['city']),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (onLogout != null) ...[
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  onLogout!();
+                },
+                icon: const Icon(Icons.logout),
+                label: const Text('Sign Out'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade900,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.purpleAccent, size: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
