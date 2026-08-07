@@ -106,6 +106,12 @@ export default function App() {
   const [selectedCustomerHistory, setSelectedCustomerHistory] = useState(null);
   const [customerTicketsHistory, setCustomerTicketsHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedDealerHistory, setSelectedDealerHistory] = useState(null);
+  const [dealerTicketsHistory, setDealerTicketsHistory] = useState([]);
+  const [dealerHistoryLoading, setDealerHistoryLoading] = useState(false);
+  const [selectedTechHistory, setSelectedTechHistory] = useState(null);
+  const [techTicketsHistory, setTechTicketsHistory] = useState([]);
+  const [techHistoryLoading, setTechHistoryLoading] = useState(false);
 
   // Follow-ups states
   const [followUps, setFollowUps] = useState([]);
@@ -273,6 +279,32 @@ export default function App() {
       alert(err.message);
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const fetchDealerHistory = async (dealer) => {
+    setSelectedDealerHistory(dealer);
+    setDealerHistoryLoading(true);
+    try {
+      const data = await apiFetch(`/tickets?dealer=${dealer._id}`);
+      setDealerTicketsHistory(data);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setDealerHistoryLoading(false);
+    }
+  };
+
+  const fetchTechHistory = async (tech) => {
+    setSelectedTechHistory(tech);
+    setTechHistoryLoading(true);
+    try {
+      const data = await apiFetch(`/tickets?technician=${tech._id}`);
+      setTechTicketsHistory(data);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setTechHistoryLoading(false);
     }
   };
 
@@ -1127,6 +1159,12 @@ export default function App() {
                         Edit Details
                       </button>
                       <button
+                        onClick={() => fetchDealerHistory(dealer)}
+                        className="text-xs text-amber-450 hover:text-amber-350 font-bold cursor-pointer"
+                      >
+                        History
+                      </button>
+                      <button
                         onClick={() => toggleDealer(dealer._id)}
                         className={`text-xs px-3.5 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                           dealer.status === 'active' 
@@ -1202,6 +1240,12 @@ export default function App() {
                         className="text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer"
                       >
                         Edit Details
+                      </button>
+                      <button
+                        onClick={() => fetchTechHistory(tech)}
+                        className="text-xs text-amber-450 hover:text-amber-350 font-bold cursor-pointer"
+                      >
+                        History
                       </button>
                       <button
                         onClick={() => toggleTech(tech._id)}
@@ -2472,6 +2516,168 @@ export default function App() {
                           <p className="text-slate-450 font-semibold mb-1">Request Info</p>
                           <p className="text-slate-400">Created: {new Date(ticket.createdAt).toLocaleDateString()}</p>
                           {ticket.preferredVisitDate && <p className="text-slate-400">Preferred Date: {new Date(ticket.preferredVisitDate).toLocaleDateString()}</p>}
+                        </div>
+                      </div>
+
+                      {ticket.serviceDetails?.description && (
+                        <div className="bg-slate-900/40 p-2.5 rounded-lg border border-slate-800/40 text-xs">
+                          <p className="text-slate-400 font-semibold mb-1">Issue Description:</p>
+                          <p className="text-slate-300 italic">"{ticket.serviceDetails.description}"</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dealer History Modal */}
+      {selectedDealerHistory && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+              <div>
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-violet-400" />
+                  Request History for Dealer: {selectedDealerHistory.name}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Code: {selectedDealerHistory.code} | City: {selectedDealerHistory.city} | Mobile: {selectedDealerHistory.mobile}</p>
+              </div>
+              <button 
+                onClick={() => setSelectedDealerHistory(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+              {dealerHistoryLoading ? (
+                <div className="text-center py-12 text-slate-500">Loading history...</div>
+              ) : dealerTicketsHistory.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">No requests raised by this dealer yet.</div>
+              ) : (
+                <div className="space-y-4">
+                  {dealerTicketsHistory.map(ticket => (
+                    <div key={ticket._id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-extrabold text-white">{ticket.ticketNumber}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            ticket.type === 'installation' ? 'bg-cyan-950 text-cyan-400 border border-cyan-900/50' : 'bg-amber-950 text-amber-400 border border-amber-900/50'
+                          }`}>
+                            {ticket.type}
+                          </span>
+                        </div>
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase ${
+                          ticket.status === 'completed' ? 'bg-emerald-950 text-emerald-400' :
+                          ticket.status === 'pending' ? 'bg-yellow-950 text-yellow-400' :
+                          ticket.status === 'assigned' ? 'bg-blue-950 text-blue-400' :
+                          'bg-slate-800 text-slate-400'
+                        }`}>
+                          {ticket.status}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        <div>
+                          <p className="text-slate-450 font-semibold mb-1">Customer Details</p>
+                          <p className="text-white font-medium">{ticket.customer?.name}</p>
+                          <p className="text-slate-500">City: {ticket.customer?.city} | Mobile: {ticket.customer?.mobile}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-450 font-semibold mb-1">Product Details</p>
+                          <p className="text-white font-medium">{ticket.product?.category} - {ticket.product?.name}</p>
+                          <p className="text-slate-500 font-mono">Model: {ticket.product?.modelNumber || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-450 font-semibold mb-1">Assignment Info</p>
+                          <p className="text-slate-450 font-medium">Technician: {ticket.assignedTechnician?.name || 'Unassigned'}</p>
+                          <p className="text-slate-500">Created: {new Date(ticket.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+
+                      {ticket.serviceDetails?.description && (
+                        <div className="bg-slate-900/40 p-2.5 rounded-lg border border-slate-800/40 text-xs">
+                          <p className="text-slate-400 font-semibold mb-1">Issue Description:</p>
+                          <p className="text-slate-300 italic">"{ticket.serviceDetails.description}"</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Technician History Modal */}
+      {selectedTechHistory && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+              <div>
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-violet-400" />
+                  Assigned Tickets for Technician: {selectedTechHistory.name}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Code: {selectedTechHistory.code} | Mobile: {selectedTechHistory.mobile}</p>
+              </div>
+              <button 
+                onClick={() => setSelectedTechHistory(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+              {techHistoryLoading ? (
+                <div className="text-center py-12 text-slate-500">Loading history...</div>
+              ) : techTicketsHistory.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">No tickets worked on by this technician yet.</div>
+              ) : (
+                <div className="space-y-4">
+                  {techTicketsHistory.map(ticket => (
+                    <div key={ticket._id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-extrabold text-white">{ticket.ticketNumber}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            ticket.type === 'installation' ? 'bg-cyan-950 text-cyan-400 border border-cyan-900/50' : 'bg-amber-950 text-amber-400 border border-amber-900/50'
+                          }`}>
+                            {ticket.type}
+                          </span>
+                        </div>
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase ${
+                          ticket.status === 'completed' ? 'bg-emerald-950 text-emerald-400' :
+                          ticket.status === 'pending' ? 'bg-yellow-950 text-yellow-400' :
+                          ticket.status === 'assigned' ? 'bg-blue-950 text-blue-400' :
+                          'bg-slate-800 text-slate-400'
+                        }`}>
+                          {ticket.status}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        <div>
+                          <p className="text-slate-450 font-semibold mb-1">Customer Details</p>
+                          <p className="text-white font-medium">{ticket.customer?.name}</p>
+                          <p className="text-slate-500">City: {ticket.customer?.city} | Mobile: {ticket.customer?.mobile}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-450 font-semibold mb-1">Product & Dealer</p>
+                          <p className="text-white font-medium">{ticket.product?.category} - {ticket.product?.name}</p>
+                          <p className="text-slate-550">Dealer: {ticket.dealer?.name} (Code: {ticket.dealer?.code})</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-450 font-semibold mb-1">Date Info</p>
+                          <p className="text-slate-400">Created: {new Date(ticket.createdAt).toLocaleDateString()}</p>
+                          {ticket.preferredVisitDate && <p className="text-slate-400">Preferred: {new Date(ticket.preferredVisitDate).toLocaleDateString()}</p>}
                         </div>
                       </div>
 
