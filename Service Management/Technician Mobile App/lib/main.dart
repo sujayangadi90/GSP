@@ -581,7 +581,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 5 images allowed')));
       return;
     }
-    final pickedFile = await _picker.pickImage(source: ImageSource.camera);
+    final pickedFile = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1920,
+      maxHeight: 1080,
+      imageQuality: 80, // Compresses image to 80% quality
+    );
     if (pickedFile != null) {
       setState(() {
         _completionPhotos.add(File(pickedFile.path));
@@ -618,7 +623,14 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         );
         Navigator.pop(context);
       } else {
-        throw Exception('Failed to submit job completion');
+        String errorMessage = 'Failed to submit job completion';
+        try {
+          final errorData = jsonDecode(response.body);
+          if (errorData != null && errorData['message'] != null) {
+            errorMessage = errorData['message'];
+          }
+        } catch (_) {}
+        throw Exception(errorMessage);
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

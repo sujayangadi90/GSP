@@ -159,7 +159,7 @@ const updateTicketStatus = async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    if (ticket.assignedTechnician.toString() !== req.user._id.toString()) {
+    if (!ticket.assignedTechnician || ticket.assignedTechnician.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized to update this ticket' });
     }
 
@@ -189,7 +189,7 @@ const submitWorkCompletion = async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    if (ticket.assignedTechnician.toString() !== req.user._id.toString()) {
+    if (!ticket.assignedTechnician || ticket.assignedTechnician.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized to complete this ticket' });
     }
 
