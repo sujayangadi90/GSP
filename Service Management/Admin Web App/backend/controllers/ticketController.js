@@ -15,7 +15,8 @@ const createTicket = async (req, res) => {
     serviceDetails,
     installationDetails,
     preferredVisitDate,
-    remarks
+    remarks,
+    dealer
   } = req.body;
 
   try {
@@ -27,7 +28,7 @@ const createTicket = async (req, res) => {
       installationDetails,
       preferredVisitDate,
       remarks,
-      dealer: req.user._id,
+      dealer: req.user.role === 'admin' ? dealer : req.user._id,
       status: 'new'
     });
 

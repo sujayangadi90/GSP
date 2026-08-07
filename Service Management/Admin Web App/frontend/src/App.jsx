@@ -58,6 +58,39 @@ export default function App() {
   const [assignNotes, setAssignNotes] = useState('');
   const [verificationForm, setVerificationForm] = useState({ status: 'approved', reason: '' });
   const [closureRemarks, setClosureRemarks] = useState('');
+  
+  // Raise Request Modal states
+  const [createRequestOpen, setCreateRequestOpen] = useState(false);
+  const [newRequestForm, setNewRequestForm] = useState({
+    dealer: '',
+    type: 'installation',
+    customer: {
+      name: '',
+      mobile: '',
+      alternateMobile: '',
+      address: '',
+      city: '',
+      pincode: ''
+    },
+    product: {
+      category: '',
+      name: '',
+      modelNumber: '',
+      serialNumber: '',
+      purchaseDate: '',
+      invoiceNumber: ''
+    },
+    serviceDetails: {
+      description: '',
+      priority: 'medium'
+    },
+    installationDetails: {
+      preferredDate: ''
+    },
+    preferredVisitDate: '',
+    remarks: ''
+  });
+  const [invoiceFile, setInvoiceFile] = useState(null);
 
   // Sidebar / Submenu states
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -426,6 +459,88 @@ export default function App() {
     }
   };
 
+  const handleCreateRequest = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const formData = new FormData();
+      formData.append('type', newRequestForm.type);
+      formData.append('dealer', newRequestForm.dealer);
+      formData.append('preferredVisitDate', newRequestForm.preferredVisitDate);
+      formData.append('remarks', newRequestForm.remarks);
+      
+      // Customer
+      formData.append('customer[name]', newRequestForm.customer.name);
+      formData.append('customer[mobile]', newRequestForm.customer.mobile);
+      if (newRequestForm.customer.alternateMobile) {
+        formData.append('customer[alternateMobile]', newRequestForm.customer.alternateMobile);
+      }
+      formData.append('customer[address]', newRequestForm.customer.address);
+      formData.append('customer[city]', newRequestForm.customer.city);
+      formData.append('customer[pincode]', newRequestForm.customer.pincode);
+      
+      // Product
+      formData.append('product[category]', newRequestForm.product.category);
+      formData.append('product[name]', newRequestForm.product.name);
+      if (newRequestForm.product.modelNumber) {
+        formData.append('product[modelNumber]', newRequestForm.product.modelNumber);
+      }
+      if (newRequestForm.product.serialNumber) {
+        formData.append('product[serialNumber]', newRequestForm.product.serialNumber);
+      }
+      if (newRequestForm.product.purchaseDate) {
+        formData.append('product[purchaseDate]', newRequestForm.product.purchaseDate);
+      }
+      if (newRequestForm.product.invoiceNumber) {
+        formData.append('product[invoiceNumber]', newRequestForm.product.invoiceNumber);
+      }
+
+      // Type-specific
+      if (newRequestForm.type === 'service') {
+        formData.append('serviceDetails[description]', newRequestForm.serviceDetails.description);
+        formData.append('serviceDetails[priority]', newRequestForm.serviceDetails.priority);
+      } else {
+        formData.append('installationDetails[preferredDate]', newRequestForm.installationDetails.preferredDate);
+      }
+
+      if (invoiceFile) {
+        formData.append('invoiceImage', invoiceFile);
+      }
+
+      const res = await fetch(`${API_BASE}/tickets`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to create request');
+      }
+
+      alert('Request created successfully!');
+      setCreateRequestOpen(false);
+      setNewRequestForm({
+        dealer: '',
+        type: 'installation',
+        customer: { name: '', mobile: '', alternateMobile: '', address: '', city: '', pincode: '' },
+        product: { category: '', name: '', modelNumber: '', serialNumber: '', purchaseDate: '', invoiceNumber: '' },
+        serviceDetails: { description: '', priority: 'medium' },
+        installationDetails: { preferredDate: '' },
+        preferredVisitDate: '',
+        remarks: ''
+      });
+      setInvoiceFile(null);
+      fetchData();
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
@@ -686,6 +801,16 @@ export default function App() {
                   <h1 className="text-3xl font-extrabold text-white tracking-tight">Installation & Service Requests</h1>
                   <p className="text-slate-400 mt-1">Manage, assign, and track customer support tickets</p>
                 </div>
+                <button 
+                  onClick={() => {
+                    fetchAppliances();
+                    fetchBrands();
+                    setCreateRequestOpen(true);
+                  }}
+                  className="bg-violet-600 hover:bg-violet-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md transition duration-200 cursor-pointer flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> Raise Request
+                </button>
               </div>
 
               {/* Filters */}
@@ -1607,6 +1732,362 @@ export default function App() {
               <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 py-2.5 rounded-lg text-sm font-bold text-white transition">
                 {brandForm.id ? 'Save Configuration' : 'Create Brand'}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Raise Request Modal */}
+      {createRequestOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl my-8 overflow-hidden">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+              <h3 className="font-bold text-white">Raise Installation / Service Request</h3>
+              <button 
+                onClick={() => setCreateRequestOpen(false)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateRequest} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+              
+              {/* Request Details */}
+              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
+                <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Request Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Select Dealer *</label>
+                    <select 
+                      required 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer"
+                      value={newRequestForm.dealer}
+                      onChange={e => setNewRequestForm({ ...newRequestForm, dealer: e.target.value })}
+                    >
+                      <option value="">-- Choose Dealer --</option>
+                      {dealers.map(d => (
+                        <option key={d._id} value={d._id}>{d.name} ({d.city})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Request Type *</label>
+                    <select 
+                      required 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer"
+                      value={newRequestForm.type}
+                      onChange={e => setNewRequestForm({ ...newRequestForm, type: e.target.value })}
+                    >
+                      <option value="installation">Installation</option>
+                      <option value="service">Service Request</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Preferred Visit Date *</label>
+                    <input 
+                      required 
+                      type="date" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.preferredVisitDate}
+                      onChange={e => setNewRequestForm({ ...newRequestForm, preferredVisitDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Details */}
+              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
+                <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Customer Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Customer Name *</label>
+                    <input 
+                      required 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.customer.name}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        customer: { ...newRequestForm.customer, name: e.target.value } 
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Mobile Number *</label>
+                    <input 
+                      required 
+                      type="tel" 
+                      pattern="[0-9]{10}"
+                      placeholder="10 digit mobile"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.customer.mobile}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        customer: { ...newRequestForm.customer, mobile: e.target.value } 
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Alternate Mobile</label>
+                    <input 
+                      type="tel" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.customer.alternateMobile}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        customer: { ...newRequestForm.customer, alternateMobile: e.target.value } 
+                      })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Address *</label>
+                    <input 
+                      required 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.customer.address}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        customer: { ...newRequestForm.customer, address: e.target.value } 
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">City *</label>
+                    <input 
+                      required 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.customer.city}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        customer: { ...newRequestForm.customer, city: e.target.value } 
+                      })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Pincode *</label>
+                    <input 
+                      required 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.customer.pincode}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        customer: { ...newRequestForm.customer, pincode: e.target.value } 
+                      })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Product details */}
+              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
+                <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Product Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Category (Appliance) *</label>
+                    <select 
+                      required 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer"
+                      value={newRequestForm.product.category}
+                      onChange={e => {
+                        const appName = e.target.value;
+                        setNewRequestForm({ 
+                          ...newRequestForm, 
+                          product: { 
+                            ...newRequestForm.product, 
+                            category: appName, 
+                            name: '' 
+                          } 
+                        });
+                      }}
+                    >
+                      <option value="">-- Choose Category --</option>
+                      {appliances.map(app => (
+                        <option key={app._id} value={app.name}>{app.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Product (Brand) *</label>
+                    <select 
+                      required 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer"
+                      value={newRequestForm.product.name}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        product: { ...newRequestForm.product, name: e.target.value } 
+                      })}
+                      disabled={!newRequestForm.product.category}
+                    >
+                      <option value="">-- Choose Brand --</option>
+                      {brands
+                        .filter(b => {
+                          const appObj = appliances.find(a => a.name === newRequestForm.product.category);
+                          return appObj && (b.appliance === appObj._id || b.appliance?._id === appObj._id);
+                        })
+                        .map(b => (
+                          <option key={b._id} value={b.name}>{b.name}</option>
+                        ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Invoice Number</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.product.invoiceNumber}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        product: { ...newRequestForm.product, invoiceNumber: e.target.value } 
+                      })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Model Number</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.product.modelNumber}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        product: { ...newRequestForm.product, modelNumber: e.target.value } 
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Serial Number</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.product.serialNumber}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        product: { ...newRequestForm.product, serialNumber: e.target.value } 
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Purchase Date</label>
+                    <input 
+                      type="date" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.product.purchaseDate}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        product: { ...newRequestForm.product, purchaseDate: e.target.value } 
+                      })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Type-Specific Details */}
+              {newRequestForm.type === 'service' ? (
+                <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
+                  <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Service Request Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Issue Description *</label>
+                      <textarea 
+                        required
+                        rows="2"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                        value={newRequestForm.serviceDetails.description}
+                        onChange={e => setNewRequestForm({ 
+                          ...newRequestForm, 
+                          serviceDetails: { ...newRequestForm.serviceDetails, description: e.target.value } 
+                        })}
+                      ></textarea>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Priority *</label>
+                      <select 
+                        required 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer"
+                        value={newRequestForm.serviceDetails.priority}
+                        onChange={e => setNewRequestForm({ 
+                          ...newRequestForm, 
+                          serviceDetails: { ...newRequestForm.serviceDetails, priority: e.target.value } 
+                        })}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
+                  <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Installation Request Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Preferred Installation Date *</label>
+                      <input 
+                        required 
+                        type="date" 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                        value={newRequestForm.installationDetails.preferredDate}
+                        onChange={e => setNewRequestForm({ 
+                          ...newRequestForm, 
+                          installationDetails: { ...newRequestForm.installationDetails, preferredDate: e.target.value },
+                          preferredVisitDate: e.target.value 
+                        })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Attachments & Remarks */}
+              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
+                <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Attachment & Remarks</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Invoice Image / Photo</label>
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500 cursor-pointer"
+                      onChange={e => setInvoiceFile(e.target.files[0])}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Remarks</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      value={newRequestForm.remarks}
+                      onChange={e => setNewRequestForm({ ...newRequestForm, remarks: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button 
+                  type="button" 
+                  onClick={() => setCreateRequestOpen(false)} 
+                  className="px-5 py-2.5 text-sm text-slate-400 hover:text-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-violet-600 hover:bg-violet-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-md transition duration-200 cursor-pointer"
+                >
+                  Submit Request
+                </button>
+              </div>
             </form>
           </div>
         </div>

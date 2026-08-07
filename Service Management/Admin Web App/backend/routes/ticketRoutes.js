@@ -18,7 +18,7 @@ router.use(protect);
 // Unified routes for query & create
 router.route('/')
   .get(getTickets)
-  .post(authorize('dealer'), upload.single('invoiceImage'), createTicket);
+  .post(authorize('dealer', 'admin'), upload.single('invoiceImage'), createTicket);
 
 // Single ticket detail
 router.route('/:id')
