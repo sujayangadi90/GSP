@@ -7,7 +7,8 @@ const {
   updateTicketStatus,
   submitWorkCompletion,
   verifyWork,
-  closeTicket
+  closeTicket,
+  getCustomers
 } = require('../controllers/ticketController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -19,6 +20,9 @@ router.use(protect);
 router.route('/')
   .get(getTickets)
   .post(authorize('dealer', 'admin'), upload.single('invoiceImage'), createTicket);
+
+router.route('/customers')
+  .get(authorize('admin'), getCustomers);
 
 // Single ticket detail
 router.route('/:id')

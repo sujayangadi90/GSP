@@ -102,6 +102,7 @@ export default function App() {
   const [brandForm, setBrandForm] = useState(null); // null or { id?, name, applianceId, followUpDays }
   const [cities, setCities] = useState([]);
   const [cityForm, setCityForm] = useState(null); // null or { id?, name }
+  const [customers, setCustomers] = useState([]);
 
   // Follow-ups states
   const [followUps, setFollowUps] = useState([]);
@@ -113,6 +114,7 @@ export default function App() {
   // Filters & Searches
   const [dealerSearch, setDealerSearch] = useState('');
   const [techSearch, setTechSearch] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
   const [ticketFilters, setTicketFilters] = useState({
     status: '',
     type: '',
@@ -249,6 +251,15 @@ export default function App() {
     }
   };
 
+  const fetchCustomers = async () => {
+    try {
+      const data = await apiFetch('/tickets/customers');
+      setCustomers(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Run searches / filters trigger reload
   useEffect(() => {
     if (user) {
@@ -257,6 +268,8 @@ export default function App() {
         fetchBrands();
       } else if (activeTab === 'cities') {
         fetchCities();
+      } else if (activeTab === 'customers') {
+        fetchCustomers();
       } else if (activeTab === 'followups') {
         fetchFollowUps();
       } else {
@@ -648,6 +661,18 @@ export default function App() {
     );
   }
 
+  const filteredCustomers = customers.filter(c => {
+    const s = customerSearch.toLowerCase();
+    return (
+      (c.name && c.name.toLowerCase().includes(s)) ||
+      (c.mobile && c.mobile.toLowerCase().includes(s)) ||
+      (c.alternateMobile && c.alternateMobile.toLowerCase().includes(s)) ||
+      (c.address && c.address.toLowerCase().includes(s)) ||
+      (c.city && c.city.toLowerCase().includes(s)) ||
+      (c.pincode && c.pincode.toLowerCase().includes(s))
+    );
+  });
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Header */}
@@ -693,6 +718,13 @@ export default function App() {
           >
             <TicketIcon className="w-5 h-5" />
             Tickets & Requests
+          </button>
+          <button
+            onClick={() => setActiveTab('customers')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'customers' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <UserCheck className="w-5 h-5" />
+            Customers
           </button>
           <button
             onClick={() => setActiveTab('dealers')}
@@ -1353,6 +1385,94 @@ export default function App() {
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Customers Tab */}
+          {activeTab === 'customers' && (
+            <div className="space-y-8">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight">Customers Directory</h1>
+                  <p className="text-slate-400 mt-1">View unique customer details compiled across all service and installation requests</p>
+                </div>
+                
+                {/* Search Bar */}
+                <div className="relative w-full md:w-80">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <Search className="w-5 h-5 text-slate-400" />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search by name, mobile, city..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-violet-600 focus:border-transparent transition"
+                    value={customerSearch}
+                    onChange={e => setCustomerSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Customers Table / Card list */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400 text-xs font-bold uppercase bg-slate-950/40">
+                        <th className="py-4 px-6">Customer Name</th>
+                        <th className="py-4 px-6">Mobile Number</th>
+                        <th className="py-4 px-6">Alternate Mobile</th>
+                        <th className="py-4 px-6">City</th>
+                        <th className="py-4 px-6">Address</th>
+                        <th className="py-4 px-6 text-center">Requests Raised</th>
+                        <th className="py-4 px-6">Last Active</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                      {filteredCustomers.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="py-12 text-center text-slate-500 text-sm">
+                            No customers found.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredCustomers.map((cust, idx) => (
+                          <tr key={cust.mobile || idx} className="hover:bg-slate-800/25 transition duration-150">
+                            <td className="py-4 px-6 font-bold text-white">
+                              {cust.name}
+                            </td>
+                            <td className="py-4 px-6 font-mono text-sm">
+                              {cust.mobile}
+                            </td>
+                            <td className="py-4 px-6 font-mono text-sm text-slate-400">
+                              {cust.alternateMobile || '—'}
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="bg-slate-850 px-3 py-1 rounded-full text-xs font-semibold text-slate-300">
+                                {cust.city}
+                              </span>
+                            </td>
+                            <td className="py-4 px-6 text-sm text-slate-400 max-w-xs truncate" title={cust.address}>
+                              {cust.address} (PIN: {cust.pincode})
+                            </td>
+                            <td className="py-4 px-6 text-center">
+                              <span className="inline-flex items-center justify-center bg-violet-950 text-violet-400 text-xs font-bold px-2.5 py-1 rounded-full border border-violet-900/50">
+                                {cust.ticketCount}
+                              </span>
+                            </td>
+                            <td className="py-4 px-6 text-sm text-slate-400">
+                              {cust.lastTicketDate ? new Date(cust.lastTicketDate).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              }) : '—'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

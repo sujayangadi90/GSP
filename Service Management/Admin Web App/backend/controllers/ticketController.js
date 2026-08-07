@@ -331,6 +331,33 @@ const closeTicket = async (req, res) => {
   }
 };
 
+// @desc    Get all unique customers
+// @route   GET /api/tickets/customers
+// @access  Private/Admin
+const getCustomers = async (req, res) => {
+  try {
+    const customers = await Ticket.aggregate([
+      {
+        $group: {
+          _id: "$customer.mobile",
+          name: { $first: "$customer.name" },
+          mobile: { $first: "$customer.mobile" },
+          alternateMobile: { $first: "$customer.alternateMobile" },
+          address: { $first: "$customer.address" },
+          city: { $first: "$customer.city" },
+          pincode: { $first: "$customer.pincode" },
+          lastTicketDate: { $max: "$createdAt" },
+          ticketCount: { $sum: 1 }
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+    res.json(customers);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createTicket,
   getTickets,
@@ -339,5 +366,6 @@ module.exports = {
   updateTicketStatus,
   submitWorkCompletion,
   verifyWork,
-  closeTicket
+  closeTicket,
+  getCustomers
 };
