@@ -1369,7 +1369,7 @@ export default function App() {
                     {selectedTicket.invoiceImage && (
                       <div className="col-span-2">
                         <p className="text-xs text-slate-500 font-semibold">Invoice Attachment</p>
-                        <a href={`http://localhost:5050/${selectedTicket.invoiceImage}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:text-violet-300 text-xs font-bold underline mt-1 inline-block">View Uploaded Invoice Image</a>
+                        <a href={`/${selectedTicket.invoiceImage}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:text-violet-300 text-xs font-bold underline mt-1 inline-block">View Uploaded Invoice Image</a>
                       </div>
                     )}
                   </div>
@@ -1391,8 +1391,8 @@ export default function App() {
                         <p className="text-xs text-slate-500 font-semibold mb-2">Completion Photos</p>
                         <div className="grid grid-cols-3 gap-2">
                           {selectedTicket.completion.photos.map((photo, i) => (
-                            <a key={i} href={`http://localhost:5050/${photo}`} target="_blank" rel="noreferrer">
-                              <img src={`http://localhost:5050/${photo}`} alt="Completion" className="rounded-lg object-cover w-full h-24 border border-slate-700" />
+                            <a key={i} href={`/${photo}`} target="_blank" rel="noreferrer">
+                              <img src={`/${photo}`} alt="Completion" className="rounded-lg object-cover w-full h-24 border border-slate-700" />
                             </a>
                           ))}
                         </div>
