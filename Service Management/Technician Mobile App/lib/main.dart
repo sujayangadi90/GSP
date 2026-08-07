@@ -910,7 +910,7 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, py: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.purple.shade900.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(20),
