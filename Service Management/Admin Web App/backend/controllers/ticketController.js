@@ -64,7 +64,53 @@ const getTickets = async (req, res) => {
     if (status) query.status = status;
     if (type) query.type = type;
     if (customerMobile) query['customer.mobile'] = customerMobile;
-    if (dealer && req.user.role === 'admin') query.dealer = dealer;
+    if (dealer && req.user.role === 'admin') {
+      query.dealer = dealer;
+
+      if (req.query.dealerFilter) {
+        const start = new Date(`${fromDate}T00:00:00`);
+        const end = new Date(`${toDate}T23:59:59.999`);
+        query.createdAt = { $gte: start, $lte: end };
+
+        const tickets = await Ticket.find(query)
+          .populate('dealer', 'name code email mobile')
+          .populate('assignedTechnician', 'name code mobile')
+          .sort({ createdAt: -1 });
+
+        const totalCount = await Ticket.countDocuments({
+          dealer,
+          createdAt: { $gte: start, $lte: end }
+        });
+
+        const completedCount = await Ticket.countDocuments({
+          dealer,
+          status: { $in: ['completed', 'closed'] },
+          createdAt: { $gte: start, $lte: end }
+        });
+
+        const inProgressCount = await Ticket.countDocuments({
+          dealer,
+          status: { $in: ['assigned', 'in_progress'] },
+          createdAt: { $gte: start, $lte: end }
+        });
+
+        const pendingVerificationCount = await Ticket.countDocuments({
+          dealer,
+          status: 'verification_pending',
+          createdAt: { $gte: start, $lte: end }
+        });
+
+        return res.json({
+          tickets,
+          summary: {
+            total: totalCount,
+            completed: completedCount,
+            inProgress: inProgressCount,
+            pendingVerification: pendingVerificationCount
+          }
+        });
+      }
+    }
     
     if (technician && req.user.role === 'admin') {
       query.assignedTechnician = technician;

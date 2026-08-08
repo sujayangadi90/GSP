@@ -180,6 +180,17 @@ export default function App() {
     pendingVerification: 0
   });
 
+  // Dealer History Filter states
+  const [dealerFromDate, setDealerFromDate] = useState(todayStr);
+  const [dealerToDate, setDealerToDate] = useState(todayStr);
+  const [dealerPerformanceStats, setDealerPerformanceStats] = useState({
+    total: 0,
+    completed: 0,
+    inProgress: 0,
+    pendingVerification: 0
+  });
+  const [isDealerFilterApplied, setIsDealerFilterApplied] = useState(false);
+
   // Follow-ups states
   const [followUps, setFollowUps] = useState([]);
   const [followUpFilters, setFollowUpFilters] = useState({
@@ -357,6 +368,28 @@ export default function App() {
     }
   };
 
+  const fetchDealerHistory = async () => {
+    if (!dealerFromDate || !dealerToDate) {
+      alert('Both dates are mandatory.');
+      return;
+    }
+    if (dealerFromDate > dealerToDate) {
+      alert('From Date cannot be greater than To Date.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await apiFetch(`/tickets?dealer=${historyEntity._id}&fromDate=${dealerFromDate}&toDate=${dealerToDate}&dealerFilter=true`);
+      setHistoryTickets(data.tickets);
+      setDealerPerformanceStats(data.summary);
+      setIsDealerFilterApplied(true);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchTechnicianHistory = async () => {
     if (!techFromDate || !techToDate) {
       alert('Both dates are mandatory.');
@@ -391,6 +424,10 @@ export default function App() {
       if (type === 'customer') {
         url = `/tickets?customerMobile=${entity.mobile}`;
       } else if (type === 'dealer') {
+        // Reset dealer filter states to today but filter not applied initially
+        setDealerFromDate(todayStr);
+        setDealerToDate(todayStr);
+        setIsDealerFilterApplied(false);
         url = `/tickets?dealer=${entity._id}`;
       } else if (type === 'technician') {
         // Reset default technician filter states
@@ -1922,6 +1959,38 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+              )}              {/* Dealer Date-based Filter */}
+              {historyContext === 'dealer' && (
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-wrap items-end gap-6">
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">FROM DATE</label>
+                    <input
+                      type="date"
+                      required
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      value={dealerFromDate}
+                      onChange={e => setDealerFromDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">TO DATE</label>
+                    <input
+                      type="date"
+                      required
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      value={dealerToDate}
+                      onChange={e => setDealerToDate(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <button
+                      onClick={fetchDealerHistory}
+                      className="bg-violet-600 hover:bg-violet-500 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition duration-150 cursor-pointer shadow-md"
+                    >
+                      GO
+                    </button>
+                  </div>
+                </div>
               )}
 
               {/* Stats Counters inside history */}
@@ -1968,6 +2037,39 @@ export default function App() {
                     </div>
                   </div>
                 )
+              ) : historyContext === 'dealer' ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                    <span className="text-slate-500 text-xs font-semibold uppercase">Total Requests</span>
+                    <p className="text-2xl font-bold text-white mt-1">
+                      {isDealerFilterApplied ? dealerPerformanceStats.total : historyTickets.length}
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                    <span className="text-emerald-500/80 text-xs font-semibold uppercase">Completed</span>
+                    <p className="text-2xl font-bold text-emerald-400 mt-1">
+                      {isDealerFilterApplied
+                        ? dealerPerformanceStats.completed
+                        : historyTickets.filter(t => t.status === 'completed' || t.status === 'closed').length}
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                    <span className="text-amber-500/80 text-xs font-semibold uppercase">In Progress / Assigned</span>
+                    <p className="text-2xl font-bold text-amber-400 mt-1">
+                      {isDealerFilterApplied
+                        ? dealerPerformanceStats.inProgress
+                        : historyTickets.filter(t => t.status === 'assigned' || t.status === 'in_progress').length}
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                    <span className="text-yellow-500/80 text-xs font-semibold uppercase">Pending Verification</span>
+                    <p className="text-2xl font-bold text-yellow-400 mt-1">
+                      {isDealerFilterApplied
+                        ? dealerPerformanceStats.pendingVerification
+                        : historyTickets.filter(t => t.status === 'verification_pending').length}
+                    </p>
+                  </div>
+                </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
@@ -1977,7 +2079,7 @@ export default function App() {
                   <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
                     <span className="text-emerald-500/80 text-xs font-semibold uppercase">Completed</span>
                     <p className="text-2xl font-bold text-emerald-400 mt-1">
-                      {historyTickets.filter(t => t.status === 'completed').length}
+                      {historyTickets.filter(t => t.status === 'completed' || t.status === 'closed').length}
                     </p>
                   </div>
                   <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
@@ -1989,7 +2091,7 @@ export default function App() {
                   <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
                     <span className="text-yellow-500/80 text-xs font-semibold uppercase">Pending Verification</span>
                     <p className="text-2xl font-bold text-yellow-400 mt-1">
-                      {historyTickets.filter(t => t.status === 'pending' || t.status === 'verification_pending').length}
+                      {historyTickets.filter(t => t.status === 'verification_pending').length}
                     </p>
                   </div>
                 </div>
