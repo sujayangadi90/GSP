@@ -110,6 +110,65 @@ export default function App() {
   const [historyTickets, setHistoryTickets] = useState([]);
   const [historySearchQuery, setHistorySearchQuery] = useState('');
 
+  // Dashboard Date Filter states
+  const getLocalDateString = (date = new Date()) => {
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+  };
+
+  const calculatePredefinedRange = (filterName) => {
+    const today = new Date();
+    let fromDate = new Date();
+    let toDate = new Date();
+
+    switch (filterName) {
+      case 'Today':
+        break;
+      case 'Yesterday':
+        fromDate.setDate(today.getDate() - 1);
+        toDate.setDate(today.getDate() - 1);
+        break;
+      case 'Last 7 Days':
+        fromDate.setDate(today.getDate() - 6);
+        break;
+      case 'Last 30 Days':
+        fromDate.setDate(today.getDate() - 29);
+        break;
+      case 'This Month':
+        fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        break;
+      case 'Last Month':
+        fromDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        toDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        break;
+      case 'This Year':
+        fromDate = new Date(today.getFullYear(), 0, 1);
+        break;
+      default:
+        break;
+    }
+
+    return {
+      fromDate: getLocalDateString(fromDate),
+      toDate: getLocalDateString(toDate)
+    };
+  };
+
+  const todayStr = getLocalDateString();
+  const [dashboardDateFilter, setDashboardDateFilter] = useState('Today');
+  const [dashboardCustomRange, setDashboardCustomRange] = useState({
+    fromDate: todayStr,
+    toDate: todayStr
+  });
+  const [appliedDashboardRange, setAppliedDashboardRange] = useState({
+    fromDate: todayStr,
+    toDate: todayStr
+  });
+  const [dashboardPendingVerifications, setDashboardPendingVerifications] = useState([]);
+  const [dashboardNewUnassigned, setDashboardNewUnassigned] = useState([]);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+
   // Follow-ups states
   const [followUps, setFollowUps] = useState([]);
   const [followUpFilters, setFollowUpFilters] = useState({
@@ -198,6 +257,20 @@ export default function App() {
     setToken('');
     localStorage.removeItem('gsp_user');
     localStorage.removeItem('gsp_token');
+  };
+
+  const fetchDashboardData = async () => {
+    try {
+      setDashboardLoading(true);
+      const data = await apiFetch(`/tickets/dashboard?fromDate=${appliedDashboardRange.fromDate}&toDate=${appliedDashboardRange.toDate}`);
+      setStats(data.stats);
+      setDashboardPendingVerifications(data.pendingVerifications);
+      setDashboardNewUnassigned(data.newUnassignedTickets);
+    } catch (err) {
+      console.error('Error fetching dashboard stats:', err);
+    } finally {
+      setDashboardLoading(false);
+    }
   };
 
   const fetchData = async () => {
@@ -311,12 +384,14 @@ export default function App() {
         fetchCustomers();
       } else if (activeTab === 'followups') {
         fetchFollowUps();
+      } else if (activeTab === 'dashboard') {
+        fetchDashboardData();
       } else {
         fetchData();
         fetchCities();
       }
     }
-  }, [dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters]);
+  }, [dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange]);
 
   useEffect(() => {
     setCustomerPage(1);
@@ -838,103 +913,174 @@ export default function App() {
           {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
             <div className="space-y-8">
-              <div>
-                <h1 className="text-3xl font-extrabold text-white tracking-tight">Overview Dashboard</h1>
-                <p className="text-slate-400 mt-1">Real-time statistics of service operations</p>
-              </div>
-
-              {/* Stat Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Requests</span>
-                  <span className="text-3xl font-black text-white mt-2">{stats.total}</span>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight">Overview Dashboard</h1>
+                  <p className="text-slate-400 mt-1">Real-time statistics of service operations</p>
                 </div>
-                <div className="bg-blue-950/20 border border-blue-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
-                  <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">New Requests</span>
-                  <span className="text-3xl font-black text-blue-400 mt-2">{stats.new}</span>
-                </div>
-                <div className="bg-amber-950/20 border border-amber-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
-                  <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Assigned</span>
-                  <span className="text-3xl font-black text-amber-400 mt-2">{stats.assigned}</span>
-                </div>
-                <div className="bg-purple-950/20 border border-purple-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
-                  <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Pending/Action</span>
-                  <span className="text-3xl font-black text-purple-400 mt-2">{stats.pending}</span>
-                </div>
-                <div className="bg-emerald-950/20 border border-emerald-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
-                  <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Closed</span>
-                  <span className="text-3xl font-black text-emerald-400 mt-2">{stats.closed}</span>
-                </div>
-              </div>
-
-              {/* Quick Actions / Recent activity */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Pending Verification list */}
-                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <UserCheck className="w-5 h-5 text-purple-400" />
-                      Pending Work Verifications
-                    </h3>
-                    <span className="bg-purple-900/50 text-purple-200 text-xs px-2.5 py-1 rounded-full font-bold">
-                      {tickets.filter(t => t.status === 'verification_pending').length} Action Required
-                    </span>
-                  </div>
-                  <div className="divide-y divide-slate-800 max-h-96 overflow-y-auto">
-                    {tickets.filter(t => t.status === 'verification_pending').length === 0 ? (
-                      <p className="text-slate-500 py-6 text-center text-sm font-medium">No pending work verifications</p>
-                    ) : (
-                      tickets.filter(t => t.status === 'verification_pending').map(ticket => (
-                        <div key={ticket._id} className="py-4 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition duration-150">
-                          <div>
-                            <p className="text-sm font-bold text-white">{ticket.ticketNumber} • {ticket.customer.name}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">Technician: {ticket.assignedTechnician?.name || 'N/A'}</p>
-                          </div>
-                          <button 
-                            onClick={() => setSelectedTicket(ticket)}
-                            className="bg-violet-600 hover:bg-violet-500 px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer"
-                          >
-                            Verify Work
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* New Tickets pending assignment */}
-                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Clock className="w-5 h-5 text-blue-400" />
-                      New Unassigned Tickets
-                    </h3>
-                    <span className="bg-blue-900/50 text-blue-200 text-xs px-2.5 py-1 rounded-full font-bold">
-                      {tickets.filter(t => t.status === 'new').length} Unassigned
-                    </span>
-                  </div>
-                  <div className="divide-y divide-slate-800 max-h-96 overflow-y-auto">
-                    {tickets.filter(t => t.status === 'new').length === 0 ? (
-                      <p className="text-slate-500 py-6 text-center text-sm font-medium">No unassigned tickets</p>
-                    ) : (
-                      tickets.filter(t => t.status === 'new').map(ticket => (
-                        <div key={ticket._id} className="py-4 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition duration-150">
-                          <div>
-                            <p className="text-sm font-bold text-white">{ticket.ticketNumber} • {ticket.customer.name}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">{ticket.customer.city} • {ticket.type}</p>
-                          </div>
-                          <button 
-                            onClick={() => setSelectedTicket(ticket)}
-                            className="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer"
-                          >
-                            Assign Tech
-                          </button>
-                        </div>
-                      ))
-                    )}
+                
+                {/* Date Filter */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {dashboardDateFilter === 'Custom' && (
+                    <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-2 rounded-xl">
+                      <input 
+                        type="date"
+                        className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-hidden"
+                        value={dashboardCustomRange.fromDate}
+                        onChange={e => setDashboardCustomRange({ ...dashboardCustomRange, fromDate: e.target.value })}
+                      />
+                      <span className="text-xs text-slate-500">to</span>
+                      <input 
+                        type="date"
+                        className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-hidden"
+                        value={dashboardCustomRange.toDate}
+                        onChange={e => setDashboardCustomRange({ ...dashboardCustomRange, toDate: e.target.value })}
+                      />
+                      <button
+                        onClick={() => {
+                          if (dashboardCustomRange.fromDate > dashboardCustomRange.toDate) {
+                            alert('From Date cannot be later than To Date');
+                            return;
+                          }
+                          setAppliedDashboardRange({
+                            fromDate: dashboardCustomRange.fromDate,
+                            toDate: dashboardCustomRange.toDate
+                          });
+                        }}
+                        className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-2.5 py-1 rounded-lg font-bold transition cursor-pointer"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  )}
+                  
+                  <div className="relative">
+                    <select
+                      className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      value={dashboardDateFilter}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setDashboardDateFilter(val);
+                        if (val !== 'Custom') {
+                          const range = calculatePredefinedRange(val);
+                          setAppliedDashboardRange(range);
+                        }
+                      }}
+                    >
+                      <option value="Today">Today</option>
+                      <option value="Yesterday">Yesterday</option>
+                      <option value="Last 7 Days">Last 7 Days</option>
+                      <option value="Last 30 Days">Last 30 Days</option>
+                      <option value="This Month">This Month</option>
+                      <option value="Last Month">Last Month</option>
+                      <option value="This Year">This Year</option>
+                      <option value="Custom">Custom Date Range</option>
+                    </select>
                   </div>
                 </div>
               </div>
+
+              {dashboardLoading ? (
+                <div className="flex flex-col items-center justify-center py-24 gap-4">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-violet-600"></div>
+                  <p className="text-slate-400 text-sm font-medium">Refreshing stats...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Stat Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Requests</span>
+                      <span className="text-3xl font-black text-white mt-2">{stats.total}</span>
+                    </div>
+                    <div className="bg-blue-950/20 border border-blue-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                      <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">New Requests</span>
+                      <span className="text-3xl font-black text-blue-400 mt-2">{stats.new}</span>
+                    </div>
+                    <div className="bg-amber-950/20 border border-amber-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                      <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Assigned</span>
+                      <span className="text-3xl font-black text-amber-400 mt-2">{stats.assigned}</span>
+                    </div>
+                    <div className="bg-purple-950/20 border border-purple-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                      <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Pending/Action</span>
+                      <span className="text-3xl font-black text-purple-400 mt-2">{stats.pending}</span>
+                    </div>
+                    <div className="bg-emerald-950/20 border border-emerald-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                      <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Closed</span>
+                      <span className="text-3xl font-black text-emerald-400 mt-2">{stats.closed}</span>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions / Recent activity */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Pending Verification list */}
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                          <UserCheck className="w-5 h-5 text-purple-400" />
+                          Pending Work Verifications
+                        </h3>
+                        <span className="bg-purple-900/50 text-purple-200 text-xs px-2.5 py-1 rounded-full font-bold">
+                          {dashboardPendingVerifications.length} Action Required
+                        </span>
+                      </div>
+                      <div className="divide-y divide-slate-800 max-h-96 overflow-y-auto">
+                        {dashboardPendingVerifications.length === 0 ? (
+                          <p className="text-slate-500 py-6 text-center text-sm font-medium">No pending work verifications</p>
+                        ) : (
+                          dashboardPendingVerifications.map(ticket => (
+                            <div key={ticket._id} className="py-4 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition duration-150">
+                              <div>
+                                <p className="text-sm font-bold text-white">{ticket.ticketNumber} • {ticket.customer.name}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">Technician: {ticket.assignedTechnician?.name || 'N/A'}</p>
+                              </div>
+                              <button 
+                                onClick={() => setSelectedTicket(ticket)}
+                                className="bg-violet-600 hover:bg-violet-500 px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer"
+                              >
+                                Verify Work
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* New Tickets pending assignment */}
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                          <Clock className="w-5 h-5 text-blue-400" />
+                          New Unassigned Tickets
+                        </h3>
+                        <span className="bg-blue-900/50 text-blue-200 text-xs px-2.5 py-1 rounded-full font-bold">
+                          {dashboardNewUnassigned.length} Unassigned
+                        </span>
+                      </div>
+                      <div className="divide-y divide-slate-800 max-h-96 overflow-y-auto">
+                        {dashboardNewUnassigned.length === 0 ? (
+                          <p className="text-slate-500 py-6 text-center text-sm font-medium">No unassigned tickets</p>
+                        ) : (
+                          dashboardNewUnassigned.map(ticket => (
+                            <div key={ticket._id} className="py-4 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition duration-150">
+                              <div>
+                                <p className="text-sm font-bold text-white">{ticket.ticketNumber} • {ticket.customer.name}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">{ticket.customer.city} • {ticket.type}</p>
+                              </div>
+                              <button 
+                                onClick={() => setSelectedTicket(ticket)}
+                                className="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer"
+                              >
+                                Assign Tech
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

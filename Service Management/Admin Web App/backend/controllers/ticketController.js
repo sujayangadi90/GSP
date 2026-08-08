@@ -369,6 +369,96 @@ const getCustomers = async (req, res) => {
   }
 };
 
+// @desc    Get dashboard statistics with date filters
+// @route   GET /api/tickets/dashboard
+// @access  Private/Admin
+const getDashboardStats = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query;
+    if (!fromDate || !toDate) {
+      return res.status(400).json({ message: 'fromDate and toDate are required' });
+    }
+
+    const start = new Date(`${fromDate}T00:00:00`);
+    const end = new Date(`${toDate}T23:59:59.999`);
+
+    // Total Requests: tickets created within [start, end]
+    const totalCount = await Ticket.countDocuments({
+      createdAt: { $gte: start, $lte: end }
+    });
+
+    // New Requests: tickets created within [start, end] with status 'new'
+    const newCount = await Ticket.countDocuments({
+      createdAt: { $gte: start, $lte: end },
+      status: 'new'
+    });
+
+    // Assigned Requests: assignment date within [start, end] and status !== 'new'
+    const assignedCount = await Ticket.countDocuments({
+      status: { $ne: 'new' },
+      timeline: {
+        $elemMatch: {
+          status: 'assigned',
+          timestamp: { $gte: start, $lte: end }
+        }
+      }
+    });
+
+    // Pending/Action Requests: in_progress, verification_pending, or completed
+    // whose status entry timestamp (or updatedAt fallback) is in the date range
+    const pendingTickets = await Ticket.find({
+      status: { $in: ['in_progress', 'verification_pending', 'completed'] }
+    });
+    const pendingCount = pendingTickets.filter(ticket => {
+      const currentStatusTimeline = [...ticket.timeline]
+        .reverse()
+        .find(item => item.status === ticket.status);
+      if (currentStatusTimeline) {
+        const ts = new Date(currentStatusTimeline.timestamp);
+        return ts >= start && ts <= end;
+      }
+      return ticket.updatedAt >= start && ticket.updatedAt <= end;
+    }).length;
+
+    // Closed Requests: closedAt in [start, end] and status === 'closed'
+    const closedCount = await Ticket.countDocuments({
+      status: 'closed',
+      closedAt: { $gte: start, $lte: end }
+    });
+
+    // Pending Work Verifications: status === 'verification_pending' and verification request date (completion.submittedAt) in [start, end]
+    const pendingVerifications = await Ticket.find({
+      status: 'verification_pending',
+      'completion.submittedAt': { $gte: start, $lte: end }
+    })
+    .populate('dealer', 'name code email mobile')
+    .populate('assignedTechnician', 'name code mobile')
+    .sort({ 'completion.submittedAt': -1 });
+
+    // New Unassigned Tickets: status === 'new' and createdAt in [start, end]
+    const newUnassignedTickets = await Ticket.find({
+      status: 'new',
+      createdAt: { $gte: start, $lte: end }
+    })
+    .populate('dealer', 'name code email mobile')
+    .sort({ createdAt: -1 });
+
+    res.json({
+      stats: {
+        total: totalCount,
+        new: newCount,
+        assigned: assignedCount,
+        pending: pendingCount,
+        closed: closedCount
+      },
+      pendingVerifications,
+      newUnassignedTickets
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createTicket,
   getTickets,
@@ -378,5 +468,6 @@ module.exports = {
   submitWorkCompletion,
   verifyWork,
   closeTicket,
-  getCustomers
+  getCustomers,
+  getDashboardStats
 };

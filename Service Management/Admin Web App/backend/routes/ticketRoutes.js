@@ -8,7 +8,8 @@ const {
   submitWorkCompletion,
   verifyWork,
   closeTicket,
-  getCustomers
+  getCustomers,
+  getDashboardStats
 } = require('../controllers/ticketController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -23,6 +24,9 @@ router.route('/')
 
 router.route('/customers')
   .get(authorize('admin'), getCustomers);
+
+router.route('/dashboard')
+  .get(authorize('admin'), getDashboardStats);
 
 // Single ticket detail
 router.route('/:id')
