@@ -499,7 +499,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         context,
         MaterialPageRoute(
           builder: (context) => JobHistoryScreen(
-            jobs: _jobs,
+            token: widget.token,
             apiUrl: widget.apiUrl,
           ),
         ),
@@ -861,19 +861,82 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
 }
 
 class JobHistoryScreen extends StatefulWidget {
-  final List jobs;
+  final String token;
   final String apiUrl;
 
-  const JobHistoryScreen({super.key, required this.jobs, required this.apiUrl});
+  const JobHistoryScreen({super.key, required this.token, required this.apiUrl});
 
   @override
   State<JobHistoryScreen> createState() => _JobHistoryScreenState();
 }
 
 class _JobHistoryScreenState extends State<JobHistoryScreen> {
+  List _jobs = [];
+  bool _isLoading = false;
+  bool _isMoreLoading = false;
+  int _currentPage = 1;
+  bool _hasMore = false;
+
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
   String _selectedStatusFilter = 'closed'; // 'assigned' or 'closed'
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchJobs();
+  }
+
+  Future<void> _fetchJobs({bool isLoadMore = false}) async {
+    if (isLoadMore) {
+      setState(() => _isMoreLoading = true);
+    } else {
+      setState(() {
+        _isLoading = true;
+        _jobs = [];
+        _currentPage = 1;
+        _hasMore = false;
+      });
+    }
+
+    try {
+      final queryParams = 'month=$_selectedMonth&year=$_selectedYear&status=$_selectedStatusFilter&page=$_currentPage&limit=10';
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/tickets?$queryParams'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}'
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final Map<String, dynamic> body = jsonDecode(res.body);
+        final List data = body['data'] ?? [];
+        setState(() {
+          if (isLoadMore) {
+            _jobs.addAll(data);
+          } else {
+            _jobs = data;
+          }
+          _hasMore = body['hasMore'] ?? false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching jobs: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+        _isMoreLoading = false;
+      });
+    }
+  }
+
+  void _onLoadMore() {
+    if (_hasMore && !_isMoreLoading) {
+      _currentPage++;
+      _fetchJobs(isLoadMore: true);
+    }
+  }
 
   String _getMonthName(int month) {
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -898,30 +961,6 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
       }
     }
     return 'N/A';
-  }
-
-  bool _matchesFilters(dynamic job) {
-    // 1. Status Filter
-    final status = job['status']?.toString().toLowerCase() ?? '';
-    if (_selectedStatusFilter == 'assigned') {
-      if (status != 'assigned' && status != 'in_progress') return false;
-    } else {
-      if (status != 'completed' && status != 'verification_pending' && status != 'closed') return false;
-    }
-
-    // 2. Month & Year Filter based on assignment date (or createdAt)
-    DateTime? assignDate;
-    if (job['timeline'] != null && job['timeline'] is List) {
-      for (var entry in job['timeline']) {
-        if (entry['status'] == 'assigned' && entry['timestamp'] != null) {
-          assignDate = DateTime.tryParse(entry['timestamp']);
-          break;
-        }
-      }
-    }
-    assignDate ??= DateTime.tryParse(job['createdAt'] ?? '');
-    if (assignDate == null) return false;
-    return assignDate.month == _selectedMonth && assignDate.year == _selectedYear;
   }
 
   Future<void> _selectMonthYear(BuildContext context) async {
@@ -1001,6 +1040,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                       _selectedYear = tempYear;
                     });
                     Navigator.pop(context);
+                    _fetchJobs();
                   },
                   child: const Text('Select', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
                 ),
@@ -1064,8 +1104,6 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = widget.jobs.where(_matchesFilters).toList();
-
     return Scaffold(
       appBar: AppBar(title: const Text('Job History')),
       body: Column(
@@ -1117,6 +1155,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                         setState(() {
                           _selectedStatusFilter = 'assigned';
                         });
+                        _fetchJobs();
                       }
                     },
                   ),
@@ -1131,6 +1170,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                         setState(() {
                           _selectedStatusFilter = 'closed';
                         });
+                        _fetchJobs();
                       }
                     },
                   ),
@@ -1139,81 +1179,101 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
             ),
           ),
           Expanded(
-            child: filtered.isEmpty
-              ? const Center(child: Text('No matching jobs found', style: TextStyle(color: Colors.grey)))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    final job = filtered[index];
-                    final customerName = job['customer']['name'] ?? 'N/A';
-                    final applianceName = job['product']['name'] ?? 'N/A';
-                    final brand = job['product']['category'] ?? 'N/A';
-                    final scope = job['type']?.toString().toUpperCase() ?? 'SERVICE';
-                    final assignedDateStr = _getAssignedDate(job);
-                    final photos = job['completion']?['photos'] as List?;
-                    final hasPhotos = photos != null && photos.isNotEmpty;
+            child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _jobs.isEmpty
+                ? const Center(child: Text('No matching jobs found', style: TextStyle(color: Colors.grey)))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _jobs.length + (_hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == _jobs.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          child: Center(
+                            child: _isMoreLoading
+                              ? const CircularProgressIndicator()
+                              : ElevatedButton(
+                                  onPressed: _onLoadMore,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF004D40), // Teal dark
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  child: const Text('Load More'),
+                                ),
+                          ),
+                        );
+                      }
+                      final job = _jobs[index];
+                      final customerName = job['customer']['name'] ?? 'N/A';
+                      final applianceName = job['product']['name'] ?? 'N/A';
+                      final brand = job['product']['category'] ?? 'N/A';
+                      final scope = job['type']?.toString().toUpperCase() ?? 'SERVICE';
+                      final assignedDateStr = _getAssignedDate(job);
+                      final photos = job['completion']?['photos'] as List?;
+                      final hasPhotos = photos != null && photos.isNotEmpty;
 
-                    return Card(
-                      color: const Color(0xFF1E2422),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: Colors.teal.withOpacity(0.15)),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  job['ticketNumber'] ?? 'TKT-????',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.teal.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    job['status'].toString().toUpperCase(),
-                                    style: const TextStyle(color: Colors.teal, fontSize: 10, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text('Customer: $customerName', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                            const SizedBox(height: 4),
-                            Text('Appliance: $applianceName ($brand)', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                            const SizedBox(height: 4),
-                            Text('Type: $scope', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                            const SizedBox(height: 4),
-                            Text('Assigned: $assignedDateStr', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                            if (hasPhotos) ...[
-                              const SizedBox(height: 12),
-                              ElevatedButton.icon(
-                                onPressed: () => _viewPhotos(context, photos),
-                                icon: const Icon(Icons.photo_library, size: 16),
-                                label: const Text('View Photos'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal[900],
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                              ),
-                            ]
-                          ],
+                      return Card(
+                        color: const Color(0xFF1E2422),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: Colors.teal.withOpacity(0.15)),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    job['ticketNumber'] ?? 'TKT-????',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.teal.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      job['status'].toString().toUpperCase(),
+                                      style: const TextStyle(color: Colors.teal, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text('Customer: $customerName', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                              const SizedBox(height: 4),
+                              Text('Appliance: $applianceName ($brand)', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                              const SizedBox(height: 4),
+                              Text('Type: $scope', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                              const SizedBox(height: 4),
+                              Text('Assigned: $assignedDateStr', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                              if (hasPhotos) ...[
+                                const SizedBox(height: 12),
+                                ElevatedButton.icon(
+                                  onPressed: () => _viewPhotos(context, photos),
+                                  icon: const Icon(Icons.photo_library, size: 16),
+                                  label: const Text('View Photos'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.teal[900],
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                ),
+                              ]
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

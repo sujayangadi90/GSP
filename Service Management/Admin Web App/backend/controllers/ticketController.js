@@ -70,6 +70,14 @@ const getTickets = async (req, res) => {
         } else {
           query.status = status;
         }
+      } else if (req.user.role === 'technician') {
+        if (status === 'assigned') {
+          query.status = { $in: ['assigned', 'in_progress'] };
+        } else if (status === 'closed') {
+          query.status = { $in: ['completed', 'verification_pending', 'closed'] };
+        } else {
+          query.status = status;
+        }
       } else {
         query.status = status;
       }
