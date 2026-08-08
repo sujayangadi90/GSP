@@ -202,6 +202,7 @@ export default function App() {
   const [customerPage, setCustomerPage] = useState(1);
   const [followUpPage, setFollowUpPage] = useState(1);
   const [ticketPage, setTicketPage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
 
   // Filters & Searches
   const [dealerSearch, setDealerSearch] = useState('');
@@ -383,6 +384,7 @@ export default function App() {
       setHistoryTickets(data.tickets);
       setDealerPerformanceStats(data.summary);
       setIsDealerFilterApplied(true);
+      setHistoryPage(1);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -404,6 +406,7 @@ export default function App() {
       const data = await apiFetch(`/tickets?technician=${historyEntity._id}&fromDate=${techFromDate}&toDate=${techToDate}&performanceFilter=${techStatusFilter}`);
       setHistoryTickets(data.tickets);
       setTechPerformanceStats(data.summary);
+      setHistoryPage(1);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -417,6 +420,7 @@ export default function App() {
     setHistoryTabBack(backTab);
     setHistoryTickets([]);
     setHistorySearchQuery('');
+    setHistoryPage(1);
     setActiveTab('history_view');
     setLoading(true);
     try {
@@ -482,6 +486,10 @@ export default function App() {
   useEffect(() => {
     setTicketPage(1);
   }, [ticketFilters, dealerSearch, techSearch]);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [historySearchQuery]);
 
   // Appliance Actions
   const saveAppliance = async (e) => {
@@ -2099,21 +2107,8 @@ export default function App() {
 
               {/* Requests List */}
               <div className="space-y-4">
-                {historyTickets.filter(t => {
-                  const s = historySearchQuery.toLowerCase();
-                  return (
-                    (t.ticketNumber && t.ticketNumber.toLowerCase().includes(s)) ||
-                    (t.product?.category && t.product.category.toLowerCase().includes(s)) ||
-                    (t.product?.name && t.product.name.toLowerCase().includes(s)) ||
-                    (t.customer?.name && t.customer.name.toLowerCase().includes(s)) ||
-                    (t.status && t.status.toLowerCase().includes(s))
-                  );
-                }).length === 0 ? (
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl py-16 text-center text-slate-500 text-sm">
-                    No matching service or repair requests found.
-                  </div>
-                ) : (
-                  historyTickets.filter(t => {
+                {(() => {
+                  const filtered = historyTickets.filter(t => {
                     const s = historySearchQuery.toLowerCase();
                     return (
                       (t.ticketNumber && t.ticketNumber.toLowerCase().includes(s)) ||
@@ -2122,57 +2117,105 @@ export default function App() {
                       (t.customer?.name && t.customer.name.toLowerCase().includes(s)) ||
                       (t.status && t.status.toLowerCase().includes(s))
                     );
-                  }).map(ticket => (
-                    <div key={ticket._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 hover:shadow-xl transition duration-150">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg font-black text-white">{ticket.ticketNumber}</span>
-                          <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${
-                            ticket.type === 'installation' ? 'bg-cyan-950 text-cyan-400 border border-cyan-900/50' : 'bg-amber-950 text-amber-400 border border-amber-900/50'
-                          }`}>
-                            {ticket.type}
-                          </span>
-                        </div>
-                        <span className={`text-xs px-3 py-1.5 rounded-xl font-bold uppercase ${
-                          ticket.status === 'completed' ? 'bg-emerald-950 text-emerald-400' :
-                          ticket.status === 'pending' ? 'bg-yellow-950 text-yellow-400' :
-                          ticket.status === 'assigned' ? 'bg-blue-950 text-blue-400' :
-                          'bg-slate-800 text-slate-400'
-                        }`}>
-                          {ticket.status}
-                        </span>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                        <div className="space-y-1">
-                          <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Customer Details</p>
-                          <p className="text-white font-bold">{ticket.customer?.name}</p>
-                          <p className="text-slate-450">{ticket.customer?.mobile} | {ticket.customer?.city}</p>
-                          <p className="text-slate-450 text-xs truncate max-w-xs">{ticket.customer?.address}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Product & Device</p>
-                          <p className="text-white font-bold">{ticket.product?.category} - {ticket.product?.name}</p>
-                          <p className="text-slate-450 font-mono text-xs">Model: {ticket.product?.modelNumber || '—'}</p>
-                          <p className="text-slate-450 font-mono text-xs">Serial: {ticket.product?.serialNumber || '—'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Partner Assignments</p>
-                          <p className="text-white font-medium">Dealer: {ticket.dealer?.name || '—'}</p>
-                          <p className="text-slate-450">Tech: {ticket.assignedTechnician?.name || 'Unassigned'}</p>
-                          <p className="text-slate-500 text-xs">Created: {new Date(ticket.createdAt).toLocaleString()}</p>
-                        </div>
-                      </div>
+                  });
 
-                      {ticket.serviceDetails?.description && (
-                        <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800 text-sm">
-                          <p className="text-slate-500 text-xs font-bold mb-1.5 uppercase">Issue Description:</p>
-                          <p className="text-slate-300 italic font-mono">"{ticket.serviceDetails.description}"</p>
+                  return (
+                    <>
+                      {filtered.length === 0 ? (
+                        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl py-16 text-center text-slate-500 text-sm">
+                          No matching service or repair requests found.
                         </div>
+                      ) : (
+                        filtered.slice((historyPage - 1) * 10, historyPage * 10).map(ticket => (
+                          <div key={ticket._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 hover:shadow-xl transition duration-150">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                              <div className="flex items-center gap-3">
+                                <span className="text-lg font-black text-white">{ticket.ticketNumber}</span>
+                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${
+                                  ticket.type === 'installation' ? 'bg-cyan-950 text-cyan-400 border border-cyan-900/50' : 'bg-amber-950 text-amber-400 border border-amber-900/50'
+                                }`}>
+                                  {ticket.type}
+                                </span>
+                              </div>
+                              <span className={`text-xs px-3 py-1.5 rounded-xl font-bold uppercase ${
+                                ticket.status === 'completed' ? 'bg-emerald-950 text-emerald-400' :
+                                ticket.status === 'pending' ? 'bg-yellow-950 text-yellow-400' :
+                                ticket.status === 'assigned' ? 'bg-blue-950 text-blue-400' :
+                                'bg-slate-800 text-slate-400'
+                              }`}>
+                                {ticket.status}
+                              </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                              <div className="space-y-1">
+                                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Customer Details</p>
+                                <p className="text-white font-bold">{ticket.customer?.name}</p>
+                                <p className="text-slate-450">{ticket.customer?.mobile} | {ticket.customer?.city}</p>
+                                <p className="text-slate-450 text-xs truncate max-w-xs">{ticket.customer?.address}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Product & Device</p>
+                                <p className="text-white font-bold">{ticket.product?.category} - {ticket.product?.name}</p>
+                                <p className="text-slate-450 font-mono text-xs">Model: {ticket.product?.modelNumber || '—'}</p>
+                                <p className="text-slate-450 font-mono text-xs">Serial: {ticket.product?.serialNumber || '—'}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Partner Assignments</p>
+                                <p className="text-white font-medium">Dealer: {ticket.dealer?.name || '—'}</p>
+                                <p className="text-slate-450">Tech: {ticket.assignedTechnician?.name || 'Unassigned'}</p>
+                                <p className="text-slate-500 text-xs">Created: {new Date(ticket.createdAt).toLocaleString()}</p>
+                              </div>
+                            </div>
+
+                            {ticket.serviceDetails?.description && (
+                              <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800 text-sm">
+                                <p className="text-slate-500 text-xs font-bold mb-1.5 uppercase">Issue Description:</p>
+                                <p className="text-slate-300 italic font-mono">"{ticket.serviceDetails.description}"</p>
+                              </div>
+                            )}
+                          </div>
+                        ))
                       )}
-                    </div>
-                  ))
-                )}
+
+                      {/* Pagination footer */}
+                      <div className="px-6 py-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between mt-6">
+                        <div className="text-xs text-slate-400">
+                          Showing <span className="font-semibold text-slate-200">{filtered.length === 0 ? 0 : (historyPage - 1) * 10 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(historyPage * 10, filtered.length)}</span> of <span className="font-semibold text-slate-200">{filtered.length}</span> entries
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setHistoryPage(prev => Math.max(prev - 1, 1))}
+                            disabled={historyPage === 1}
+                            className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                          >
+                            Previous
+                          </button>
+                          {Array.from({ length: Math.ceil(filtered.length / 10) }, (_, i) => i + 1).map(page => (
+                            <button
+                              key={page}
+                              onClick={() => setHistoryPage(page)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                                page === historyPage
+                                  ? 'bg-violet-600 text-white shadow-md'
+                                  : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => setHistoryPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filtered.length / 10))))}
+                            disabled={historyPage === Math.max(1, Math.ceil(filtered.length / 10))}
+                            className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-355 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           )}
