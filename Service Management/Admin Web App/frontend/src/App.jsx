@@ -169,6 +169,17 @@ export default function App() {
   const [dashboardNewUnassigned, setDashboardNewUnassigned] = useState([]);
   const [dashboardLoading, setDashboardLoading] = useState(false);
 
+  // Technician History Filter states
+  const [techFromDate, setTechFromDate] = useState(todayStr);
+  const [techToDate, setTechToDate] = useState(todayStr);
+  const [techStatusFilter, setTechStatusFilter] = useState('assigned_completed');
+  const [techPerformanceStats, setTechPerformanceStats] = useState({
+    total: 0,
+    completed: 0,
+    inProgress: 0,
+    pendingVerification: 0
+  });
+
   // Follow-ups states
   const [followUps, setFollowUps] = useState([]);
   const [followUpFilters, setFollowUpFilters] = useState({
@@ -346,6 +357,27 @@ export default function App() {
     }
   };
 
+  const fetchTechnicianHistory = async () => {
+    if (!techFromDate || !techToDate) {
+      alert('Both dates are mandatory.');
+      return;
+    }
+    if (techFromDate > techToDate) {
+      alert('From Date cannot be greater than To Date.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await apiFetch(`/tickets?technician=${historyEntity._id}&fromDate=${techFromDate}&toDate=${techToDate}&performanceFilter=${techStatusFilter}`);
+      setHistoryTickets(data.tickets);
+      setTechPerformanceStats(data.summary);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const viewHistory = async (type, entity, backTab) => {
     setHistoryContext(type);
     setHistoryEntity(entity);
@@ -361,10 +393,19 @@ export default function App() {
       } else if (type === 'dealer') {
         url = `/tickets?dealer=${entity._id}`;
       } else if (type === 'technician') {
-        url = `/tickets?technician=${entity._id}`;
+        // Reset default technician filter states
+        setTechFromDate(todayStr);
+        setTechToDate(todayStr);
+        setTechStatusFilter('assigned_completed');
+        url = `/tickets?technician=${entity._id}&fromDate=${todayStr}&toDate=${todayStr}&performanceFilter=assigned_completed`;
       }
       const data = await apiFetch(url);
-      setHistoryTickets(data);
+      if (type === 'technician') {
+        setHistoryTickets(data.tickets);
+        setTechPerformanceStats(data.summary);
+      } else {
+        setHistoryTickets(data);
+      }
     } catch (err) {
       alert(err.message);
     } finally {
@@ -1836,32 +1877,123 @@ export default function App() {
                   />
                 </div>
               </div>
+              
+              {/* Technician Date-based Performance Filter */}
+              {historyContext === 'technician' && (
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-wrap items-end gap-6">
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">FROM DATE</label>
+                    <input
+                      type="date"
+                      required
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      value={techFromDate}
+                      onChange={e => setTechFromDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">TO DATE</label>
+                    <input
+                      type="date"
+                      required
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      value={techToDate}
+                      onChange={e => setTechToDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">TICKET STATUS</label>
+                    <select
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      value={techStatusFilter}
+                      onChange={e => setTechStatusFilter(e.target.value)}
+                    >
+                      <option value="assigned_completed">Assigned & Completed</option>
+                      <option value="assigned">Assigned</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <button
+                      onClick={fetchTechnicianHistory}
+                      className="bg-violet-600 hover:bg-violet-500 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition duration-150 cursor-pointer shadow-md"
+                    >
+                      GO
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Stats Counters inside history */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
-                  <span className="text-slate-500 text-xs font-semibold uppercase">Total Requests</span>
-                  <p className="text-2xl font-bold text-white mt-1">{historyTickets.length}</p>
+              {historyContext === 'technician' ? (
+                techStatusFilter === 'assigned' ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-slate-500 text-xs font-semibold uppercase">Total Requests</span>
+                      <p className="text-2xl font-bold text-white mt-1">{techPerformanceStats.total}</p>
+                    </div>
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-amber-500/80 text-xs font-semibold uppercase">In Progress / Assigned</span>
+                      <p className="text-2xl font-bold text-amber-400 mt-1">{techPerformanceStats.inProgress}</p>
+                    </div>
+                  </div>
+                ) : techStatusFilter === 'completed' ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-emerald-500/80 text-xs font-semibold uppercase">Completed</span>
+                      <p className="text-2xl font-bold text-emerald-400 mt-1">{techPerformanceStats.completed}</p>
+                    </div>
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-yellow-500/80 text-xs font-semibold uppercase">Pending Verification</span>
+                      <p className="text-2xl font-bold text-yellow-400 mt-1">{techPerformanceStats.pendingVerification}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-slate-500 text-xs font-semibold uppercase">Total Requests</span>
+                      <p className="text-2xl font-bold text-white mt-1">{techPerformanceStats.total}</p>
+                    </div>
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-emerald-500/80 text-xs font-semibold uppercase">Completed</span>
+                      <p className="text-2xl font-bold text-emerald-400 mt-1">{techPerformanceStats.completed}</p>
+                    </div>
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-amber-500/80 text-xs font-semibold uppercase">In Progress / Assigned</span>
+                      <p className="text-2xl font-bold text-amber-400 mt-1">{techPerformanceStats.inProgress}</p>
+                    </div>
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-yellow-500/80 text-xs font-semibold uppercase">Pending Verification</span>
+                      <p className="text-2xl font-bold text-yellow-400 mt-1">{techPerformanceStats.pendingVerification}</p>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                    <span className="text-slate-500 text-xs font-semibold uppercase">Total Requests</span>
+                    <p className="text-2xl font-bold text-white mt-1">{historyTickets.length}</p>
+                  </div>
+                  <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                    <span className="text-emerald-500/80 text-xs font-semibold uppercase">Completed</span>
+                    <p className="text-2xl font-bold text-emerald-400 mt-1">
+                      {historyTickets.filter(t => t.status === 'completed').length}
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                    <span className="text-amber-500/80 text-xs font-semibold uppercase">In Progress / Assigned</span>
+                    <p className="text-2xl font-bold text-amber-400 mt-1">
+                      {historyTickets.filter(t => t.status === 'assigned' || t.status === 'in_progress').length}
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                    <span className="text-yellow-500/80 text-xs font-semibold uppercase">Pending Verification</span>
+                    <p className="text-2xl font-bold text-yellow-400 mt-1">
+                      {historyTickets.filter(t => t.status === 'pending' || t.status === 'verification_pending').length}
+                    </p>
+                  </div>
                 </div>
-                <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
-                  <span className="text-emerald-500/80 text-xs font-semibold uppercase">Completed</span>
-                  <p className="text-2xl font-bold text-emerald-400 mt-1">
-                    {historyTickets.filter(t => t.status === 'completed').length}
-                  </p>
-                </div>
-                <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
-                  <span className="text-amber-500/80 text-xs font-semibold uppercase">In Progress / Assigned</span>
-                  <p className="text-2xl font-bold text-amber-400 mt-1">
-                    {historyTickets.filter(t => t.status === 'assigned' || t.status === 'in_progress').length}
-                  </p>
-                </div>
-                <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
-                  <span className="text-yellow-500/80 text-xs font-semibold uppercase">Pending Verification</span>
-                  <p className="text-2xl font-bold text-yellow-400 mt-1">
-                    {historyTickets.filter(t => t.status === 'pending' || t.status === 'verification_pending').length}
-                  </p>
-                </div>
-              </div>
+              )}
 
               {/* Requests List */}
               <div className="space-y-4">

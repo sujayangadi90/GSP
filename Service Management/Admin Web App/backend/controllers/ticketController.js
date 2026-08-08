@@ -48,7 +48,7 @@ const createTicket = async (req, res) => {
 // @access  Private
 const getTickets = async (req, res) => {
   try {
-    const { status, type, dealer, technician, city, search, customerMobile, fromDate, toDate } = req.query;
+    const { status, type, dealer, technician, city, search, customerMobile, fromDate, toDate, performanceFilter } = req.query;
     let query = {};
 
     // For dealers, restrict to their own tickets
@@ -65,10 +65,68 @@ const getTickets = async (req, res) => {
     if (type) query.type = type;
     if (customerMobile) query['customer.mobile'] = customerMobile;
     if (dealer && req.user.role === 'admin') query.dealer = dealer;
-    if (technician && req.user.role === 'admin') query.assignedTechnician = technician;
+    
+    if (technician && req.user.role === 'admin') {
+      query.assignedTechnician = technician;
+
+      if (performanceFilter) {
+        const start = new Date(`${fromDate}T00:00:00`);
+        const end = new Date(`${toDate}T23:59:59.999`);
+
+        if (performanceFilter === 'assigned') {
+          query.timeline = { $elemMatch: { status: 'assigned', timestamp: { $gte: start, $lte: end } } };
+        } else if (performanceFilter === 'completed') {
+          query['completion.submittedAt'] = { $gte: start, $lte: end };
+        } else {
+          // assigned_completed
+          query.$or = [
+            { timeline: { $elemMatch: { status: 'assigned', timestamp: { $gte: start, $lte: end } } } },
+            { 'completion.submittedAt': { $gte: start, $lte: end } }
+          ];
+        }
+
+        const tickets = await Ticket.find(query)
+          .populate('dealer', 'name code email mobile')
+          .populate('assignedTechnician', 'name code mobile')
+          .sort({ createdAt: -1 });
+
+        const totalCount = await Ticket.countDocuments({
+          assignedTechnician: technician,
+          timeline: { $elemMatch: { status: 'assigned', timestamp: { $gte: start, $lte: end } } }
+        });
+
+        const completedCount = await Ticket.countDocuments({
+          assignedTechnician: technician,
+          'completion.submittedAt': { $gte: start, $lte: end }
+        });
+
+        const inProgressCount = await Ticket.countDocuments({
+          assignedTechnician: technician,
+          status: { $in: ['assigned', 'in_progress'] },
+          timeline: { $elemMatch: { status: 'assigned', timestamp: { $gte: start, $lte: end } } }
+        });
+
+        const pendingVerificationCount = await Ticket.countDocuments({
+          assignedTechnician: technician,
+          status: 'verification_pending',
+          'completion.submittedAt': { $gte: start, $lte: end }
+        });
+
+        return res.json({
+          tickets,
+          summary: {
+            total: totalCount,
+            completed: completedCount,
+            inProgress: inProgressCount,
+            pendingVerification: pendingVerificationCount
+          }
+        });
+      }
+    }
+
     if (city) query['customer.city'] = { $regex: city, $options: 'i' };
 
-    if (fromDate && toDate) {
+    if (fromDate && toDate && !performanceFilter) {
       const start = new Date(fromDate);
       start.setUTCHours(0, 0, 0, 0);
 
