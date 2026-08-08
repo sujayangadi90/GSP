@@ -117,6 +117,11 @@ export default function App() {
     toDate: new Date().toISOString().split('T')[0]
   });
 
+  // Pagination states
+  const [customerPage, setCustomerPage] = useState(1);
+  const [followUpPage, setFollowUpPage] = useState(1);
+  const [ticketPage, setTicketPage] = useState(1);
+
   // Filters & Searches
   const [dealerSearch, setDealerSearch] = useState('');
   const [techSearch, setTechSearch] = useState('');
@@ -125,7 +130,9 @@ export default function App() {
     status: '',
     type: '',
     city: '',
-    search: ''
+    search: '',
+    fromDate: '',
+    toDate: ''
   });
 
   useEffect(() => {
@@ -199,7 +206,7 @@ export default function App() {
       // Load dealers, technicians, and tickets
       const dealersData = await apiFetch(`/dealers?search=${dealerSearch}`);
       const techsData = await apiFetch(`/technicians?search=${techSearch}`);
-      const ticketsData = await apiFetch(`/tickets?status=${ticketFilters.status}&type=${ticketFilters.type}&city=${ticketFilters.city}&search=${ticketFilters.search}`);
+      const ticketsData = await apiFetch(`/tickets?status=${ticketFilters.status}&type=${ticketFilters.type}&city=${ticketFilters.city}&search=${ticketFilters.search}&fromDate=${ticketFilters.fromDate || ''}&toDate=${ticketFilters.toDate || ''}`);
 
       setDealers(dealersData);
       setTechnicians(techsData);
@@ -310,6 +317,18 @@ export default function App() {
       }
     }
   }, [dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters]);
+
+  useEffect(() => {
+    setCustomerPage(1);
+  }, [customerSearch]);
+
+  useEffect(() => {
+    setFollowUpPage(1);
+  }, [followUpFilters]);
+
+  useEffect(() => {
+    setTicketPage(1);
+  }, [ticketFilters, dealerSearch, techSearch]);
 
   // Appliance Actions
   const saveAppliance = async (e) => {
@@ -749,7 +768,7 @@ export default function App() {
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'tickets' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
             <TicketIcon className="w-5 h-5" />
-            Tickets & Requests
+            Tickets
           </button>
           <button
             onClick={() => setActiveTab('customers')}
@@ -940,7 +959,7 @@ export default function App() {
               </div>
 
               {/* Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-800">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-800">
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Search</label>
                   <div className="relative">
@@ -984,12 +1003,33 @@ export default function App() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">City</label>
-                  <input 
-                    type="text" 
-                    placeholder="Enter city..."
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                  <select 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
                     value={ticketFilters.city}
                     onChange={(e) => setTicketFilters({ ...ticketFilters, city: e.target.value })}
+                  >
+                    <option value="">All Cities</option>
+                    {cities.map(city => (
+                      <option key={city._id} value={city.name}>{city.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">From Date</label>
+                  <input 
+                    type="date" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                    value={ticketFilters.fromDate}
+                    onChange={(e) => setTicketFilters({ ...ticketFilters, fromDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">To Date</label>
+                  <input 
+                    type="date" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                    value={ticketFilters.toDate}
+                    onChange={(e) => setTicketFilters({ ...ticketFilters, toDate: e.target.value })}
                   />
                 </div>
               </div>
@@ -1015,7 +1055,7 @@ export default function App() {
                           <td colSpan="7" className="text-center py-8 text-slate-500 font-medium">No tickets found matches current filters</td>
                         </tr>
                       ) : (
-                        tickets.map(ticket => (
+                        tickets.slice((ticketPage - 1) * 15, ticketPage * 15).map(ticket => (
                           <tr key={ticket._id} className="hover:bg-slate-800/35 transition duration-150">
                             <td className="px-6 py-4">
                               <span className="font-bold text-white">{ticket.ticketNumber}</span>
@@ -1071,6 +1111,29 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
+                {tickets.length > 15 && (
+                  <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between">
+                    <div className="text-xs text-slate-400">
+                      Showing <span className="font-semibold text-slate-200">{(ticketPage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(ticketPage * 15, tickets.length)}</span> of <span className="font-semibold text-slate-200">{tickets.length}</span> entries
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setTicketPage(prev => Math.max(prev - 1, 1))}
+                        disabled={ticketPage === 1}
+                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setTicketPage(prev => Math.min(prev + 1, Math.ceil(tickets.length / 15)))}
+                        disabled={ticketPage === Math.ceil(tickets.length / 15)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1480,7 +1543,7 @@ export default function App() {
                           </td>
                         </tr>
                       ) : (
-                        filteredCustomers.map((cust, idx) => (
+                        filteredCustomers.slice((customerPage - 1) * 15, customerPage * 15).map((cust, idx) => (
                           <tr key={cust.mobile || idx} className="hover:bg-slate-800/25 transition duration-150">
                             <td className="py-4 px-6 font-bold text-white">
                               {cust.name}
@@ -1513,6 +1576,29 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
+                {filteredCustomers.length > 15 && (
+                  <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between">
+                    <div className="text-xs text-slate-400">
+                      Showing <span className="font-semibold text-slate-200">{(customerPage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(customerPage * 15, filteredCustomers.length)}</span> of <span className="font-semibold text-slate-200">{filteredCustomers.length}</span> entries
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCustomerPage(prev => Math.max(prev - 1, 1))}
+                        disabled={customerPage === 1}
+                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setCustomerPage(prev => Math.min(prev + 1, Math.ceil(filteredCustomers.length / 15)))}
+                        disabled={customerPage === Math.ceil(filteredCustomers.length / 15)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1715,7 +1801,7 @@ export default function App() {
                           <td colSpan="8" className="p-8 text-center text-slate-500 text-sm">No follow-ups found for the selected date range.</td>
                         </tr>
                       ) : (
-                        followUps.map(f => (
+                        followUps.slice((followUpPage - 1) * 15, followUpPage * 15).map(f => (
                           <tr key={f._id} className="hover:bg-slate-800/20 transition">
                             <td className="p-4 text-sm font-semibold text-slate-200">
                               {new Date(f.dueAt).toLocaleDateString('en-GB')}
@@ -1764,6 +1850,29 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
+                {followUps.length > 15 && (
+                  <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between">
+                    <div className="text-xs text-slate-400">
+                      Showing <span className="font-semibold text-slate-200">{(followUpPage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(followUpPage * 15, followUps.length)}</span> of <span className="font-semibold text-slate-200">{followUps.length}</span> entries
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setFollowUpPage(prev => Math.max(prev - 1, 1))}
+                        disabled={followUpPage === 1}
+                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setFollowUpPage(prev => Math.min(prev + 1, Math.ceil(followUps.length / 15)))}
+                        disabled={followUpPage === Math.ceil(followUps.length / 15)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
