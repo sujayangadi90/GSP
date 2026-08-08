@@ -1105,78 +1105,104 @@ export default function App() {
               </div>
 
               {/* Filters */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-800">
+              <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                {/* Row 1: Search */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Search</label>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">SEARCH</label>
                   <div className="relative">
                     <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
                     <input 
                       type="text" 
-                      placeholder="Ticket #, Customer, Product..."
+                      placeholder="Ticket #, Customer, Dealer, Technician"
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                       value={ticketFilters.search}
                       onChange={(e) => setTicketFilters({ ...ticketFilters, search: e.target.value })}
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Status</label>
-                  <select 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
-                    value={ticketFilters.status}
-                    onChange={(e) => setTicketFilters({ ...ticketFilters, status: e.target.value })}
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="new">New</option>
-                    <option value="assigned">Assigned</option>
-                    <option value="in_progress">Work In Progress</option>
-                    <option value="verification_pending">Verification Pending</option>
-                    <option value="completed">Completed (Pending Close)</option>
-                    <option value="closed">Closed</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Request Type</label>
-                  <select 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
-                    value={ticketFilters.type}
-                    onChange={(e) => setTicketFilters({ ...ticketFilters, type: e.target.value })}
-                  >
-                    <option value="">All Types</option>
-                    <option value="installation">Installation</option>
-                    <option value="service">Service Request</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">City</label>
-                  <select 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
-                    value={ticketFilters.city}
-                    onChange={(e) => setTicketFilters({ ...ticketFilters, city: e.target.value })}
-                  >
-                    <option value="">All Cities</option>
-                    {cities.map(city => (
-                      <option key={city._id} value={city.name}>{city.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">From Date</label>
-                  <input 
-                    type="date" 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
-                    value={ticketFilters.fromDate}
-                    onChange={(e) => setTicketFilters({ ...ticketFilters, fromDate: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">To Date</label>
-                  <input 
-                    type="date" 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
-                    value={ticketFilters.toDate}
-                    onChange={(e) => setTicketFilters({ ...ticketFilters, toDate: e.target.value })}
-                  />
+
+                {/* Row 2: Date, City, Request Type, Status */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* DATE */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">DATE</label>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="date" 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                        value={ticketFilters.fromDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (ticketFilters.toDate && val > ticketFilters.toDate) {
+                            alert('From Date cannot be later than To Date');
+                            return;
+                          }
+                          setTicketFilters({ ...ticketFilters, fromDate: val });
+                        }}
+                      />
+                      <span className="text-slate-500 text-xs font-bold">to</span>
+                      <input 
+                        type="date" 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                        value={ticketFilters.toDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (ticketFilters.fromDate && ticketFilters.fromDate > val) {
+                            alert('From Date cannot be later than To Date');
+                            return;
+                          }
+                          setTicketFilters({ ...ticketFilters, toDate: val });
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* CITY */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">CITY</label>
+                    <select 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      value={ticketFilters.city}
+                      onChange={(e) => setTicketFilters({ ...ticketFilters, city: e.target.value })}
+                    >
+                      <option value="">All Cities</option>
+                      {cities.map(city => (
+                        <option key={city._id} value={city.name}>{city.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* REQUEST TYPE */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">REQUEST TYPE</label>
+                    <select 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      value={ticketFilters.type}
+                      onChange={(e) => setTicketFilters({ ...ticketFilters, type: e.target.value })}
+                    >
+                      <option value="">All Types</option>
+                      <option value="installation">Installation</option>
+                      <option value="service">Service Request</option>
+                    </select>
+                  </div>
+
+                  {/* STATUS */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">STATUS</label>
+                    <select 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      value={ticketFilters.status}
+                      onChange={(e) => setTicketFilters({ ...ticketFilters, status: e.target.value })}
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="new">New</option>
+                      <option value="assigned">Assigned</option>
+                      <option value="in_progress">Work In Progress</option>
+                      <option value="verification_pending">Verification Pending</option>
+                      <option value="completed">Completed (Pending Close)</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
