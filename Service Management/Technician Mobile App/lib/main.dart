@@ -499,7 +499,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         context,
         MaterialPageRoute(
           builder: (context) => JobHistoryScreen(
-            jobs: _jobs.where((j) => j['status'] == 'completed' || j['status'] == 'verification_pending' || j['status'] == 'closed').toList(),
+            jobs: _jobs,
+            apiUrl: widget.apiUrl,
           ),
         ),
       ),
@@ -859,33 +860,363 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   }
 }
 
-class JobHistoryScreen extends StatelessWidget {
+class JobHistoryScreen extends StatefulWidget {
   final List jobs;
+  final String apiUrl;
 
-  const JobHistoryScreen({super.key, required this.jobs});
+  const JobHistoryScreen({super.key, required this.jobs, required this.apiUrl});
+
+  @override
+  State<JobHistoryScreen> createState() => _JobHistoryScreenState();
+}
+
+class _JobHistoryScreenState extends State<JobHistoryScreen> {
+  int _selectedMonth = DateTime.now().month;
+  int _selectedYear = DateTime.now().year;
+  String _selectedStatusFilter = 'closed'; // 'assigned' or 'closed'
+
+  String _getMonthName(int month) {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[month - 1];
+  }
+
+  String _getAssignedDate(Map<String, dynamic> job) {
+    if (job['timeline'] != null && job['timeline'] is List) {
+      for (var entry in job['timeline']) {
+        if (entry['status'] == 'assigned' && entry['timestamp'] != null) {
+          final date = DateTime.tryParse(entry['timestamp']);
+          if (date != null) {
+            return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+          }
+        }
+      }
+    }
+    if (job['createdAt'] != null) {
+      final date = DateTime.tryParse(job['createdAt']);
+      if (date != null) {
+        return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+      }
+    }
+    return 'N/A';
+  }
+
+  bool _matchesFilters(dynamic job) {
+    // 1. Status Filter
+    final status = job['status']?.toString().toLowerCase() ?? '';
+    if (_selectedStatusFilter == 'assigned') {
+      if (status != 'assigned' && status != 'in_progress') return false;
+    } else {
+      if (status != 'completed' && status != 'verification_pending' && status != 'closed') return false;
+    }
+
+    // 2. Month & Year Filter based on assignment date (or createdAt)
+    DateTime? assignDate;
+    if (job['timeline'] != null && job['timeline'] is List) {
+      for (var entry in job['timeline']) {
+        if (entry['status'] == 'assigned' && entry['timestamp'] != null) {
+          assignDate = DateTime.tryParse(entry['timestamp']);
+          break;
+        }
+      }
+    }
+    assignDate ??= DateTime.tryParse(job['createdAt'] ?? '');
+    if (assignDate == null) return false;
+    return assignDate.month == _selectedMonth && assignDate.year == _selectedYear;
+  }
+
+  Future<void> _selectMonthYear(BuildContext context) async {
+    int tempMonth = _selectedMonth;
+    int tempYear = _selectedYear;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E293B),
+              title: const Text('Select Month & Year', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int>(
+                    value: tempMonth,
+                    dropdownColor: const Color(0xFF1E293B),
+                    decoration: const InputDecoration(
+                      labelText: 'Month',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('January')),
+                      DropdownMenuItem(value: 2, child: Text('February')),
+                      DropdownMenuItem(value: 3, child: Text('March')),
+                      DropdownMenuItem(value: 4, child: Text('April')),
+                      DropdownMenuItem(value: 5, child: Text('May')),
+                      DropdownMenuItem(value: 6, child: Text('June')),
+                      DropdownMenuItem(value: 7, child: Text('July')),
+                      DropdownMenuItem(value: 8, child: Text('August')),
+                      DropdownMenuItem(value: 9, child: Text('September')),
+                      DropdownMenuItem(value: 10, child: Text('October')),
+                      DropdownMenuItem(value: 11, child: Text('November')),
+                      DropdownMenuItem(value: 12, child: Text('December')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => tempMonth = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    value: tempYear,
+                    dropdownColor: const Color(0xFF1E293B),
+                    decoration: const InputDecoration(
+                      labelText: 'Year',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    items: [2024, 2025, 2026, 2027, 2028].map((y) {
+                      return DropdownMenuItem(value: y, child: Text(y.toString()));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => tempYear = val);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = tempMonth;
+                      _selectedYear = tempYear;
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Select', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _viewPhotos(BuildContext context, List photos) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final base = widget.apiUrl.replaceAll('/api', '');
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          title: const Text('Completion Photos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: photos.isEmpty
+              ? const Text('No photos uploaded.', style: TextStyle(color: Colors.grey))
+              : SizedBox(
+                  width: double.maxFinite,
+                  height: 300,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: photos.length,
+                    itemBuilder: (context, index) {
+                      final url = '$base/${photos[index]}';
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            url,
+                            fit: BoxFit.cover,
+                            width: 250,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 250,
+                                color: Colors.grey[850],
+                                child: const Icon(Icons.broken_image, color: Colors.grey),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final filtered = widget.jobs.where(_matchesFilters).toList();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Job History')),
-      body: jobs.isEmpty
-        ? const Center(child: Text('No historical jobs found', style: TextStyle(color: Colors.grey)))
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: jobs.length,
-            itemBuilder: (context, index) {
-              final job = jobs[index];
-              return Card(
+      body: Column(
+        children: [
+          // Month & Year Selector Card
+          GestureDetector(
+            onTap: () => _selectMonthYear(context),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
                 color: const Color(0xFF1E2422),
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  title: Text(job['ticketNumber'] ?? 'TKT-????', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Customer: ${job['customer']['name']}\nDevice: ${job['product']['name']}\nStatus: ${job['status'].toString().toUpperCase()}'),
-                  trailing: const Icon(Icons.verified, color: Colors.green),
-                ),
-              );
-            },
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.teal.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, color: Colors.teal, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_getMonthName(_selectedMonth)} $_selectedYear',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                  const Icon(Icons.arrow_drop_down, color: Colors.white),
+                ],
+              ),
+            ),
           ),
+          // Status choice chips row
+          Container(
+            height: 48,
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: const Text('Assigned'),
+                    selected: _selectedStatusFilter == 'assigned',
+                    onSelected: (sel) {
+                      if (sel) {
+                        setState(() {
+                          _selectedStatusFilter = 'assigned';
+                        });
+                      }
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: const Text('Closed'),
+                    selected: _selectedStatusFilter == 'closed',
+                    onSelected: (sel) {
+                      if (sel) {
+                        setState(() {
+                          _selectedStatusFilter = 'closed';
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: filtered.isEmpty
+              ? const Center(child: Text('No matching jobs found', style: TextStyle(color: Colors.grey)))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final job = filtered[index];
+                    final customerName = job['customer']['name'] ?? 'N/A';
+                    final applianceName = job['product']['name'] ?? 'N/A';
+                    final brand = job['product']['category'] ?? 'N/A';
+                    final scope = job['type']?.toString().toUpperCase() ?? 'SERVICE';
+                    final assignedDateStr = _getAssignedDate(job);
+                    final photos = job['completion']?['photos'] as List?;
+                    final hasPhotos = photos != null && photos.isNotEmpty;
+
+                    return Card(
+                      color: const Color(0xFF1E2422),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.teal.withOpacity(0.15)),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  job['ticketNumber'] ?? 'TKT-????',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.teal.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    job['status'].toString().toUpperCase(),
+                                    style: const TextStyle(color: Colors.teal, fontSize: 10, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text('Customer: $customerName', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 4),
+                            Text('Appliance: $applianceName ($brand)', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                            const SizedBox(height: 4),
+                            Text('Type: $scope', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                            const SizedBox(height: 4),
+                            Text('Assigned: $assignedDateStr', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                            if (hasPhotos) ...[
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: () => _viewPhotos(context, photos),
+                                icon: const Icon(Icons.photo_library, size: 16),
+                                label: const Text('View Photos'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal[900],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                            ]
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+          ),
+        ],
+      ),
     );
   }
 }
