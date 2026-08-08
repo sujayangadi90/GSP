@@ -76,12 +76,13 @@ const getTickets = async (req, res) => {
         if (performanceFilter === 'assigned') {
           query.timeline = { $elemMatch: { status: 'assigned', timestamp: { $gte: start, $lte: end } } };
         } else if (performanceFilter === 'completed') {
+          query.status = { $in: ['completed', 'closed'] };
           query['completion.submittedAt'] = { $gte: start, $lte: end };
         } else {
           // assigned_completed
           query.$or = [
             { timeline: { $elemMatch: { status: 'assigned', timestamp: { $gte: start, $lte: end } } } },
-            { 'completion.submittedAt': { $gte: start, $lte: end } }
+            { status: { $in: ['completed', 'closed'] }, 'completion.submittedAt': { $gte: start, $lte: end } }
           ];
         }
 
@@ -97,6 +98,7 @@ const getTickets = async (req, res) => {
 
         const completedCount = await Ticket.countDocuments({
           assignedTechnician: technician,
+          status: { $in: ['completed', 'closed'] },
           'completion.submittedAt': { $gte: start, $lte: end }
         });
 
