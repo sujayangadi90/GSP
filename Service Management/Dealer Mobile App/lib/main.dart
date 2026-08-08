@@ -839,7 +839,21 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                       validator: (val) => val == null || val.isEmpty ? 'Please select a city' : null,
                     ),
                   ),
-                  _buildTextField(_custPincode, 'Pincode', keyboardType: TextInputType.number),
+                  _buildTextField(
+                    _custPincode,
+                    'Pincode',
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(6),
+                    ],
+                    validator: (val) {
+                      if (val == null || val.isEmpty) return 'Field required';
+                      if (val.length != 6) return 'Must be exactly 6 digits';
+                      return null;
+                    },
+                  ),
                   
                   const SizedBox(height: 24),
                   _buildSectionHeader('Product Information'),
@@ -894,15 +908,15 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                       validator: (val) => val == null ? 'Please select a brand' : null,
                     ),
                   ),
-                  _buildTextField(_prodModel, 'Model Number'),
+                  _buildTextField(_prodModel, 'Model Number', required: false),
                   _buildTextField(_prodSerial, 'Serial Number', required: false),
                   _buildTextField(_prodInvoice, 'Invoice Number', required: false),
-                  _buildDateField(_prodDate, 'Purchase Date (Optional)'),
+                  _buildDateField(_prodDate, 'Purchase Date', required: false),
                   
                   if (widget.type == 'service') ...[
                     const SizedBox(height: 24),
                     _buildSectionHeader('Service Details'),
-                    _buildTextField(_serviceDesc, 'Problem Description', maxLines: 3),
+                    _buildTextField(_serviceDesc, 'Problem Description', maxLines: 3, required: false),
                     const SizedBox(height: 8),
                     const Text('Priority', style: TextStyle(fontSize: 13, color: Colors.grey)),
                     Row(
@@ -916,7 +930,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
 
                   const SizedBox(height: 24),
                   _buildSectionHeader('Scheduling & Attachments'),
-                  _buildDateField(_visitDateController, 'Preferred Visit/Installation Date'),
+                  _buildDateField(_visitDateController, 'Preferred Visit/Installation Date', required: true),
                   const SizedBox(height: 16),
                   
                   ElevatedButton.icon(
@@ -996,14 +1010,14 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
     );
   }
 
-  Widget _buildDateField(TextEditingController controller, String label) {
+  Widget _buildDateField(TextEditingController controller, String label, {bool required = true}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: TextFormField(
         controller: controller,
         readOnly: true,
         decoration: InputDecoration(
-          labelText: label,
+          labelText: label + (required ? ' *' : ''),
           suffixIcon: const Icon(Icons.calendar_month),
           border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
         ),
@@ -1020,6 +1034,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
             });
           }
         },
+        validator: required ? (val) => val == null || val.isEmpty ? 'Please select a date' : null : null,
       ),
     );
   }

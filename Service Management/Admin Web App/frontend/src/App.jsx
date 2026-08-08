@@ -741,6 +741,19 @@ export default function App() {
 
   const handleCreateRequest = async (e) => {
     e.preventDefault();
+    
+    // Validation
+    const mobile = newRequestForm.customer.mobile;
+    if (!/^[0-9]{10}$/.test(mobile)) {
+      alert("Mobile Number must be exactly 10 digits.");
+      return;
+    }
+    const pincode = newRequestForm.customer.pincode;
+    if (!/^[0-9]{6}$/.test(pincode)) {
+      alert("Pincode must be exactly 6 digits.");
+      return;
+    }
+
     try {
       setLoading(true);
       const formData = new FormData();
@@ -2955,11 +2968,14 @@ export default function App() {
                     <input 
                       required 
                       type="text" 
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      placeholder="6 digit pincode"
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
                       value={newRequestForm.customer.pincode}
                       onChange={e => setNewRequestForm({ 
                         ...newRequestForm, 
-                        customer: { ...newRequestForm.customer, pincode: e.target.value } 
+                        customer: { ...newRequestForm.customer, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) } 
                       })}
                     />
                   </div>
@@ -3076,9 +3092,8 @@ export default function App() {
                   <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Service Request Details</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Issue Description *</label>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Issue Description</label>
                       <textarea 
-                        required
                         rows="2"
                         className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
                         value={newRequestForm.serviceDetails.description}
