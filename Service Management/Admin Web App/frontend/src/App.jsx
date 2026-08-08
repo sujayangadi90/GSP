@@ -1124,6 +1124,19 @@ export default function App() {
                       >
                         Previous
                       </button>
+                      {Array.from({ length: Math.ceil(tickets.length / 15) }, (_, i) => i + 1).map(page => (
+                        <button
+                          key={page}
+                          onClick={() => setTicketPage(page)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                            page === ticketPage
+                              ? 'bg-violet-600 text-white shadow-md'
+                              : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
                       <button
                         onClick={() => setTicketPage(prev => Math.min(prev + 1, Math.ceil(tickets.length / 15)))}
                         disabled={ticketPage === Math.ceil(tickets.length / 15)}
@@ -1589,6 +1602,19 @@ export default function App() {
                       >
                         Previous
                       </button>
+                      {Array.from({ length: Math.ceil(filteredCustomers.length / 15) }, (_, i) => i + 1).map(page => (
+                        <button
+                          key={page}
+                          onClick={() => setCustomerPage(page)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                            page === customerPage
+                              ? 'bg-violet-600 text-white shadow-md'
+                              : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
                       <button
                         onClick={() => setCustomerPage(prev => Math.min(prev + 1, Math.ceil(filteredCustomers.length / 15)))}
                         disabled={customerPage === Math.ceil(filteredCustomers.length / 15)}
@@ -1863,6 +1889,19 @@ export default function App() {
                       >
                         Previous
                       </button>
+                      {Array.from({ length: Math.ceil(followUps.length / 15) }, (_, i) => i + 1).map(page => (
+                        <button
+                          key={page}
+                          onClick={() => setFollowUpPage(page)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                            page === followUpPage
+                              ? 'bg-violet-600 text-white shadow-md'
+                              : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
                       <button
                         onClick={() => setFollowUpPage(prev => Math.min(prev + 1, Math.ceil(followUps.length / 15)))}
                         disabled={followUpPage === Math.ceil(followUps.length / 15)}
