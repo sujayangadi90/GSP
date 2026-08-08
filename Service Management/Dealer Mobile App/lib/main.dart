@@ -271,6 +271,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _inProgressCount = 0;
   int _completedCount = 0;
   bool _isLoading = false;
+  int _selectedMonth = DateTime.now().month;
+  int _selectedYear = DateTime.now().year;
 
   @override
   void initState() {
@@ -281,8 +283,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadStats() async {
     setState(() => _isLoading = true);
     try {
+      final firstDay = DateTime(_selectedYear, _selectedMonth, 1);
+      final lastDay = DateTime(_selectedYear, _selectedMonth + 1, 0);
+      final fromDateStr = "${firstDay.year}-${firstDay.month.toString().padLeft(2, '0')}-01";
+      final toDateStr = "${lastDay.year}-${lastDay.month.toString().padLeft(2, '0')}-${lastDay.day.toString().padLeft(2, '0')}";
+
       final res = await http.get(
-        Uri.parse('${widget.apiUrl}/tickets'),
+        Uri.parse('${widget.apiUrl}/tickets?fromDate=$fromDateStr&toDate=$toDateStr'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}'
@@ -292,11 +299,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final List tickets = jsonDecode(res.body);
         int fresh = 0, open = 0, work = 0, done = 0;
         for (var t in tickets) {
-          final s = t['status'];
+          final s = t['status']?.toString().toLowerCase() ?? '';
           if (s == 'new') fresh++;
-          if (s == 'assigned') open++;
-          if (s == 'in_progress') work++;
-          if (s == 'completed' || s == 'verification_pending') done++;
+          if (s != 'completed' && s != 'closed' && s != 'cancelled') open++;
+          if (s == 'assigned' || s == 'in_progress') work++;
+          if (s == 'completed' || s == 'closed') done++;
         }
         setState(() {
           _newCount = fresh;
@@ -354,8 +361,91 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      value: _selectedMonth,
+                      dropdownColor: const Color(0xFF1E293B),
+                      decoration: InputDecoration(
+                        labelText: 'Month',
+                        labelStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                        filled: true,
+                        fillColor: const Color(0xFF0F172A),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF334155)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF334155)),
+                        ),
+                      ),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      items: const [
+                        DropdownMenuItem(value: 1, child: Text('Jan')),
+                        DropdownMenuItem(value: 2, child: Text('Feb')),
+                        DropdownMenuItem(value: 3, child: Text('Mar')),
+                        DropdownMenuItem(value: 4, child: Text('Apr')),
+                        DropdownMenuItem(value: 5, child: Text('May')),
+                        DropdownMenuItem(value: 6, child: Text('Jun')),
+                        DropdownMenuItem(value: 7, child: Text('Jul')),
+                        DropdownMenuItem(value: 8, child: Text('Aug')),
+                        DropdownMenuItem(value: 9, child: Text('Sep')),
+                        DropdownMenuItem(value: 10, child: Text('Oct')),
+                        DropdownMenuItem(value: 11, child: Text('Nov')),
+                        DropdownMenuItem(value: 12, child: Text('Dec')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _selectedMonth = val;
+                          });
+                          _loadStats();
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      value: _selectedYear,
+                      dropdownColor: const Color(0xFF1E293B),
+                      decoration: InputDecoration(
+                        labelText: 'Year',
+                        labelStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                        filled: true,
+                        fillColor: const Color(0xFF0F172A),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF334155)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF334155)),
+                        ),
+                      ),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      items: [2024, 2025, 2026, 2027, 2028].map((y) {
+                        return DropdownMenuItem(value: y, child: Text(y.toString()));
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _selectedYear = val;
+                          });
+                          _loadStats();
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
               const Text(
-                'Request Status Counters',
+                'Request Status',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 12),
