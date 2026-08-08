@@ -1111,42 +1111,40 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
-                {tickets.length > 15 && (
-                  <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between">
-                    <div className="text-xs text-slate-400">
-                      Showing <span className="font-semibold text-slate-200">{(ticketPage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(ticketPage * 15, tickets.length)}</span> of <span className="font-semibold text-slate-200">{tickets.length}</span> entries
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setTicketPage(prev => Math.max(prev - 1, 1))}
-                        disabled={ticketPage === 1}
-                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
-                      >
-                        Previous
-                      </button>
-                      {Array.from({ length: Math.ceil(tickets.length / 15) }, (_, i) => i + 1).map(page => (
-                        <button
-                          key={page}
-                          onClick={() => setTicketPage(page)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
-                            page === ticketPage
-                              ? 'bg-violet-600 text-white shadow-md'
-                              : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => setTicketPage(prev => Math.min(prev + 1, Math.ceil(tickets.length / 15)))}
-                        disabled={ticketPage === Math.ceil(tickets.length / 15)}
-                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
-                      >
-                        Next
-                      </button>
-                    </div>
+                <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between">
+                  <div className="text-xs text-slate-400">
+                    Showing <span className="font-semibold text-slate-200">{tickets.length === 0 ? 0 : (ticketPage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(ticketPage * 15, tickets.length)}</span> of <span className="font-semibold text-slate-200">{tickets.length}</span> entries
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setTicketPage(prev => Math.max(prev - 1, 1))}
+                      disabled={ticketPage === 1}
+                      className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: Math.ceil(tickets.length / 15) }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setTicketPage(page)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                          page === ticketPage
+                            ? 'bg-violet-600 text-white shadow-md'
+                            : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setTicketPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(tickets.length / 15))))}
+                      disabled={ticketPage === Math.max(1, Math.ceil(tickets.length / 15))}
+                      className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1589,42 +1587,40 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
-                {filteredCustomers.length > 15 && (
-                  <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between">
-                    <div className="text-xs text-slate-400">
-                      Showing <span className="font-semibold text-slate-200">{(customerPage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(customerPage * 15, filteredCustomers.length)}</span> of <span className="font-semibold text-slate-200">{filteredCustomers.length}</span> entries
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCustomerPage(prev => Math.max(prev - 1, 1))}
-                        disabled={customerPage === 1}
-                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
-                      >
-                        Previous
-                      </button>
-                      {Array.from({ length: Math.ceil(filteredCustomers.length / 15) }, (_, i) => i + 1).map(page => (
-                        <button
-                          key={page}
-                          onClick={() => setCustomerPage(page)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
-                            page === customerPage
-                              ? 'bg-violet-600 text-white shadow-md'
-                              : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => setCustomerPage(prev => Math.min(prev + 1, Math.ceil(filteredCustomers.length / 15)))}
-                        disabled={customerPage === Math.ceil(filteredCustomers.length / 15)}
-                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
-                      >
-                        Next
-                      </button>
-                    </div>
+                <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between">
+                  <div className="text-xs text-slate-400">
+                    Showing <span className="font-semibold text-slate-200">{filteredCustomers.length === 0 ? 0 : (customerPage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(customerPage * 15, filteredCustomers.length)}</span> of <span className="font-semibold text-slate-200">{filteredCustomers.length}</span> entries
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCustomerPage(prev => Math.max(prev - 1, 1))}
+                      disabled={customerPage === 1}
+                      className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: Math.ceil(filteredCustomers.length / 15) }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setCustomerPage(page)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                          page === customerPage
+                            ? 'bg-violet-600 text-white shadow-md'
+                            : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setCustomerPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filteredCustomers.length / 15))))}
+                      disabled={customerPage === Math.max(1, Math.ceil(filteredCustomers.length / 15))}
+                      className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1876,42 +1872,40 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
-                {followUps.length > 15 && (
-                  <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between">
-                    <div className="text-xs text-slate-400">
-                      Showing <span className="font-semibold text-slate-200">{(followUpPage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(followUpPage * 15, followUps.length)}</span> of <span className="font-semibold text-slate-200">{followUps.length}</span> entries
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setFollowUpPage(prev => Math.max(prev - 1, 1))}
-                        disabled={followUpPage === 1}
-                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
-                      >
-                        Previous
-                      </button>
-                      {Array.from({ length: Math.ceil(followUps.length / 15) }, (_, i) => i + 1).map(page => (
-                        <button
-                          key={page}
-                          onClick={() => setFollowUpPage(page)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
-                            page === followUpPage
-                              ? 'bg-violet-600 text-white shadow-md'
-                              : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => setFollowUpPage(prev => Math.min(prev + 1, Math.ceil(followUps.length / 15)))}
-                        disabled={followUpPage === Math.ceil(followUps.length / 15)}
-                        className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
-                      >
-                        Next
-                      </button>
-                    </div>
+                <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between">
+                  <div className="text-xs text-slate-400">
+                    Showing <span className="font-semibold text-slate-200">{followUps.length === 0 ? 0 : (followUpPage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(followUpPage * 15, followUps.length)}</span> of <span className="font-semibold text-slate-200">{followUps.length}</span> entries
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setFollowUpPage(prev => Math.max(prev - 1, 1))}
+                      disabled={followUpPage === 1}
+                      className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: Math.ceil(followUps.length / 15) }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setFollowUpPage(page)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                          page === followUpPage
+                            ? 'bg-violet-600 text-white shadow-md'
+                            : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setFollowUpPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(followUps.length / 15))))}
+                      disabled={followUpPage === Math.max(1, Math.ceil(followUps.length / 15))}
+                      className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
