@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const TechnicianApp());
@@ -675,11 +676,29 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
             ]),
             const SizedBox(height: 12),
             ElevatedButton.icon(
-              onPressed: () {
-                // Call client action simulation
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Dialing client mobile: ${_job!['customer']['mobile']}...')),
-                );
+              onPressed: () async {
+                final mobile = _job!['customer']['mobile']?.toString() ?? '';
+                if (mobile.isNotEmpty) {
+                  final Uri launchUri = Uri(
+                    scheme: 'tel',
+                    path: mobile,
+                  );
+                  try {
+                    if (!await launchUrl(launchUri)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Could not launch dialer for $mobile')),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error launching phone app: $e')),
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No mobile number available')),
+                  );
+                }
               },
               icon: const Icon(Icons.phone),
               label: const Text('Call Customer'),
