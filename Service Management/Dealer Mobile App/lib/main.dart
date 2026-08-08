@@ -1060,7 +1060,12 @@ class TicketListScreen extends StatefulWidget {
 class _TicketListScreenState extends State<TicketListScreen> {
   List _tickets = [];
   bool _isLoading = false;
+  bool _isMoreLoading = false;
   String _selectedStatusFilter = 'all';
+  int _selectedMonth = DateTime.now().month;
+  int _selectedYear = DateTime.now().year;
+  int _currentPage = 1;
+  bool _hasMore = false;
 
   @override
   void initState() {
@@ -1068,56 +1073,226 @@ class _TicketListScreenState extends State<TicketListScreen> {
     _fetchTickets();
   }
 
-  Future<void> _fetchTickets() async {
-    setState(() => _isLoading = true);
+  Future<void> _fetchTickets({bool isLoadMore = false}) async {
+    if (isLoadMore) {
+      setState(() => _isMoreLoading = true);
+    } else {
+      setState(() {
+        _isLoading = true;
+        _tickets = [];
+        _currentPage = 1;
+        _hasMore = false;
+      });
+    }
+
     try {
+      final queryParams = 'month=$_selectedMonth&year=$_selectedYear&status=$_selectedStatusFilter&page=$_currentPage&limit=10';
       final res = await http.get(
-        Uri.parse('${widget.apiUrl}/tickets'),
+        Uri.parse('${widget.apiUrl}/tickets?$queryParams'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}'
         },
       );
+
       if (res.statusCode == 200) {
+        final Map<String, dynamic> body = jsonDecode(res.body);
+        final List data = body['data'] ?? [];
         setState(() {
-          _tickets = jsonDecode(res.body);
+          if (isLoadMore) {
+            _tickets.addAll(data);
+          } else {
+            _tickets = data;
+          }
+          _hasMore = body['hasMore'] ?? false;
         });
       }
     } catch (e) {
       print('Error fetching tickets: $e');
     } finally {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isMoreLoading = false;
+      });
     }
+  }
+
+  void _onViewMore() {
+    if (_hasMore && !_isMoreLoading) {
+      _currentPage++;
+      _fetchTickets(isLoadMore: true);
+    }
+  }
+
+  String _getMonthName(int month) {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[month - 1];
+  }
+
+  Future<void> _selectMonthYear(BuildContext context) async {
+    int tempMonth = _selectedMonth;
+    int tempYear = _selectedYear;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E293B),
+              title: const Text('Select Month & Year', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int>(
+                    value: tempMonth,
+                    dropdownColor: const Color(0xFF1E293B),
+                    decoration: const InputDecoration(
+                      labelText: 'Month',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('January')),
+                      DropdownMenuItem(value: 2, child: Text('February')),
+                      DropdownMenuItem(value: 3, child: Text('March')),
+                      DropdownMenuItem(value: 4, child: Text('April')),
+                      DropdownMenuItem(value: 5, child: Text('May')),
+                      DropdownMenuItem(value: 6, child: Text('June')),
+                      DropdownMenuItem(value: 7, child: Text('July')),
+                      DropdownMenuItem(value: 8, child: Text('August')),
+                      DropdownMenuItem(value: 9, child: Text('September')),
+                      DropdownMenuItem(value: 10, child: Text('October')),
+                      DropdownMenuItem(value: 11, child: Text('November')),
+                      DropdownMenuItem(value: 12, child: Text('December')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => tempMonth = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    value: tempYear,
+                    dropdownColor: const Color(0xFF1E293B),
+                    decoration: const InputDecoration(
+                      labelText: 'Year',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    items: [2024, 2025, 2026, 2027, 2028].map((y) {
+                      return DropdownMenuItem(value: y, child: Text(y.toString()));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => tempYear = val);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = tempMonth;
+                      _selectedYear = tempYear;
+                    });
+                    Navigator.pop(context);
+                    _fetchTickets();
+                  },
+                  child: const Text('Select', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Filter logic
-    final filteredTickets = _tickets.where((t) {
-      if (_selectedStatusFilter == 'all') return true;
-      if (_selectedStatusFilter == 'new') return t['status'] == 'new';
-      if (_selectedStatusFilter == 'assigned') return t['status'] == 'assigned';
-      if (_selectedStatusFilter == 'in_progress') return t['status'] == 'in_progress';
-      if (_selectedStatusFilter == 'completed') return t['status'] == 'completed' || t['status'] == 'verification_pending';
-      if (_selectedStatusFilter == 'closed') return t['status'] == 'closed';
-      return true;
-    }).toList();
-
     return Scaffold(
       appBar: AppBar(title: const Text('My Requests')),
       body: Column(
         children: [
+          GestureDetector(
+            onTap: () => _selectMonthYear(context),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, color: Colors.blueGrey, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_getMonthName(_selectedMonth)} $_selectedYear',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                  const Icon(Icons.arrow_drop_down, color: Colors.white),
+                ],
+              ),
+            ),
+          ),
           _buildFilterTabs(),
           Expanded(
             child: _isLoading 
               ? const Center(child: CircularProgressIndicator())
-              : filteredTickets.isEmpty
-                ? const Center(child: Text('No requests found', style: TextStyle(color: Colors.grey)))
+              : _tickets.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('No requests found', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          SizedBox(height: 8),
+                          Text('There are no requests for the selected period.', style: TextStyle(color: Colors.grey, fontSize: 12), textAlign: TextAlign.center),
+                        ],
+                      ),
+                    ),
+                  )
                 : ListView.builder(
                     padding: const EdgeInsets.all(12),
-                    itemCount: filteredTickets.length,
+                    itemCount: _tickets.length + (_hasMore ? 1 : 0),
                     itemBuilder: (context, index) {
-                      final t = filteredTickets[index];
+                      if (index == _tickets.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          child: Center(
+                            child: _isMoreLoading
+                              ? const CircularProgressIndicator()
+                              : ElevatedButton(
+                                  onPressed: _onViewMore,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF7C3AED),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  child: const Text('View More'),
+                                ),
+                          ),
+                        );
+                      }
+                      final t = _tickets[index];
                       return _buildTicketCard(t);
                     },
                   ),
@@ -1154,9 +1329,12 @@ class _TicketListScreenState extends State<TicketListScreen> {
         label: Text(label),
         selected: active,
         onSelected: (sel) {
-          setState(() {
-            _selectedStatusFilter = value;
-          });
+          if (sel) {
+            setState(() {
+              _selectedStatusFilter = value;
+            });
+            _fetchTickets();
+          }
         },
       ),
     );

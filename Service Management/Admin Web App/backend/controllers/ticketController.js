@@ -48,7 +48,7 @@ const createTicket = async (req, res) => {
 // @access  Private
 const getTickets = async (req, res) => {
   try {
-    const { status, type, dealer, technician, city, search, customerMobile, fromDate, toDate, performanceFilter } = req.query;
+    const { status, type, dealer, technician, city, search, customerMobile, fromDate, toDate, performanceFilter, month, year, page, limit } = req.query;
     let query = {};
 
     // For dealers, restrict to their own tickets
@@ -61,7 +61,19 @@ const getTickets = async (req, res) => {
     }
 
     // Applying filters
-    if (status) query.status = status;
+    if (status) {
+      if (req.user.role === 'dealer') {
+        if (status === 'all') {
+          // fetch all
+        } else if (status === 'completed') {
+          query.status = { $in: ['completed', 'verification_pending'] };
+        } else {
+          query.status = status;
+        }
+      } else {
+        query.status = status;
+      }
+    }
     if (type) query.type = type;
     if (customerMobile) query['customer.mobile'] = customerMobile;
     if (dealer && req.user.role === 'admin') {
@@ -191,6 +203,35 @@ const getTickets = async (req, res) => {
         { 'customer.mobile': { $regex: search, $options: 'i' } },
         { 'product.name': { $regex: search, $options: 'i' } }
       ];
+    }
+
+    if (month && year) {
+      const m = parseInt(month, 10);
+      const y = parseInt(year, 10);
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 0, 23, 59, 59, 999);
+      query.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (page) {
+      const p = parseInt(page, 10) || 1;
+      const l = parseInt(limit, 10) || 10;
+      const skip = (p - 1) * l;
+
+      const total = await Ticket.countDocuments(query);
+      const tickets = await Ticket.find(query)
+        .populate('dealer', 'name code email mobile')
+        .populate('assignedTechnician', 'name code mobile')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(l);
+
+      return res.json({
+        data: tickets,
+        page: p,
+        limit: l,
+        hasMore: (skip + tickets.length) < total
+      });
     }
 
     const tickets = await Ticket.find(query)
