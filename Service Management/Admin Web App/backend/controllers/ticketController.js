@@ -418,11 +418,13 @@ const submitWorkCompletion = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to complete this ticket' });
     }
 
-    const completionPhotos = [];
-    if (req.files) {
+    let completionPhotos = [];
+    if (req.files && req.files.length > 0) {
       req.files.forEach(file => {
         completionPhotos.push('uploads/' + file.filename);
       });
+    } else if (ticket.completion && ticket.completion.photos) {
+      completionPhotos = ticket.completion.photos;
     }
 
     ticket.status = 'verification_pending';
