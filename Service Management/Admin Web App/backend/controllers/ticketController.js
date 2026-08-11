@@ -250,7 +250,7 @@ const getTickets = async (req, res) => {
 
     if (city) query['customer.city'] = { $regex: city, $options: 'i' };
 
-    if (fromDate && toDate && !performanceFilter) {
+    if (fromDate && toDate && !performanceFilter && dashboardFilter !== 'true') {
       const start = new Date(fromDate);
       start.setUTCHours(0, 0, 0, 0);
 
