@@ -722,6 +722,49 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                       _job!['adminVerification']['reason'] ?? 'No reason provided',
                       style: const TextStyle(fontSize: 13, color: Colors.white, fontStyle: FontStyle.italic),
                     ),
+                    if (_job!['completion'] != null &&
+                        _job!['completion']['photos'] != null &&
+                        (_job!['completion']['photos'] as List).isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Previous Completion Photos:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red[200]),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 80,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: (_job!['completion']['photos'] as List).length,
+                          itemBuilder: (context, idx) {
+                            final base = widget.apiUrl.replaceAll('/api', '');
+                            final path = _job!['completion']['photos'][idx];
+                            final url = '$base/$path';
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: GestureDetector(
+                                onTap: () => _viewPhotos(context, _job!['completion']['photos']),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    url,
+                                    fit: BoxFit.cover,
+                                    width: 80,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: 80,
+                                        color: Colors.grey[850],
+                                        child: const Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
