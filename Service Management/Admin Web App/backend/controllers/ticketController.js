@@ -427,13 +427,20 @@ const submitWorkCompletion = async (req, res) => {
       completionPhotos = ticket.completion.photos;
     }
 
-    ticket.status = 'verification_pending';
-    ticket.completion = {
+    const newCompletion = {
       photos: completionPhotos,
       workDone,
       remarks,
       submittedAt: Date.now()
     };
+
+    ticket.status = 'verification_pending';
+    ticket.completion = newCompletion;
+
+    if (!ticket.completionHistory) {
+      ticket.completionHistory = [];
+    }
+    ticket.completionHistory.push(newCompletion);
 
     ticket.timeline.push({
       status: 'verification_pending',

@@ -67,6 +67,12 @@ const TicketSchema = new mongoose.Schema({
     remarks: String,
     submittedAt: Date
   },
+  completionHistory: [{
+    photos: [String],
+    workDone: String,
+    remarks: String,
+    submittedAt: Date
+  }],
   adminVerification: {
     status: { type: String, enum: ['approved', 'rejected'] },
     reason: String,

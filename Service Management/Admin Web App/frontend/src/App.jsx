@@ -2594,30 +2594,42 @@ export default function App() {
                 </div>
 
                 {/* Technician Completion Uploads */}
-                {selectedTicket.completion?.workDone && (
-                  <div className="bg-slate-800/40 border border-slate-850 p-5 rounded-2xl space-y-4">
-                    <h4 className="font-bold text-white text-sm border-b border-slate-700 pb-2 flex items-center justify-between">
-                      <span>Technician Job Submission</span>
-                      <span className="text-xs text-slate-400">{new Date(selectedTicket.completion.submittedAt).toLocaleString()}</span>
-                    </h4>
-                    <div className="text-sm text-slate-300 space-y-2">
-                      <p><span className="text-slate-500 font-semibold">Work Done:</span> {selectedTicket.completion.workDone}</p>
-                      <p><span className="text-slate-500 font-semibold">Remarks:</span> {selectedTicket.completion.remarks || 'None'}</p>
-                    </div>
-                    {selectedTicket.completion.photos && selectedTicket.completion.photos.length > 0 && (
-                      <div>
-                        <p className="text-xs text-slate-500 font-semibold mb-2">Completion Photos</p>
-                        <div className="grid grid-cols-3 gap-2">
-                          {selectedTicket.completion.photos.map((photo, i) => (
-                            <a key={i} href={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} target="_blank" rel="noreferrer">
-                              <img src={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} alt="Completion" className="rounded-lg object-cover w-full h-24 border border-slate-700" />
-                            </a>
-                          ))}
+                {(() => {
+                  const completionsList = selectedTicket.completionHistory && selectedTicket.completionHistory.length > 0
+                    ? selectedTicket.completionHistory
+                    : (selectedTicket.completion?.workDone ? [selectedTicket.completion] : []);
+                  
+                  return completionsList.map((comp, idx) => {
+                    const submissionLabel = completionsList.length > 1
+                      ? `${idx + 1}${idx === 0 ? 'st' : idx === 1 ? 'nd' : idx === 2 ? 'rd' : 'th'} Completion Submission`
+                      : "Technician Job Submission";
+                    
+                    return (
+                      <div key={idx} className="bg-slate-800/40 border border-slate-850 p-5 rounded-2xl space-y-4">
+                        <h4 className="font-bold text-white text-sm border-b border-slate-700 pb-2 flex items-center justify-between">
+                          <span>{submissionLabel}</span>
+                          <span className="text-xs text-slate-400">{new Date(comp.submittedAt).toLocaleString()}</span>
+                        </h4>
+                        <div className="text-sm text-slate-300 space-y-2">
+                          <p><span className="text-slate-500 font-semibold">Work Done:</span> {comp.workDone}</p>
+                          <p><span className="text-slate-500 font-semibold">Remarks:</span> {comp.remarks || 'None'}</p>
                         </div>
+                        {comp.photos && comp.photos.length > 0 && (
+                          <div>
+                            <p className="text-xs text-slate-500 font-semibold mb-2">Completion Photos</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              {comp.photos.map((photo, i) => (
+                                <a key={i} href={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} target="_blank" rel="noreferrer">
+                                  <img src={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} alt="Completion" className="rounded-lg object-cover w-full h-24 border border-slate-700" />
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
+                    );
+                  });
+                })()}
 
               </div>
 
