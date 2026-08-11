@@ -1385,16 +1385,23 @@ export default function App() {
                               )}
                             </td>
                             <td className="px-6 py-4">
-                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                                ticket.status === 'new' ? 'bg-blue-900/50 text-blue-300 border border-blue-700/30' :
-                                ticket.status === 'assigned' ? 'bg-amber-900/50 text-amber-300 border border-amber-700/30' :
-                                ticket.status === 'in_progress' ? 'bg-orange-900/50 text-orange-300 border border-orange-700/30' :
-                                ticket.status === 'verification_pending' ? 'bg-purple-900/50 text-purple-300 border border-purple-700/30' :
-                                ticket.status === 'completed' ? 'bg-green-900/50 text-green-300 border border-green-700/30' :
-                                'bg-slate-800 text-slate-400'
-                              }`}>
-                                {ticket.status.replace('_', ' ')}
-                              </span>
+                              <div className="flex flex-wrap gap-2 items-center">
+                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                                  ticket.status === 'new' ? 'bg-blue-900/50 text-blue-300 border border-blue-700/30' :
+                                  ticket.status === 'assigned' ? 'bg-amber-900/50 text-amber-300 border border-amber-700/30' :
+                                  ticket.status === 'in_progress' ? 'bg-orange-900/50 text-orange-300 border border-orange-700/30' :
+                                  ticket.status === 'verification_pending' ? 'bg-purple-900/50 text-purple-300 border border-purple-700/30' :
+                                  ticket.status === 'completed' ? 'bg-green-900/50 text-green-300 border border-green-700/30' :
+                                  'bg-slate-800 text-slate-400'
+                                }`}>
+                                  {ticket.status.replace('_', ' ')}
+                                </span>
+                                {ticket.adminVerification?.status === 'rejected' && (
+                                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-red-950/60 text-red-400 border border-red-800/40">
+                                    Reassigned
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-6 py-4 text-right">
                               <button 
@@ -2580,7 +2587,7 @@ export default function App() {
                     {selectedTicket.invoiceImage && (
                       <div className="col-span-2">
                         <p className="text-xs text-slate-500 font-semibold">Invoice Attachment</p>
-                        <a href={`/${selectedTicket.invoiceImage}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:text-violet-300 text-xs font-bold underline mt-1 inline-block">View Uploaded Invoice Image</a>
+                        <a href={selectedTicket.invoiceImage.startsWith('http') ? selectedTicket.invoiceImage : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${selectedTicket.invoiceImage}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:text-violet-300 text-xs font-bold underline mt-1 inline-block">View Uploaded Invoice Image</a>
                       </div>
                     )}
                   </div>
@@ -2602,8 +2609,8 @@ export default function App() {
                         <p className="text-xs text-slate-500 font-semibold mb-2">Completion Photos</p>
                         <div className="grid grid-cols-3 gap-2">
                           {selectedTicket.completion.photos.map((photo, i) => (
-                            <a key={i} href={`/${photo}`} target="_blank" rel="noreferrer">
-                              <img src={`/${photo}`} alt="Completion" className="rounded-lg object-cover w-full h-24 border border-slate-700" />
+                            <a key={i} href={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} target="_blank" rel="noreferrer">
+                              <img src={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} alt="Completion" className="rounded-lg object-cover w-full h-24 border border-slate-700" />
                             </a>
                           ))}
                         </div>

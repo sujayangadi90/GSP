@@ -121,6 +121,8 @@ const getTickets = async (req, res) => {
       if (req.user.role === 'dealer') {
         if (status === 'all') {
           // fetch all
+        } else if (status === 'open') {
+          query.status = { $in: ['new', 'assigned', 'in_progress'] };
         } else if (status === 'completed') {
           query.status = { $in: ['completed', 'verification_pending'] };
         } else {

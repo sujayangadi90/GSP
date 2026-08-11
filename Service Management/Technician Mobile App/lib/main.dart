@@ -453,16 +453,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(number, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: (status == 'assigned' ? Colors.amber : Colors.orange).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                status.toString().toUpperCase(),
-                style: TextStyle(color: status == 'assigned' ? Colors.amber : Colors.orange, fontSize: 9, fontWeight: FontWeight.bold),
-              ),
+            Row(
+              children: [
+                if (job['adminVerification'] != null && job['adminVerification']['status'] == 'rejected')
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    ),
+                    child: const Text(
+                      'REASSIGNED',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (status == 'assigned' ? Colors.amber : Colors.orange).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    status.toString().toUpperCase(),
+                    style: TextStyle(color: status == 'assigned' ? Colors.amber : Colors.orange, fontSize: 9, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -668,6 +686,47 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_job!['adminVerification'] != null && _job!['adminVerification']['status'] == 'rejected') ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                        SizedBox(width: 8),
+                        Text(
+                          'REASSIGNED / REJECTED',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.redAccent),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'This ticket was previously submitted but rejected by the Admin.',
+                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Admin Comments / Reason:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red[200]),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _job!['adminVerification']['reason'] ?? 'No reason provided',
+                      style: const TextStyle(fontSize: 13, color: Colors.white, fontStyle: FontStyle.italic),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             _buildDetailBlock('Customer Details', [
               'Name: ${_job!['customer']['name']}',
               'Mobile: ${_job!['customer']['mobile']}',

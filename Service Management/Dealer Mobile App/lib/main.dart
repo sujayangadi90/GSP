@@ -319,6 +319,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _navigateToRequests({required String status}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TicketListScreen(
+          token: widget.token,
+          apiUrl: widget.apiUrl,
+          initialStatus: status,
+          initialMonth: _selectedMonth,
+          initialYear: _selectedYear,
+        ),
+      ),
+    ).then((_) => _loadStats());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -459,10 +474,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     childAspectRatio: 1.4,
                     physics: const NeverScrollableScrollPhysics(),
                     children: [
-                      _buildStatCard('New Requests', _newCount, Colors.blue),
-                      _buildStatCard('Total Open', _openCount, Colors.amber),
-                      _buildStatCard('In Progress', _inProgressCount, Colors.orange),
-                      _buildStatCard('Completed', _completedCount, Colors.green),
+                      _buildStatCard('New Requests', _newCount, Colors.blue, () {
+                        _navigateToRequests(status: 'new');
+                      }),
+                      _buildStatCard('Total Open', _openCount, Colors.amber, () {
+                        _navigateToRequests(status: 'open');
+                      }),
+                      _buildStatCard('In Progress', _inProgressCount, Colors.orange, () {
+                        _navigateToRequests(status: 'in_progress');
+                      }),
+                      _buildStatCard('Completed', _completedCount, Colors.green, () {
+                        _navigateToRequests(status: 'completed');
+                      }),
                     ],
                   ),
               const SizedBox(height: 32),
@@ -530,21 +553,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, int count, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        border: Border.all(color: color.withOpacity(0.35)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
-          Text('$count', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
-        ],
+  Widget _buildStatCard(String title, int count, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          border: Border.all(color: color.withOpacity(0.35)),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+            Text('$count', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
+          ],
+        ),
       ),
     );
   }
@@ -1065,8 +1092,18 @@ class BoxCover {
 class TicketListScreen extends StatefulWidget {
   final String token;
   final String apiUrl;
+  final String? initialStatus;
+  final int? initialMonth;
+  final int? initialYear;
 
-  const TicketListScreen({super.key, required this.token, required this.apiUrl});
+  const TicketListScreen({
+    super.key,
+    required this.token,
+    required this.apiUrl,
+    this.initialStatus,
+    this.initialMonth,
+    this.initialYear,
+  });
 
   @override
   State<TicketListScreen> createState() => _TicketListScreenState();
@@ -1076,15 +1113,18 @@ class _TicketListScreenState extends State<TicketListScreen> {
   List _tickets = [];
   bool _isLoading = false;
   bool _isMoreLoading = false;
-  String _selectedStatusFilter = 'all';
-  int _selectedMonth = DateTime.now().month;
-  int _selectedYear = DateTime.now().year;
+  late String _selectedStatusFilter;
+  late int _selectedMonth;
+  late int _selectedYear;
   int _currentPage = 1;
   bool _hasMore = false;
 
   @override
   void initState() {
     super.initState();
+    _selectedStatusFilter = widget.initialStatus ?? 'all';
+    _selectedMonth = widget.initialMonth ?? DateTime.now().month;
+    _selectedYear = widget.initialYear ?? DateTime.now().year;
     _fetchTickets();
   }
 
@@ -1099,9 +1139,14 @@ class _TicketListScreenState extends State<TicketListScreen> {
         _hasMore = false;
       });
     }
-
     try {
-      final queryParams = 'month=$_selectedMonth&year=$_selectedYear&status=$_selectedStatusFilter&page=$_currentPage&limit=10';
+      final firstDay = DateTime(_selectedYear, _selectedMonth, 1);
+      final lastDay = DateTime(_selectedYear, _selectedMonth + 1, 0);
+      final fromDateStr = "${firstDay.year}-${firstDay.month.toString().padLeft(2, '0')}-01";
+      final toDateStr = "${lastDay.year}-${lastDay.month.toString().padLeft(2, '0')}-${lastDay.day.toString().padLeft(2, '0')}";
+
+      // Request all tickets for the date range so we can perform perfect client-side filtering aligned with the dashboard
+      final queryParams = 'fromDate=$fromDateStr&toDate=$toDateStr&status=all&page=1&limit=100';
       final res = await http.get(
         Uri.parse('${widget.apiUrl}/tickets?$queryParams'),
         headers: {
@@ -1113,13 +1158,44 @@ class _TicketListScreenState extends State<TicketListScreen> {
       if (res.statusCode == 200) {
         final Map<String, dynamic> body = jsonDecode(res.body);
         final List data = body['data'] ?? [];
+
+        // Client-side filtering to match the dashboard stats exactly
+        List filteredData = data;
+        if (_selectedStatusFilter == 'open') {
+          filteredData = data.where((t) {
+            final s = t['status']?.toString().toLowerCase() ?? '';
+            return s != 'completed' && s != 'closed' && s != 'cancelled';
+          }).toList();
+        } else if (_selectedStatusFilter == 'new') {
+          filteredData = data.where((t) {
+            final s = t['status']?.toString().toLowerCase() ?? '';
+            return s == 'new';
+          }).toList();
+        } else if (_selectedStatusFilter == 'assigned') {
+          filteredData = data.where((t) {
+            final s = t['status']?.toString().toLowerCase() ?? '';
+            return s == 'assigned';
+          }).toList();
+        } else if (_selectedStatusFilter == 'in_progress') {
+          filteredData = data.where((t) {
+            final s = t['status']?.toString().toLowerCase() ?? '';
+            return s == 'assigned' || s == 'in_progress';
+          }).toList();
+        } else if (_selectedStatusFilter == 'completed') {
+          filteredData = data.where((t) {
+            final s = t['status']?.toString().toLowerCase() ?? '';
+            return s == 'completed' || s == 'closed' || s == 'verification_pending';
+          }).toList();
+        } else if (_selectedStatusFilter == 'closed') {
+          filteredData = data.where((t) {
+            final s = t['status']?.toString().toLowerCase() ?? '';
+            return s == 'closed';
+          }).toList();
+        }
+
         setState(() {
-          if (isLoadMore) {
-            _tickets.addAll(data);
-          } else {
-            _tickets = data;
-          }
-          _hasMore = body['hasMore'] ?? false;
+          _tickets = filteredData;
+          _hasMore = false; // All tickets are fetched in a single request (limit=100)
         });
       }
     } catch (e) {
@@ -1326,6 +1402,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         children: [
           _buildTabButton('all', 'All'),
+          _buildTabButton('open', 'Open'),
           _buildTabButton('new', 'New'),
           _buildTabButton('assigned', 'Assigned'),
           _buildTabButton('in_progress', 'In Progress'),
