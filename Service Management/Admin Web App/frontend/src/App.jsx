@@ -214,7 +214,8 @@ export default function App() {
     city: '',
     search: '',
     fromDate: '',
-    toDate: ''
+    toDate: '',
+    dashboardFilter: ''
   });
 
   useEffect(() => {
@@ -302,7 +303,7 @@ export default function App() {
       // Load dealers, technicians, and tickets
       const dealersData = await apiFetch(`/dealers?search=${dealerSearch}`);
       const techsData = await apiFetch(`/technicians?search=${techSearch}`);
-      const ticketsData = await apiFetch(`/tickets?status=${ticketFilters.status}&type=${ticketFilters.type}&city=${ticketFilters.city}&search=${ticketFilters.search}&fromDate=${ticketFilters.fromDate || ''}&toDate=${ticketFilters.toDate || ''}`);
+      const ticketsData = await apiFetch(`/tickets?status=${ticketFilters.status}&type=${ticketFilters.type}&city=${ticketFilters.city}&search=${ticketFilters.search}&fromDate=${ticketFilters.fromDate || ''}&toDate=${ticketFilters.toDate || ''}&dashboardFilter=${ticketFilters.dashboardFilter || ''}`);
 
       setDealers(dealersData);
       setTechnicians(techsData);
@@ -490,6 +491,19 @@ export default function App() {
   useEffect(() => {
     setHistoryPage(1);
   }, [historySearchQuery]);
+
+  const handleStatClick = (statusType) => {
+    setTicketFilters({
+      status: statusType,
+      type: '',
+      city: '',
+      search: '',
+      fromDate: appliedDashboardRange.fromDate,
+      toDate: appliedDashboardRange.toDate,
+      dashboardFilter: 'true'
+    });
+    setActiveTab('tickets');
+  };
 
   // Appliance Actions
   const saveAppliance = async (e) => {
@@ -1088,23 +1102,38 @@ export default function App() {
                 <>
                   {/* Stat Cards */}
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    <div className="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                    <div 
+                      onClick={() => handleStatClick('')}
+                      className="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                    >
                       <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Requests</span>
                       <span className="text-3xl font-black text-white mt-2">{stats.total}</span>
                     </div>
-                    <div className="bg-blue-950/20 border border-blue-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                    <div 
+                      onClick={() => handleStatClick('new')}
+                      className="bg-blue-950/20 border border-blue-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                    >
                       <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">New Requests</span>
                       <span className="text-3xl font-black text-blue-400 mt-2">{stats.new}</span>
                     </div>
-                    <div className="bg-amber-950/20 border border-amber-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                    <div 
+                      onClick={() => handleStatClick('assigned')}
+                      className="bg-amber-950/20 border border-amber-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                    >
                       <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Assigned</span>
                       <span className="text-3xl font-black text-amber-400 mt-2">{stats.assigned}</span>
                     </div>
-                    <div className="bg-purple-950/20 border border-purple-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                    <div 
+                      onClick={() => handleStatClick('pending')}
+                      className="bg-purple-950/20 border border-purple-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                    >
                       <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Pending/Action</span>
                       <span className="text-3xl font-black text-purple-400 mt-2">{stats.pending}</span>
                     </div>
-                    <div className="bg-emerald-950/20 border border-emerald-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                    <div 
+                      onClick={() => handleStatClick('closed')}
+                      className="bg-emerald-950/20 border border-emerald-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                    >
                       <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Closed</span>
                       <span className="text-3xl font-black text-emerald-400 mt-2">{stats.closed}</span>
                     </div>
@@ -1215,7 +1244,7 @@ export default function App() {
                       placeholder="Ticket #, Customer, Dealer, Technician"
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                       value={ticketFilters.search}
-                      onChange={(e) => setTicketFilters({ ...ticketFilters, search: e.target.value })}
+                      onChange={(e) => setTicketFilters({ ...ticketFilters, search: e.target.value, dashboardFilter: '' })}
                     />
                   </div>
                 </div>
@@ -1236,7 +1265,7 @@ export default function App() {
                             alert('From Date cannot be later than To Date');
                             return;
                           }
-                          setTicketFilters({ ...ticketFilters, fromDate: val });
+                          setTicketFilters({ ...ticketFilters, fromDate: val, dashboardFilter: '' });
                         }}
                       />
                       <span className="text-slate-500 text-xs font-bold">to</span>
@@ -1250,7 +1279,7 @@ export default function App() {
                             alert('From Date cannot be later than To Date');
                             return;
                           }
-                          setTicketFilters({ ...ticketFilters, toDate: val });
+                          setTicketFilters({ ...ticketFilters, toDate: val, dashboardFilter: '' });
                         }}
                       />
                     </div>
@@ -1262,7 +1291,7 @@ export default function App() {
                     <select 
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
                       value={ticketFilters.city}
-                      onChange={(e) => setTicketFilters({ ...ticketFilters, city: e.target.value })}
+                      onChange={(e) => setTicketFilters({ ...ticketFilters, city: e.target.value, dashboardFilter: '' })}
                     >
                       <option value="">All Cities</option>
                       {cities.map(city => (
@@ -1277,7 +1306,7 @@ export default function App() {
                     <select 
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
                       value={ticketFilters.type}
-                      onChange={(e) => setTicketFilters({ ...ticketFilters, type: e.target.value })}
+                      onChange={(e) => setTicketFilters({ ...ticketFilters, type: e.target.value, dashboardFilter: '' })}
                     >
                       <option value="">All Types</option>
                       <option value="installation">Installation</option>
@@ -1291,11 +1320,12 @@ export default function App() {
                     <select 
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
                       value={ticketFilters.status}
-                      onChange={(e) => setTicketFilters({ ...ticketFilters, status: e.target.value })}
+                      onChange={(e) => setTicketFilters({ ...ticketFilters, status: e.target.value, dashboardFilter: '' })}
                     >
                       <option value="">All Statuses</option>
                       <option value="new">New</option>
                       <option value="assigned">Assigned</option>
+                      <option value="pending">Pending/Action</option>
                       <option value="in_progress">Work In Progress</option>
                       <option value="verification_pending">Verification Pending</option>
                       <option value="completed">Completed (Pending Close)</option>

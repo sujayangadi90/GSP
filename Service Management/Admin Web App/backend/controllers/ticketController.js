@@ -48,7 +48,7 @@ const createTicket = async (req, res) => {
 // @access  Private
 const getTickets = async (req, res) => {
   try {
-    const { status, type, dealer, technician, city, search, customerMobile, fromDate, toDate, performanceFilter, month, year, page, limit } = req.query;
+    const { status, type, dealer, technician, city, search, customerMobile, fromDate, toDate, performanceFilter, month, year, page, limit, dashboardFilter } = req.query;
     let query = {};
 
     // For dealers, restrict to their own tickets
@@ -60,8 +60,64 @@ const getTickets = async (req, res) => {
       query.assignedTechnician = req.user._id;
     }
 
-    // Applying filters
-    if (status) {
+    // Dashboard specific filters for admin
+    if (dashboardFilter === 'true' && req.user.role === 'admin' && fromDate && toDate) {
+      const start = new Date(`${fromDate}T00:00:00`);
+      const end = new Date(`${toDate}T23:59:59.999`);
+
+      if (status === 'new') {
+        query.status = 'new';
+        query.createdAt = { $gte: start, $lte: end };
+      } else if (status === 'assigned') {
+        query.status = { $ne: 'new' };
+        query.timeline = {
+          $elemMatch: {
+            status: 'assigned',
+            timestamp: { $gte: start, $lte: end }
+          }
+        };
+      } else if (status === 'closed') {
+        query.status = 'closed';
+        query.closedAt = { $gte: start, $lte: end };
+      } else if (status === 'pending') {
+        query.status = { $in: ['in_progress', 'verification_pending', 'completed'] };
+      } else {
+        // total/all
+        query.createdAt = { $gte: start, $lte: end };
+      }
+
+      if (city) query['customer.city'] = { $regex: city, $options: 'i' };
+      if (type) query.type = type;
+      if (search) {
+        query.$or = [
+          { ticketNumber: { $regex: search, $options: 'i' } },
+          { 'customer.name': { $regex: search, $options: 'i' } },
+          { 'customer.mobile': { $regex: search, $options: 'i' } },
+          { 'product.name': { $regex: search, $options: 'i' } }
+        ];
+      }
+
+      if (status === 'pending') {
+        let tickets = await Ticket.find(query)
+          .populate('dealer', 'name code email mobile')
+          .populate('assignedTechnician', 'name code mobile')
+          .sort({ createdAt: -1 });
+
+        // filter in memory
+        tickets = tickets.filter(ticket => {
+          const currentStatusTimeline = [...ticket.timeline]
+            .reverse()
+            .find(item => item.status === ticket.status);
+          if (currentStatusTimeline) {
+            const ts = new Date(currentStatusTimeline.timestamp);
+            return ts >= start && ts <= end;
+          }
+          return ticket.updatedAt >= start && ticket.updatedAt <= end;
+        });
+
+        return res.json(tickets);
+      }
+    } else if (status) {
       if (req.user.role === 'dealer') {
         if (status === 'all') {
           // fetch all
