@@ -1340,7 +1340,16 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/80 text-sm">
-                      {tickets.length === 0 ? (
+                      {loading ? (
+                        <tr>
+                          <td colSpan="7" className="text-center py-16 text-slate-400 font-medium">
+                            <div className="flex flex-col items-center justify-center gap-3">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600"></div>
+                              <p className="text-sm">Loading requests...</p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : tickets.length === 0 ? (
                         <tr>
                           <td colSpan="7" className="text-center py-8 text-slate-500 font-medium">No tickets found matches current filters</td>
                         </tr>
