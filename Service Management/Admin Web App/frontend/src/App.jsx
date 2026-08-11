@@ -229,7 +229,6 @@ export default function App() {
   useEffect(() => {
     if (user) {
       localStorage.setItem('gsp_user', JSON.stringify(user));
-      fetchData();
     } else {
       localStorage.removeItem('gsp_user');
     }
@@ -308,18 +307,8 @@ export default function App() {
       setDealers(dealersData);
       setTechnicians(techsData);
       setTickets(ticketsData);
-
-      // Compute statistics based on loaded tickets
-      const newStats = { total: ticketsData.length, new: 0, assigned: 0, pending: 0, closed: 0 };
-      ticketsData.forEach(t => {
-        if (t.status === 'new') newStats.new++;
-        else if (t.status === 'assigned') newStats.assigned++;
-        else if (t.status === 'in_progress' || t.status === 'verification_pending' || t.status === 'completed') newStats.pending++;
-        else if (t.status === 'closed') newStats.closed++;
-      });
-      setStats(newStats);
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
+      console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
     }
@@ -474,7 +463,7 @@ export default function App() {
         fetchCities();
       }
     }
-  }, [dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange]);
+  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange]);
 
   useEffect(() => {
     setCustomerPage(1);
