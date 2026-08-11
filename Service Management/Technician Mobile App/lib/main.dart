@@ -960,6 +960,56 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       ),
     );
   }
+
+  void _viewPhotos(BuildContext context, List photos) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final base = widget.apiUrl.replaceAll('/api', '');
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          title: const Text('Completion Photos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: photos.isEmpty
+              ? const Text('No photos uploaded.', style: TextStyle(color: Colors.grey))
+              : SizedBox(
+                  width: double.maxFinite,
+                  height: 300,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: photos.length,
+                    itemBuilder: (context, index) {
+                      final url = '$base/${photos[index]}';
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            url,
+                            fit: BoxFit.cover,
+                            width: 250,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 250,
+                                color: Colors.grey[850],
+                                child: const Icon(Icons.broken_image, color: Colors.grey),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close', style: TextStyle(color: Colors.blue)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class JobHistoryScreen extends StatefulWidget {
