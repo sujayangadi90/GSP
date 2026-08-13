@@ -529,7 +529,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ).then((_) => _loadJobs()),
                       ),
                       _buildStatCard(
-                        'Finished',
+                        'Closed',
                         _completedCount,
                         Colors.green,
                         onTap: () => Navigator.push(
