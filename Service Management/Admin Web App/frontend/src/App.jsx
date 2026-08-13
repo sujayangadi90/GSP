@@ -722,6 +722,7 @@ export default function App() {
       setAssignNotes('');
       setAssignTechId('');
       fetchData();
+      fetchDashboardData();
     } catch (err) {
       alert(err.message);
     }
@@ -737,6 +738,7 @@ export default function App() {
       setSelectedTicket(updated);
       setVerificationForm({ status: 'approved', reason: '' });
       fetchData();
+      fetchDashboardData();
     } catch (err) {
       alert(err.message);
     }
@@ -752,6 +754,7 @@ export default function App() {
       setSelectedTicket(updated);
       setClosureRemarks('');
       fetchData();
+      fetchDashboardData();
     } catch (err) {
       alert(err.message);
     }
@@ -2541,7 +2544,7 @@ export default function App() {
                 <h3 className="font-extrabold text-white text-lg">{selectedTicket.ticketNumber} Details</h3>
                 <p className="text-xs text-slate-400 mt-0.5 capitalize">Type: {selectedTicket.type} • Status: {selectedTicket.status.replace('_', ' ')}</p>
               </div>
-              <button onClick={() => { setSelectedTicket(null); fetchData(); }} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-6 h-6" /></button>
+              <button onClick={() => { setSelectedTicket(null); fetchData(); fetchDashboardData(); }} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-6 h-6" /></button>
             </div>
             
             <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[calc(85vh-150px)] overflow-y-auto">
