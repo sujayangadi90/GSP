@@ -1399,14 +1399,14 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
     );
   }
 
-  void _viewPhotos(BuildContext context, List photos) {
+  void _viewPhotos(BuildContext context, List photos, {String title = 'Completion Photos'}) {
     showDialog(
       context: context,
       builder: (context) {
         final base = widget.apiUrl.replaceAll('/api', '');
         return AlertDialog(
           backgroundColor: const Color(0xFF1E293B),
-          title: const Text('Completion Photos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           content: photos.isEmpty
               ? const Text('No photos uploaded.', style: TextStyle(color: Colors.grey))
               : SizedBox(
@@ -1573,6 +1573,8 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                       final brand = job['product']['category'] ?? 'N/A';
                       final scope = job['type']?.toString().toUpperCase() ?? 'SERVICE';
                       final assignedDateStr = _getAssignedDate(job);
+                      final List? completionHistory = job['completionHistory'] as List?;
+                      final hasHistory = completionHistory != null && completionHistory.isNotEmpty;
                       final photos = job['completion']?['photos'] as List?;
                       final hasPhotos = photos != null && photos.isNotEmpty;
 
@@ -1616,7 +1618,33 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                               Text('Type: $scope', style: const TextStyle(color: Colors.grey, fontSize: 13)),
                               const SizedBox(height: 4),
                               Text('Assigned: $assignedDateStr', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                              if (hasPhotos) ...[
+                              if (hasHistory) ...[
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: List.generate(completionHistory.length, (attemptIndex) {
+                                    final comp = completionHistory[attemptIndex];
+                                    final compPhotos = comp['photos'] as List?;
+                                    if (compPhotos == null || compPhotos.isEmpty) return const SizedBox.shrink();
+                                    return ElevatedButton.icon(
+                                      onPressed: () => _viewPhotos(
+                                        context,
+                                        compPhotos,
+                                        title: 'Completion Attempt ${attemptIndex + 1}',
+                                      ),
+                                      icon: const Icon(Icons.photo_library, size: 14),
+                                      label: Text('Photos (Attempt ${attemptIndex + 1})'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.teal[900],
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    );
+                                  }),
+                                ),
+                              ] else if (hasPhotos) ...[
                                 const SizedBox(height: 12),
                                 ElevatedButton.icon(
                                   onPressed: () => _viewPhotos(context, photos),
