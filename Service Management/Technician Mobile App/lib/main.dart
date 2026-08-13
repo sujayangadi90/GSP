@@ -681,6 +681,13 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       return;
     }
 
+    if (_completionPhotos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload at least one completion photo'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {

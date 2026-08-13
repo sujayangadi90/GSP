@@ -427,6 +427,10 @@ const submitWorkCompletion = async (req, res) => {
       completionPhotos = ticket.completion.photos;
     }
 
+    if (completionPhotos.length === 0) {
+      return res.status(400).json({ message: 'Please upload at least one completion photo' });
+    }
+
     const newCompletion = {
       photos: completionPhotos,
       workDone,
