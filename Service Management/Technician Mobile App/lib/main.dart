@@ -293,9 +293,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         int assigned = 0, pending = 0, completed = 0;
         for (var job in jobsData) {
           final s = job['status'];
-          if (s == 'assigned') assigned++;
-          if (s == 'in_progress') pending++;
-          if (s == 'completed' || s == 'verification_pending' || s == 'closed') completed++;
+          if (s == 'assigned' || s == 'in_progress') assigned++;
+          if (s == 'verification_pending') pending++;
+          if (s == 'completed' || s == 'closed') completed++;
         }
         setState(() {
           _jobs = jobsData;
@@ -370,9 +370,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     childAspectRatio: 1.0,
                     physics: const NeverScrollableScrollPhysics(),
                     children: [
-                      _buildStatCard('Assigned', _assignedCount, Colors.amber),
-                      _buildStatCard('Pending', _pendingCount, Colors.orange),
-                      _buildStatCard('Finished', _completedCount, Colors.green),
+                      _buildStatCard(
+                        'Assigned',
+                        _assignedCount,
+                        Colors.amber,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => JobHistoryScreen(
+                              token: widget.token,
+                              apiUrl: widget.apiUrl,
+                              initialStatus: 'assigned',
+                            ),
+                          ),
+                        ).then((_) => _loadJobs()),
+                      ),
+                      _buildStatCard(
+                        'Pending Verification',
+                        _pendingCount,
+                        Colors.orange,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => JobHistoryScreen(
+                              token: widget.token,
+                              apiUrl: widget.apiUrl,
+                              initialStatus: 'verification_pending',
+                            ),
+                          ),
+                        ).then((_) => _loadJobs()),
+                      ),
+                      _buildStatCard(
+                        'Finished',
+                        _completedCount,
+                        Colors.green,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => JobHistoryScreen(
+                              token: widget.token,
+                              apiUrl: widget.apiUrl,
+                              initialStatus: 'closed',
+                            ),
+                          ),
+                        ).then((_) => _loadJobs()),
+                      ),
                     ],
                   ),
               const SizedBox(height: 32),
@@ -412,21 +454,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, int count, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        border: Border.all(color: color.withOpacity(0.3)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
-          Text('$count', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
-        ],
+  Widget _buildStatCard(String title, int count, Color color, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          border: Border.all(color: color.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text('$count', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
+          ],
+        ),
       ),
     );
   }
@@ -1015,8 +1065,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
 class JobHistoryScreen extends StatefulWidget {
   final String token;
   final String apiUrl;
+  final String? initialStatus;
 
-  const JobHistoryScreen({super.key, required this.token, required this.apiUrl});
+  const JobHistoryScreen({super.key, required this.token, required this.apiUrl, this.initialStatus});
 
   @override
   State<JobHistoryScreen> createState() => _JobHistoryScreenState();
@@ -1031,11 +1082,12 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
 
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
-  String _selectedStatusFilter = 'closed'; // 'assigned' or 'closed'
+  late String _selectedStatusFilter;
 
   @override
   void initState() {
     super.initState();
+    _selectedStatusFilter = widget.initialStatus ?? 'closed';
     _fetchJobs();
   }
 
@@ -1306,6 +1358,21 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                       if (sel) {
                         setState(() {
                           _selectedStatusFilter = 'assigned';
+                        });
+                        _fetchJobs();
+                      }
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: const Text('Pending Verification'),
+                    selected: _selectedStatusFilter == 'verification_pending',
+                    onSelected: (sel) {
+                      if (sel) {
+                        setState(() {
+                          _selectedStatusFilter = 'verification_pending';
                         });
                         _fetchJobs();
                       }

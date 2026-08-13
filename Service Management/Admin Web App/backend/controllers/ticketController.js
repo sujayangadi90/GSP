@@ -132,7 +132,7 @@ const getTickets = async (req, res) => {
         if (status === 'assigned') {
           query.status = { $in: ['assigned', 'in_progress'] };
         } else if (status === 'closed') {
-          query.status = { $in: ['completed', 'verification_pending', 'closed'] };
+          query.status = { $in: ['completed', 'closed'] };
         } else {
           query.status = status;
         }
