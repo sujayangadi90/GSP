@@ -271,6 +271,102 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _completedCount = 0;
   bool _isLoading = false;
   List _jobs = [];
+  int _selectedMonth = DateTime.now().month;
+  int _selectedYear = DateTime.now().year;
+
+  String _getMonthName(int month) {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[month - 1];
+  }
+
+  Future<void> _selectMonthYear(BuildContext context) async {
+    int tempMonth = _selectedMonth;
+    int tempYear = _selectedYear;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E293B),
+              title: const Text('Select Month & Year', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int>(
+                    value: tempMonth,
+                    dropdownColor: const Color(0xFF1E293B),
+                    decoration: const InputDecoration(
+                      labelText: 'Month',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('January')),
+                      DropdownMenuItem(value: 2, child: Text('February')),
+                      DropdownMenuItem(value: 3, child: Text('March')),
+                      DropdownMenuItem(value: 4, child: Text('April')),
+                      DropdownMenuItem(value: 5, child: Text('May')),
+                      DropdownMenuItem(value: 6, child: Text('June')),
+                      DropdownMenuItem(value: 7, child: Text('July')),
+                      DropdownMenuItem(value: 8, child: Text('August')),
+                      DropdownMenuItem(value: 9, child: Text('September')),
+                      DropdownMenuItem(value: 10, child: Text('October')),
+                      DropdownMenuItem(value: 11, child: Text('November')),
+                      DropdownMenuItem(value: 12, child: Text('December')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => tempMonth = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    value: tempYear,
+                    dropdownColor: const Color(0xFF1E293B),
+                    decoration: const InputDecoration(
+                      labelText: 'Year',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    items: [2024, 2025, 2026, 2027, 2028].map((y) {
+                      return DropdownMenuItem(value: y, child: Text(y.toString()));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => tempYear = val);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = tempMonth;
+                      _selectedYear = tempYear;
+                    });
+                    Navigator.pop(context);
+                    _loadJobs();
+                  },
+                  child: const Text('Select', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -282,7 +378,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _isLoading = true);
     try {
       final res = await http.get(
-        Uri.parse('${widget.apiUrl}/tickets'),
+        Uri.parse('${widget.apiUrl}/tickets?month=$_selectedMonth&year=$_selectedYear'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}'
@@ -355,9 +451,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 8),
-              const Text(
-                'Job Metrics',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Job Metrics',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  GestureDetector(
+                    onTap: () => _selectMonthYear(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E2422),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today, color: Colors.teal, size: 14),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_getMonthName(_selectedMonth)} $_selectedYear',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.arrow_drop_down, color: Colors.white, size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               _isLoading 
@@ -381,6 +505,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               token: widget.token,
                               apiUrl: widget.apiUrl,
                               initialStatus: 'assigned',
+                              initialMonth: _selectedMonth,
+                              initialYear: _selectedYear,
                             ),
                           ),
                         ).then((_) => _loadJobs()),
@@ -396,6 +522,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               token: widget.token,
                               apiUrl: widget.apiUrl,
                               initialStatus: 'verification_pending',
+                              initialMonth: _selectedMonth,
+                              initialYear: _selectedYear,
                             ),
                           ),
                         ).then((_) => _loadJobs()),
@@ -411,6 +539,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               token: widget.token,
                               apiUrl: widget.apiUrl,
                               initialStatus: 'closed',
+                              initialMonth: _selectedMonth,
+                              initialYear: _selectedYear,
                             ),
                           ),
                         ).then((_) => _loadJobs()),
@@ -569,6 +699,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           builder: (context) => JobHistoryScreen(
             token: widget.token,
             apiUrl: widget.apiUrl,
+            initialMonth: _selectedMonth,
+            initialYear: _selectedYear,
           ),
         ),
       ),
