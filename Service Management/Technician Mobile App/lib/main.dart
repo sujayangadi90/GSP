@@ -1205,8 +1205,10 @@ class JobHistoryScreen extends StatefulWidget {
   final String token;
   final String apiUrl;
   final String? initialStatus;
+  final int? initialMonth;
+  final int? initialYear;
 
-  const JobHistoryScreen({super.key, required this.token, required this.apiUrl, this.initialStatus});
+  const JobHistoryScreen({super.key, required this.token, required this.apiUrl, this.initialStatus, this.initialMonth, this.initialYear});
 
   @override
   State<JobHistoryScreen> createState() => _JobHistoryScreenState();
@@ -1219,13 +1221,15 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
   int _currentPage = 1;
   bool _hasMore = false;
 
-  int _selectedMonth = DateTime.now().month;
-  int _selectedYear = DateTime.now().year;
+  late int _selectedMonth;
+  late int _selectedYear;
   late String _selectedStatusFilter;
 
   @override
   void initState() {
     super.initState();
+    _selectedMonth = widget.initialMonth ?? DateTime.now().month;
+    _selectedYear = widget.initialYear ?? DateTime.now().year;
     _selectedStatusFilter = widget.initialStatus ?? 'closed';
     _fetchJobs();
   }
