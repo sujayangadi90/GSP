@@ -45,6 +45,7 @@ export default function App() {
   // States for lists
   const [dealers, setDealers] = useState([]);
   const [technicians, setTechnicians] = useState([]);
+  const [activeTechniciansForAssign, setActiveTechniciansForAssign] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [stats, setStats] = useState({
     total: 0, new: 0, assigned: 0, pending: 0, closed: 0
@@ -472,6 +473,20 @@ export default function App() {
   useEffect(() => {
     setFollowUpPage(1);
   }, [followUpFilters]);
+
+  useEffect(() => {
+    if (selectedTicket && selectedTicket.status === 'new') {
+      const fetchActiveTechs = async () => {
+        try {
+          const data = await apiFetch('/technicians?status=active');
+          setActiveTechniciansForAssign(data);
+        } catch (err) {
+          console.error('Error fetching active technicians for assignment:', err);
+        }
+      };
+      fetchActiveTechs();
+    }
+  }, [selectedTicket]);
 
   useEffect(() => {
     setTicketPage(1);
@@ -2651,7 +2666,7 @@ export default function App() {
                         onChange={e => setAssignTechId(e.target.value)}
                       >
                         <option value="">Select Technician...</option>
-                        {technicians.filter(t => t.status === 'active').map(tech => (
+                        {activeTechniciansForAssign.map(tech => (
                           <option key={tech._id} value={tech._id}>{tech.name} ({tech.code})</option>
                         ))}
                       </select>
