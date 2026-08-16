@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Appliance = require('../models/Appliance');
 const Brand = require('../models/Brand');
 const FollowUp = require('../models/FollowUp');
+const { sendPushNotification } = require('../utils/notification');
 
 // @desc    Create a new request (Installation or Service)
 // @route   POST /api/tickets
@@ -38,6 +39,14 @@ const createTicket = async (req, res) => {
 
     const createdTicket = await ticket.save();
     res.status(201).json(createdTicket);
+
+    // Trigger Notification
+    sendPushNotification(
+      createdTicket.dealer,
+      'Ticket Submitted',
+      `Your ticket for ${createdTicket.product.category} (${createdTicket.ticketNumber}) has been created successfully.`,
+      { screen: 'ticket_details', ticketId: createdTicket._id }
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -367,6 +376,23 @@ const assignTechnician = async (req, res) => {
 
     const updatedTicket = await ticket.save();
     res.json(updatedTicket);
+
+    // Trigger Notifications
+    // 1. To Dealer
+    sendPushNotification(
+      updatedTicket.dealer,
+      'Technician Assigned',
+      `${technician.name} has been assigned to ticket #${updatedTicket.ticketNumber}. Scheduled arrival: ${updatedTicket.preferredVisitDate ? new Date(updatedTicket.preferredVisitDate).toLocaleString() : 'Flexible'}.`,
+      { screen: 'ticket_details', ticketId: updatedTicket._id }
+    );
+
+    // 2. To Technician
+    sendPushNotification(
+      updatedTicket.assignedTechnician,
+      'New Job Assigned',
+      `You have been assigned to #${updatedTicket.ticketNumber} for ${updatedTicket.product.category}`,
+      { screen: 'job_details', jobId: updatedTicket._id }
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -397,6 +423,16 @@ const updateTicketStatus = async (req, res) => {
 
     const updatedTicket = await ticket.save();
     res.json(updatedTicket);
+
+    // Trigger Notification
+    if (status === 'in_progress') {
+      sendPushNotification(
+        updatedTicket.dealer,
+        'Service In Progress',
+        `${req.user.name} has started working on your ticket #${updatedTicket.ticketNumber}.`,
+        { screen: 'ticket_details', ticketId: updatedTicket._id }
+      );
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -454,6 +490,14 @@ const submitWorkCompletion = async (req, res) => {
 
     const updatedTicket = await ticket.save();
     res.json(updatedTicket);
+
+    // Trigger Notification
+    sendPushNotification(
+      updatedTicket.dealer,
+      'Pending Your Approval',
+      `Technician ${req.user.name} has completed the service for #${updatedTicket.ticketNumber}. Approval Pending from Admin`,
+      { screen: 'ticket_details', ticketId: updatedTicket._id }
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -503,6 +547,16 @@ const verifyWork = async (req, res) => {
 
     const updatedTicket = await ticket.save();
     res.json(updatedTicket);
+
+    // Trigger Notification
+    if (approvalStatus === 'rejected') {
+      sendPushNotification(
+        updatedTicket.assignedTechnician,
+        'Action Required: Job Rejected ⚠️',
+        `Admin has rejected the completion report for #${updatedTicket.ticketNumber}.`,
+        { screen: 'job_details', jobId: updatedTicket._id }
+      );
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -562,6 +616,23 @@ const closeTicket = async (req, res) => {
       console.error('Failed to auto-create follow-up:', followUpError.message);
     }
 
+    // Trigger Notifications
+    // 1. To Dealer
+    sendPushNotification(
+      updatedTicket.dealer,
+      'Ticket Closed Successfully',
+      `Ticket #${updatedTicket.ticketNumber} is now closed. Thank you for using GSP!`,
+      { screen: 'ticket_details', ticketId: updatedTicket._id }
+    );
+
+    // 2. To Technician
+    sendPushNotification(
+      updatedTicket.assignedTechnician,
+      'Job Closed Successfully',
+      `Great job! Job #${updatedTicket.ticketNumber} has been verified and successfully closed by the admin.`,
+      { screen: 'job_history', jobId: updatedTicket._id }
+    );
+
     res.json(updatedTicket);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -589,6 +660,25 @@ const cancelTicket = async (req, res) => {
 
     const updatedTicket = await ticket.save();
     res.json(updatedTicket);
+
+    // Trigger Notifications
+    // 1. To Dealer
+    sendPushNotification(
+      updatedTicket.dealer,
+      'Ticket Cancelled',
+      `Ticket #${updatedTicket.ticketNumber} has been cancelled.`,
+      { screen: 'ticket_details', ticketId: updatedTicket._id }
+    );
+
+    // 2. To Technician (if one is assigned)
+    if (updatedTicket.assignedTechnician) {
+      sendPushNotification(
+        updatedTicket.assignedTechnician,
+        'Job Cancelled',
+        `Job #${updatedTicket.ticketNumber} has been cancelled`,
+        { screen: 'dashboard' }
+      );
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -711,6 +801,56 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
+// @desc    Admin sends custom message (push notification) to dealer or technician
+// @route   POST /api/tickets/:id/message
+// @access  Private/Admin
+const sendCustomAdminMessage = async (req, res) => {
+  const { recipient, title, body } = req.body; // recipient: 'dealer', 'technician', or 'both'
+
+  try {
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    if (!title || !body) {
+      return res.status(400).json({ message: 'Title and body are required' });
+    }
+
+    const targets = [];
+    if ((recipient === 'dealer' || recipient === 'both') && ticket.dealer) {
+      targets.push({ id: ticket.dealer, screen: 'dashboard' });
+    }
+    if ((recipient === 'technician' || recipient === 'both') && ticket.assignedTechnician) {
+      targets.push({ id: ticket.assignedTechnician, screen: 'dashboard' });
+    }
+
+    if (targets.length === 0) {
+      return res.status(400).json({ message: 'No valid recipient found to send notification to' });
+    }
+
+    for (const target of targets) {
+      await sendPushNotification(
+        target.id,
+        title,
+        body,
+        { screen: target.screen }
+      );
+    }
+
+    ticket.timeline.push({
+      status: ticket.status,
+      note: `Admin notification sent to ${recipient}: "${title}" - "${body}"`,
+      updatedBy: req.user.name
+    });
+    await ticket.save();
+
+    res.json({ message: 'Custom push notifications sent successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createTicket,
   getTickets,
@@ -722,5 +862,6 @@ module.exports = {
   closeTicket,
   cancelTicket,
   getCustomers,
-  getDashboardStats
+  getDashboardStats,
+  sendCustomAdminMessage
 };

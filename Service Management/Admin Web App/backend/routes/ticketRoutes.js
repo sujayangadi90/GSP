@@ -10,7 +10,8 @@ const {
   closeTicket,
   cancelTicket,
   getCustomers,
-  getDashboardStats
+  getDashboardStats,
+  sendCustomAdminMessage
 } = require('../controllers/ticketController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -33,11 +34,12 @@ router.route('/dashboard')
 router.route('/:id')
   .get(getTicketById);
 
-// Admin-only assignment, verification, closure
+// Admin-only assignment, verification, closure, messages
 router.route('/:id/assign').patch(authorize('admin'), assignTechnician);
 router.route('/:id/verify').patch(authorize('admin'), verifyWork);
 router.route('/:id/close').patch(authorize('admin'), closeTicket);
 router.route('/:id/cancel').patch(authorize('admin'), cancelTicket);
+router.route('/:id/message').post(authorize('admin'), sendCustomAdminMessage);
 
 // Technician-only updates
 router.route('/:id/status').patch(authorize('technician'), updateTicketStatus);

@@ -5,8 +5,16 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint("Firebase failed to initialize (mock mode fallback): $e");
+  }
   runApp(const TechnicianApp());
 }
 
@@ -65,6 +73,72 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
       _isLoading = false;
     });
+    if (token != null) {
+      _setupFcm();
+    }
+  }
+
+  Future<void> _setupFcm() async {
+    if (_token == null) return;
+    try {
+      final messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      
+      String? fcmToken = await messaging.getToken();
+      if (fcmToken != null) {
+        await _registerFcmTokenWithBackend(fcmToken);
+      }
+      
+      messaging.onTokenRefresh.listen((newToken) {
+        _registerFcmTokenWithBackend(newToken);
+      });
+      
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${message.notification?.title ?? "Notification"}: ${message.notification?.body ?? ""}'
+              ),
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: 'View',
+                onPressed: () {
+                  // Additional navigation logic can go here if required
+                },
+              ),
+            ),
+          );
+        }
+      });
+    } catch (e) {
+      debugPrint("FCM initialization warning (mock mode active): $e");
+    }
+  }
+
+  Future<void> _registerFcmTokenWithBackend(String fcmToken) async {
+    if (_token == null) return;
+    try {
+      final res = await http.post(
+        Uri.parse('$_apiUrl/auth/fcm-token'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode({'token': fcmToken}),
+      );
+      if (res.statusCode == 200) {
+        debugPrint("FCM Token registered successfully with GSP backend.");
+      } else {
+        debugPrint("Failed to register FCM Token: ${res.body}");
+      }
+    } catch (e) {
+      debugPrint("Error sending FCM Token to backend: $e");
+    }
   }
 
   Future<void> _saveLogin(String token, Map<String, dynamic> user) async {
@@ -75,6 +149,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       _token = token;
       _userData = user;
     });
+    _setupFcm();
   }
 
   Future<void> _logout() async {

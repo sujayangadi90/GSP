@@ -79,4 +79,34 @@ const getUserProfile = async (req, res) => {
   }
 };
 
-module.exports = { loginUser, getUserProfile };
+// @desc    Register device FCM token for push notifications
+// @route   POST /api/auth/fcm-token
+// @access  Private
+const registerFcmToken = async (req, res) => {
+  const { token } = req.body;
+
+  try {
+    if (!token) {
+      return res.status(400).json({ message: 'Token is required' });
+    }
+
+    // Pull this token from any other users to prevent multiple delivery of same message to one token
+    await User.updateMany(
+      { fcmTokens: token },
+      { $pull: { fcmTokens: token } }
+    );
+
+    // Push token to current logged-in user if it doesn't already exist
+    const user = await User.findById(req.user._id);
+    if (!user.fcmTokens.includes(token)) {
+      user.fcmTokens.push(token);
+      await user.save();
+    }
+
+    res.json({ message: 'FCM token registered successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { loginUser, getUserProfile, registerFcmToken };

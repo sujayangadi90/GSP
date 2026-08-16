@@ -42,7 +42,8 @@ const UserSchema = new mongoose.Schema({
     manageTechnicians: { type: Boolean, default: true },
     followups: { type: Boolean, default: true },
     settings: { type: Boolean, default: true }
-  }
+  },
+  fcmTokens: [String]
 }, { timestamps: true });
 
 // Hash password before saving

@@ -61,6 +61,8 @@ export default function App() {
   const [closureRemarks, setClosureRemarks] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [showCancelForm, setShowCancelForm] = useState(false);
+  const [showMessageForm, setShowMessageForm] = useState(false);
+  const [messageForm, setMessageForm] = useState({ recipient: 'dealer', title: '', body: '' });
   
   // Raise Request Modal states
   const [createRequestOpen, setCreateRequestOpen] = useState(false);
@@ -875,6 +877,23 @@ export default function App() {
       fetchData();
       fetchDashboardData();
       alert("Ticket cancelled successfully!");
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleSendCustomMessage = async (e) => {
+    e.preventDefault();
+    try {
+      await apiFetch(`/tickets/${selectedTicket._id}/message`, {
+        method: 'POST',
+        body: JSON.stringify(messageForm)
+      });
+      setMessageForm({ recipient: 'dealer', title: '', body: '' });
+      setShowMessageForm(false);
+      const refreshed = await apiFetch(`/tickets/${selectedTicket._id}`);
+      setSelectedTicket(refreshed);
+      alert("Push notification sent successfully!");
     } catch (err) {
       alert(err.message);
     }
@@ -3053,6 +3072,60 @@ export default function App() {
                       )}
                     </div>
                   )}
+
+                  {/* Custom Message Notification */}
+                  <div className="border-t border-slate-700/50 pt-4 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowMessageForm(!showMessageForm)}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-slate-400 hover:text-slate-200"
+                    >
+                      <span>Send Push Announcement</span>
+                      <span>{showMessageForm ? '▲' : '▼'}</span>
+                    </button>
+                    {showMessageForm && (
+                      <form onSubmit={handleSendCustomMessage} className="mt-3 space-y-3">
+                        <div>
+                          <label className="block text-[10px] text-slate-500 font-bold mb-1">RECIPIENT</label>
+                          <select
+                            required
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white cursor-pointer"
+                            value={messageForm.recipient}
+                            onChange={e => setMessageForm({ ...messageForm, recipient: e.target.value })}
+                          >
+                            <option value="dealer">Dealer</option>
+                            <option value="technician">Technician</option>
+                            <option value="both">Both</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-slate-500 font-bold mb-1">TITLE</label>
+                          <input
+                            required
+                            type="text"
+                            placeholder="Notification title..."
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                            value={messageForm.title}
+                            onChange={e => setMessageForm({ ...messageForm, title: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-slate-500 font-bold mb-1">BODY MESSAGE</label>
+                          <textarea
+                            required
+                            placeholder="Write message details..."
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-hidden"
+                            rows="2"
+                            value={messageForm.body}
+                            onChange={e => setMessageForm({ ...messageForm, body: e.target.value })}
+                          />
+                        </div>
+                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg text-xs cursor-pointer">
+                          Send Push Notification
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 </div>
 
                 {/* Timeline History */}
