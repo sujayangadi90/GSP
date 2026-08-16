@@ -8,6 +8,7 @@ const {
   submitWorkCompletion,
   verifyWork,
   closeTicket,
+  cancelTicket,
   getCustomers,
   getDashboardStats
 } = require('../controllers/ticketController');
@@ -36,6 +37,7 @@ router.route('/:id')
 router.route('/:id/assign').patch(authorize('admin'), assignTechnician);
 router.route('/:id/verify').patch(authorize('admin'), verifyWork);
 router.route('/:id/close').patch(authorize('admin'), closeTicket);
+router.route('/:id/cancel').patch(authorize('admin'), cancelTicket);
 
 // Technician-only updates
 router.route('/:id/status').patch(authorize('technician'), updateTicketStatus);

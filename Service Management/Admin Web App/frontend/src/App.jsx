@@ -59,6 +59,8 @@ export default function App() {
   const [assignNotes, setAssignNotes] = useState('');
   const [verificationForm, setVerificationForm] = useState({ status: 'approved', reason: '' });
   const [closureRemarks, setClosureRemarks] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
+  const [showCancelForm, setShowCancelForm] = useState(false);
   
   // Raise Request Modal states
   const [createRequestOpen, setCreateRequestOpen] = useState(false);
@@ -755,6 +757,27 @@ export default function App() {
       setClosureRemarks('');
       fetchData();
       fetchDashboardData();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleCancel = async (e) => {
+    e.preventDefault();
+    if (!window.confirm("Are you sure you want to cancel this ticket? This action cannot be undone.")) {
+      return;
+    }
+    try {
+      const updated = await apiFetch(`/tickets/${selectedTicket._id}/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason: cancelReason })
+      });
+      setSelectedTicket(updated);
+      setCancelReason('');
+      setShowCancelForm(false);
+      fetchData();
+      fetchDashboardData();
+      alert("Ticket cancelled successfully!");
     } catch (err) {
       alert(err.message);
     }
@@ -2544,7 +2567,7 @@ export default function App() {
                 <h3 className="font-extrabold text-white text-lg">{selectedTicket.ticketNumber} Details</h3>
                 <p className="text-xs text-slate-400 mt-0.5 capitalize">Type: {selectedTicket.type} • Status: {selectedTicket.status.replace('_', ' ')}</p>
               </div>
-              <button onClick={() => { setSelectedTicket(null); fetchData(); fetchDashboardData(); }} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-6 h-6" /></button>
+              <button onClick={() => { setSelectedTicket(null); setShowCancelForm(false); setCancelReason(''); fetchData(); fetchDashboardData(); }} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-6 h-6" /></button>
             </div>
             
             <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[calc(85vh-150px)] overflow-y-auto">
@@ -2741,6 +2764,16 @@ export default function App() {
                     </div>
                   )}
 
+                  {selectedTicket.status === 'cancelled' && (
+                    <div className="bg-rose-950/40 border border-rose-900/30 p-3 rounded-xl text-rose-400 text-xs font-semibold space-y-1">
+                      <p>Ticket Cancelled</p>
+                      {(() => {
+                        const cancelTimeline = selectedTicket.timeline?.slice().reverse().find(item => item.status === 'cancelled');
+                        return cancelTimeline && <p className="italic text-slate-300 mt-1">Reason: {cancelTimeline.note.replace('Ticket cancelled by Admin. Reason: ', '')}</p>;
+                      })()}
+                    </div>
+                  )}
+
                   {selectedTicket.status === 'assigned' || selectedTicket.status === 'in_progress' ? (
                     <div className="bg-slate-800 p-3.5 rounded-xl border border-slate-700/50 space-y-2 text-xs">
                       <p className="font-semibold text-slate-300">Currently Assigned: {selectedTicket.assignedTechnician?.name}</p>
@@ -2756,6 +2789,49 @@ export default function App() {
                       </button>
                     </div>
                   ) : null}
+
+                  {selectedTicket.status !== 'closed' && selectedTicket.status !== 'cancelled' && (
+                    <div className="border-t border-slate-700/50 pt-4 mt-2">
+                      {!showCancelForm ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowCancelForm(true)}
+                          className="w-full bg-rose-950/30 hover:bg-rose-900/40 text-rose-400 font-bold py-2 rounded-lg text-xs cursor-pointer border border-rose-900/30 transition-all"
+                        >
+                          Cancel Ticket
+                        </button>
+                      ) : (
+                        <form onSubmit={handleCancel} className="space-y-3">
+                          <label className="block text-xs font-semibold text-slate-400">Reason for Cancellation</label>
+                          <textarea
+                            required
+                            placeholder="Please specify why this ticket is being cancelled..."
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-hidden"
+                            value={cancelReason}
+                            onChange={e => setCancelReason(e.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-lg text-xs cursor-pointer"
+                            >
+                              Confirm Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowCancelForm(false);
+                                setCancelReason('');
+                              }}
+                              className="px-3 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-300 font-bold py-2 rounded-lg text-xs cursor-pointer border border-slate-700"
+                            >
+                              Back
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Timeline History */}

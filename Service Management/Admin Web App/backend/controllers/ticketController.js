@@ -568,6 +568,32 @@ const closeTicket = async (req, res) => {
   }
 };
 
+// @desc    Admin cancels ticket
+// @route   PATCH /api/tickets/:id/cancel
+// @access  Private/Admin
+const cancelTicket = async (req, res) => {
+  const { reason } = req.body;
+
+  try {
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    ticket.status = 'cancelled';
+    ticket.timeline.push({
+      status: 'cancelled',
+      note: `Ticket cancelled by Admin. Reason: ${reason || 'None'}`,
+      updatedBy: req.user.name
+    });
+
+    const updatedTicket = await ticket.save();
+    res.json(updatedTicket);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get all unique customers
 // @route   GET /api/tickets/customers
 // @access  Private/Admin
@@ -694,6 +720,7 @@ module.exports = {
   submitWorkCompletion,
   verifyWork,
   closeTicket,
+  cancelTicket,
   getCustomers,
   getDashboardStats
 };

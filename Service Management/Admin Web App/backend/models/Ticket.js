@@ -22,7 +22,7 @@ const TicketSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['new', 'assigned', 'in_progress', 'completed', 'verification_pending', 'closed'],
+    enum: ['new', 'assigned', 'in_progress', 'completed', 'verification_pending', 'closed', 'cancelled'],
     default: 'new'
   },
   customer: {
