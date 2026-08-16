@@ -957,7 +957,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
 
                   const SizedBox(height: 24),
                   _buildSectionHeader('Scheduling & Attachments'),
-                  _buildDateField(_visitDateController, 'Preferred Visit/Installation Date', required: true),
+                  _buildDateField(_visitDateController, 'Preferred Visit Date & Time', required: true),
                   const SizedBox(height: 16),
                   
                   ElevatedButton.icon(
@@ -1045,23 +1045,30 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
         readOnly: true,
         decoration: InputDecoration(
           labelText: label + (required ? ' *' : ''),
-          suffixIcon: const Icon(Icons.calendar_month),
+          suffixIcon: const Icon(Icons.event),
           border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
         ),
         onTap: () async {
-          final picked = await showDatePicker(
+          final datePicked = await showDatePicker(
             context: context,
             initialDate: DateTime.now(),
             firstDate: DateTime.now().subtract(const Duration(days: 365)),
             lastDate: DateTime.now().add(const Duration(days: 365)),
           );
-          if (picked != null) {
-            setState(() {
-              controller.text = picked.toIso8601String().split('T')[0];
-            });
+          if (datePicked != null) {
+            final timePicked = await showTimePicker(
+              context: context,
+              initialTime: TimeOfDay.now(),
+            );
+            if (timePicked != null) {
+              final formattedTime = '${timePicked.hour.toString().padLeft(2, '0')}:${timePicked.minute.toString().padLeft(2, '0')}';
+              setState(() {
+                controller.text = '${datePicked.toIso8601String().split('T')[0]} $formattedTime';
+              });
+            }
           }
         },
-        validator: required ? (val) => val == null || val.isEmpty ? 'Please select a date' : null : null,
+        validator: required ? (val) => val == null || val.isEmpty ? 'Please select date and time' : null : null,
       ),
     );
   }
@@ -1509,6 +1516,21 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
   Map<String, dynamic>? _ticket;
   bool _isLoading = false;
 
+  String _formatDateTime(String? dtStr) {
+    if (dtStr == null || dtStr.isEmpty) return 'Flexible';
+    try {
+      final parsed = DateTime.parse(dtStr).toLocal();
+      final y = parsed.year;
+      final m = parsed.month.toString().padLeft(2, '0');
+      final d = parsed.day.toString().padLeft(2, '0');
+      final hr = parsed.hour.toString().padLeft(2, '0');
+      final min = parsed.minute.toString().padLeft(2, '0');
+      return '$y-$m-$d $hr:$min';
+    } catch (_) {
+      return dtStr;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1567,6 +1589,10 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
             _buildDetailBlock('Technician Details', [
               'Name: ${_ticket!['assignedTechnician']?['name'] ?? 'Not Assigned'}',
               'Mobile: ${_ticket!['assignedTechnician']?['mobile'] ?? 'N/A'}',
+            ]),
+            const SizedBox(height: 16),
+            _buildDetailBlock('Scheduling Details', [
+              'Preferred Visit Date & Time: ${_ticket!['preferredVisitDate'] != null ? _formatDateTime(_ticket!['preferredVisitDate'].toString()) : (_ticket!['installationDetails']?['preferredDate'] != null ? _formatDateTime(_ticket!['installationDetails']['preferredDate'].toString()) : 'Flexible')}',
             ]),
             const SizedBox(height: 16),
             if (_ticket!['completion'] != null) ...[

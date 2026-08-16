@@ -814,7 +814,7 @@ export default function App() {
         formData.append('serviceDetails[description]', newRequestForm.serviceDetails.description);
         formData.append('serviceDetails[priority]', newRequestForm.serviceDetails.priority);
       } else {
-        formData.append('installationDetails[preferredDate]', newRequestForm.installationDetails.preferredDate);
+        formData.append('installationDetails[preferredDate]', newRequestForm.preferredVisitDate);
       }
 
       if (invoiceFile) {
@@ -2587,8 +2587,14 @@ export default function App() {
                       <p>{selectedTicket.product.invoiceNumber || 'N/A'} • {selectedTicket.product.purchaseDate ? new Date(selectedTicket.product.purchaseDate).toLocaleDateString() : 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 font-semibold">Preferred Installation/Visit Date</p>
-                      <p className="font-bold text-slate-200">{selectedTicket.installationDetails?.preferredDate ? new Date(selectedTicket.installationDetails.preferredDate).toLocaleDateString() : selectedTicket.preferredVisitDate ? new Date(selectedTicket.preferredVisitDate).toLocaleDateString() : 'Flexible'}</p>
+                      <p className="text-xs text-slate-500 font-semibold">Preferred Visit Date & Time</p>
+                      <p className="font-bold text-slate-200">
+                        {selectedTicket.preferredVisitDate 
+                          ? new Date(selectedTicket.preferredVisitDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) 
+                          : selectedTicket.installationDetails?.preferredDate 
+                            ? new Date(selectedTicket.installationDetails.preferredDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) 
+                            : 'Flexible'}
+                      </p>
                     </div>
                     {selectedTicket.serviceDetails?.description && (
                       <div className="col-span-2">
@@ -2935,10 +2941,10 @@ export default function App() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Preferred Visit Date *</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Preferred Visit Date & Time *</label>
                     <input 
                       required 
-                      type="date" 
+                      type="datetime-local" 
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
                       value={newRequestForm.preferredVisitDate}
                       onChange={e => setNewRequestForm({ ...newRequestForm, preferredVisitDate: e.target.value })}
@@ -3152,7 +3158,7 @@ export default function App() {
               </div>
 
               {/* Type-Specific Details */}
-              {newRequestForm.type === 'service' ? (
+              {newRequestForm.type === 'service' && (
                 <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
                   <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Service Request Details</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -3183,26 +3189,6 @@ export default function App() {
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                       </select>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
-                  <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Installation Request Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Preferred Installation Date *</label>
-                      <input 
-                        required 
-                        type="date" 
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-                        value={newRequestForm.installationDetails.preferredDate}
-                        onChange={e => setNewRequestForm({ 
-                          ...newRequestForm, 
-                          installationDetails: { ...newRequestForm.installationDetails, preferredDate: e.target.value },
-                          preferredVisitDate: e.target.value 
-                        })}
-                      />
                     </div>
                   </div>
                 </div>

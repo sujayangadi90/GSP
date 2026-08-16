@@ -735,6 +735,21 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   final List<File> _completionPhotos = [];
   final _picker = ImagePicker();
 
+  String _formatDateTime(String? dtStr) {
+    if (dtStr == null || dtStr.isEmpty) return 'Flexible';
+    try {
+      final parsed = DateTime.parse(dtStr).toLocal();
+      final y = parsed.year;
+      final m = parsed.month.toString().padLeft(2, '0');
+      final d = parsed.day.toString().padLeft(2, '0');
+      final hr = parsed.hour.toString().padLeft(2, '0');
+      final min = parsed.minute.toString().padLeft(2, '0');
+      return '$y-$m-$d $hr:$min';
+    } catch (_) {
+      return dtStr;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1009,6 +1024,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               'Scope: ${_job!['type'].toString().toUpperCase()}',
               if (_job!['serviceDetails']?['description'] != null)
                 'Issue: ${_job!['serviceDetails']['description']}',
+            ]),
+            const SizedBox(height: 16),
+            _buildDetailBlock('Scheduling Details', [
+              'Preferred Visit Date & Time: ${_job!['preferredVisitDate'] != null ? _formatDateTime(_job!['preferredVisitDate'].toString()) : (_job!['installationDetails']?['preferredDate'] != null ? _formatDateTime(_job!['installationDetails']['preferredDate'].toString()) : 'Flexible')}',
             ]),
             const SizedBox(height: 16),
             _buildStatusFlow(status),
