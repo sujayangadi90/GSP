@@ -105,6 +105,8 @@ export default function App() {
   const [brandForm, setBrandForm] = useState(null); // null or { id?, name, applianceId, followUpDays }
   const [cities, setCities] = useState([]);
   const [cityForm, setCityForm] = useState(null); // null or { id?, name }
+  const [admins, setAdmins] = useState([]);
+  const [adminForm, setAdminForm] = useState(null); // null or { id?, name, email, password, status, permissions }
   const [customers, setCustomers] = useState([]);
   // History page states
   const [historyTabBack, setHistoryTabBack] = useState('');
@@ -344,6 +346,62 @@ export default function App() {
     }
   };
 
+  const fetchAdmins = async () => {
+    try {
+      const data = await apiFetch('/admins');
+      setAdmins(data);
+    } catch (err) {
+      console.error('Error fetching admins:', err);
+    }
+  };
+
+  const handleSaveAdmin = async (e) => {
+    e.preventDefault();
+    try {
+      if (adminForm.id) {
+        // Edit admin
+        await apiFetch(`/admins/${adminForm.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: adminForm.name,
+            email: adminForm.email,
+            password: adminForm.password || undefined,
+            status: adminForm.status,
+            permissions: adminForm.permissions
+          })
+        });
+      } else {
+        // Add admin
+        await apiFetch('/admins', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: adminForm.name,
+            email: adminForm.email,
+            password: adminForm.password,
+            status: adminForm.status,
+            permissions: adminForm.permissions
+          })
+        });
+      }
+      setAdminForm(null);
+      fetchAdmins();
+      alert('Admin user saved successfully!');
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const toggleAdminStatus = async (id) => {
+    try {
+      await apiFetch(`/admins/${id}/toggle`, {
+        method: 'PATCH'
+      });
+      fetchAdmins();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const fetchFollowUps = async () => {
     try {
       const data = await apiFetch(`/followups?fromDate=${followUpFilters.fromDate}&toDate=${followUpFilters.toDate}`);
@@ -455,6 +513,8 @@ export default function App() {
         fetchBrands();
       } else if (activeTab === 'cities') {
         fetchCities();
+      } else if (activeTab === 'user_management') {
+        fetchAdmins();
       } else if (activeTab === 'customers') {
         fetchCustomers();
       } else if (activeTab === 'followups') {
@@ -475,6 +535,43 @@ export default function App() {
   useEffect(() => {
     setFollowUpPage(1);
   }, [followUpFilters]);
+
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      const perms = user.permissions || {
+        dashboard: true,
+        tickets: true,
+        customers: true,
+        manageDealers: true,
+        manageTechnicians: true,
+        followups: true,
+        settings: true
+      };
+      
+      const isAllowed = (tab) => {
+        if (tab === 'dashboard' && !perms.dashboard) return false;
+        if (tab === 'tickets' && !perms.tickets) return false;
+        if (tab === 'customers' && !perms.customers) return false;
+        if (tab === 'dealers' && !perms.manageDealers) return false;
+        if (tab === 'technicians' && !perms.manageTechnicians) return false;
+        if (tab === 'followups' && !perms.followups) return false;
+        if (tab === 'appliances_brands' && !perms.settings) return false;
+        if (tab === 'cities' && !perms.settings) return false;
+        if (tab === 'user_management' && !perms.settings) return false;
+        return true;
+      };
+
+      if (!isAllowed(activeTab)) {
+        if (perms.dashboard) setActiveTab('dashboard');
+        else if (perms.tickets) setActiveTab('tickets');
+        else if (perms.customers) setActiveTab('customers');
+        else if (perms.manageDealers) setActiveTab('dealers');
+        else if (perms.manageTechnicians) setActiveTab('technicians');
+        else if (perms.followups) setActiveTab('followups');
+        else if (perms.settings) setActiveTab('appliances_brands');
+      }
+    }
+  }, [user, activeTab]);
 
   useEffect(() => {
     if (selectedTicket && selectedTicket.status === 'new') {
@@ -974,80 +1071,101 @@ export default function App() {
       <div className="flex flex-1 flex-col lg:flex-row">
         {/* Sidebar Nav */}
         <aside className="w-full lg:w-64 bg-slate-900/50 border-r border-slate-800 p-4 space-y-2 lg:min-h-[calc(100vh-73px)]">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'dashboard' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            Dashboard
-          </button>
-          <button
-            onClick={() => setActiveTab('tickets')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'tickets' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-          >
-            <TicketIcon className="w-5 h-5" />
-            Tickets
-          </button>
-          <button
-            onClick={() => setActiveTab('customers')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'customers' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-          >
-            <UserCheck className="w-5 h-5" />
-            Customers
-          </button>
-          <button
-            onClick={() => setActiveTab('dealers')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'dealers' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-          >
-            <Users className="w-5 h-5" />
-            Manage Dealers
-          </button>
-          <button
-            onClick={() => setActiveTab('technicians')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'technicians' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-          >
-            <Wrench className="w-5 h-5" />
-            Manage Technicians
-          </button>
-          <button
-            onClick={() => setActiveTab('followups')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'followups' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-          >
-            <Calendar className="w-5 h-5" />
-            Follow-ups
-          </button>
-          <div>
+          {(!user || user.permissions?.dashboard !== false) && (
             <button
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              onClick={() => setActiveTab('dashboard')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'dashboard' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
-              <span className="flex items-center gap-3">
-                <Settings className="w-5 h-5" />
-                Settings
-              </span>
-              <span>
-                {settingsOpen ? '▲' : '▼'}
-              </span>
+              <LayoutDashboard className="w-5 h-5" />
+              Dashboard
             </button>
-            {(settingsOpen || activeTab === 'appliances_brands' || activeTab === 'cities') && (
-              <div className="pl-6 mt-1 space-y-1">
-                <button
-                  onClick={() => setActiveTab('appliances_brands')}
-                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'appliances_brands' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
-                >
-                  <Layers className="w-4 h-4" />
-                  Appliances & Brands
-                </button>
-                <button
-                  onClick={() => setActiveTab('cities')}
-                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'cities' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
-                >
-                  <MapPin className="w-4 h-4" />
-                  Cities
-                </button>
-              </div>
-            )}
-          </div>
+          )}
+          {(!user || user.permissions?.tickets !== false) && (
+            <button
+              onClick={() => setActiveTab('tickets')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'tickets' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <TicketIcon className="w-5 h-5" />
+              Tickets
+            </button>
+          )}
+          {(!user || user.permissions?.customers !== false) && (
+            <button
+              onClick={() => setActiveTab('customers')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'customers' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <UserCheck className="w-5 h-5" />
+              Customers
+            </button>
+          )}
+          {(!user || user.permissions?.manageDealers !== false) && (
+            <button
+              onClick={() => setActiveTab('dealers')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'dealers' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <Users className="w-5 h-5" />
+              Manage Dealers
+            </button>
+          )}
+          {(!user || user.permissions?.manageTechnicians !== false) && (
+            <button
+              onClick={() => setActiveTab('technicians')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'technicians' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <Wrench className="w-5 h-5" />
+              Manage Technicians
+            </button>
+          )}
+          {(!user || user.permissions?.followups !== false) && (
+            <button
+              onClick={() => setActiveTab('followups')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'followups' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <Calendar className="w-5 h-5" />
+              Follow-ups
+            </button>
+          )}
+          {(!user || user.permissions?.settings !== false) && (
+            <div>
+              <button
+                onClick={() => setSettingsOpen(!settingsOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              >
+                <span className="flex items-center gap-3">
+                  <Settings className="w-5 h-5" />
+                  Settings
+                </span>
+                <span>
+                  {settingsOpen ? '▲' : '▼'}
+                </span>
+              </button>
+              {(settingsOpen || activeTab === 'appliances_brands' || activeTab === 'cities' || activeTab === 'user_management') && (
+                <div className="pl-6 mt-1 space-y-1">
+                  <button
+                    onClick={() => setActiveTab('appliances_brands')}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'appliances_brands' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <Layers className="w-4 h-4" />
+                    Appliances & Brands
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('cities')}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'cities' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <MapPin className="w-4 h-4" />
+                    Cities
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('user_management')}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'user_management' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <Users className="w-4 h-4" />
+                    User Management
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </aside>
 
         {/* Dashboard / Workspace Area */}
@@ -1847,6 +1965,107 @@ export default function App() {
                             title="Delete City"
                           >
                             <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'user_management' && (
+            <div className="space-y-8">
+              <div>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight">User Management</h1>
+                <p className="text-slate-400 mt-1">Manage admin users and configure their specific access permissions</p>
+              </div>
+
+              <div className="max-w-4xl bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Users className="w-5 h-5 text-violet-400" />
+                    Admin Accounts
+                  </h3>
+                  <button
+                    onClick={() => setAdminForm({
+                      name: '',
+                      email: '',
+                      password: '',
+                      status: 'active',
+                      permissions: {
+                        dashboard: true,
+                        tickets: true,
+                        customers: true,
+                        manageDealers: true,
+                        manageTechnicians: true,
+                        followups: true,
+                        settings: true
+                      }
+                    })}
+                    className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" /> Add Admin User
+                  </button>
+                </div>
+
+                <div className="divide-y divide-slate-800">
+                  {admins.length === 0 ? (
+                    <p className="text-slate-500 py-6 text-center text-sm">No admin users found</p>
+                  ) : (
+                    admins.map(admin => (
+                      <div key={admin._id} className="py-4 flex items-center justify-between hover:bg-slate-800/30 px-3 rounded-xl transition duration-150">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-white">{admin.name}</p>
+                            <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded font-mono">{admin.code}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${admin.status === 'active' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+                              {admin.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400">{admin.email}</p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            <span className="text-[10px] text-slate-500 font-bold uppercase">Access:</span>
+                            {Object.entries(admin.permissions || {}).map(([key, val]) => (
+                              val && (
+                                <span key={key} className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded-md font-medium uppercase tracking-wider">
+                                  {key.replace('manage', '').replace('followups', 'follow-ups')}
+                                </span>
+                              )
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setAdminForm({
+                              id: admin._id,
+                              name: admin.name,
+                              email: admin.email,
+                              password: '', // blank for edits
+                              status: admin.status,
+                              permissions: admin.permissions || {
+                                dashboard: true,
+                                tickets: true,
+                                customers: true,
+                                manageDealers: true,
+                                manageTechnicians: true,
+                                followups: true,
+                                settings: true
+                              }
+                            })}
+                            className="p-1.5 hover:bg-slate-850 rounded-lg text-slate-400 hover:text-slate-200 transition"
+                            title="Edit User"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            disabled={admin._id === user._id}
+                            onClick={() => toggleAdminStatus(admin._id)}
+                            className={`p-1.5 hover:bg-slate-850 rounded-lg transition disabled:opacity-30 ${admin.status === 'active' ? 'text-amber-500 hover:text-amber-400' : 'text-emerald-500 hover:text-emerald-400'}`}
+                            title={admin.status === 'active' ? 'Deactivate' : 'Activate'}
+                          >
+                            <Power className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -2966,6 +3185,92 @@ export default function App() {
               </div>
               <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 py-2.5 rounded-lg text-sm font-bold text-white transition">
                 {cityForm.id ? 'Save Changes' : 'Create City'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Form Modal */}
+      {adminForm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden my-8">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+              <h3 className="font-bold text-white">{adminForm.id ? 'Edit Admin User' : 'Add New Admin User'}</h3>
+              <button onClick={() => setAdminForm(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleSaveAdmin} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Name</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. John Doe"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                  value={adminForm.name}
+                  onChange={e => setAdminForm({ ...adminForm, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Email ID</label>
+                <input
+                  required
+                  type="email"
+                  placeholder="e.g. admin@gsp.com"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                  value={adminForm.email}
+                  onChange={e => setAdminForm({ ...adminForm, email: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Password {adminForm.id && '(leave blank to keep current)'}</label>
+                <input
+                  required={!adminForm.id}
+                  type="password"
+                  placeholder="••••••••"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                  value={adminForm.password}
+                  onChange={e => setAdminForm({ ...adminForm, password: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">User Status</label>
+                <select
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer"
+                  value={adminForm.status}
+                  onChange={e => setAdminForm({ ...adminForm, status: e.target.value })}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+
+              {/* Permissions Checkboxes */}
+              <div className="space-y-2 border-t border-slate-800 pt-3">
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">Access Permissions</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.keys(adminForm.permissions).map((permKey) => (
+                    <label key={permKey} className="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-750 text-violet-600 focus:ring-violet-500 w-4 h-4 bg-slate-800 cursor-pointer"
+                        checked={adminForm.permissions[permKey]}
+                        onChange={e => setAdminForm({
+                          ...adminForm,
+                          permissions: {
+                            ...adminForm.permissions,
+                            [permKey]: e.target.checked
+                          }
+                        })}
+                      />
+                      <span className="capitalize">{permKey.replace('manage', '').replace('followups', 'follow-ups')}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 py-2.5 rounded-lg text-sm font-bold text-white transition mt-4">
+                {adminForm.id ? 'Save Changes' : 'Create Admin User'}
               </button>
             </form>
           </div>

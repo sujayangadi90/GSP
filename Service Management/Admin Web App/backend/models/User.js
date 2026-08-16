@@ -33,6 +33,15 @@ const UserSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active'
+  },
+  permissions: {
+    dashboard: { type: Boolean, default: true },
+    tickets: { type: Boolean, default: true },
+    customers: { type: Boolean, default: true },
+    manageDealers: { type: Boolean, default: true },
+    manageTechnicians: { type: Boolean, default: true },
+    followups: { type: Boolean, default: true },
+    settings: { type: Boolean, default: true }
   }
 }, { timestamps: true });
 

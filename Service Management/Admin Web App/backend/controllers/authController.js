@@ -47,6 +47,15 @@ const loginUser = async (req, res) => {
       email: user.email,
       code: user.code,
       role: user.role,
+      permissions: user.permissions || {
+        dashboard: true,
+        tickets: true,
+        customers: true,
+        manageDealers: true,
+        manageTechnicians: true,
+        followups: true,
+        settings: true
+      },
       token: generateToken(user._id)
     });
   } catch (error) {
