@@ -1360,6 +1360,7 @@ export default function App() {
                       <option value="verification_pending">Verification Pending</option>
                       <option value="completed">Completed (Pending Close)</option>
                       <option value="closed">Closed</option>
+                      <option value="cancelled">Cancelled</option>
                     </select>
                   </div>
                 </div>
@@ -1433,6 +1434,7 @@ export default function App() {
                                   ticket.status === 'in_progress' ? 'bg-orange-900/50 text-orange-300 border border-orange-700/30' :
                                   ticket.status === 'verification_pending' ? 'bg-purple-900/50 text-purple-300 border border-purple-700/30' :
                                   ticket.status === 'completed' ? 'bg-green-900/50 text-green-300 border border-green-700/30' :
+                                  ticket.status === 'cancelled' ? 'bg-rose-900/50 text-rose-300 border border-rose-700/30' :
                                   'bg-slate-800 text-slate-400'
                                 }`}>
                                   {ticket.status.replace('_', ' ')}
