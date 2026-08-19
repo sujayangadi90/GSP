@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "513271045620",
+    "project_id": "gspg-12eb1",
+    "storage_bucket": "gspg-12eb1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:513271045620:android:9efacfad6f5d1c43802da1",
+        "android_client_info": {
+          "package_name": "com.gsp.dealer_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJG9xuTg9ZGG4HTwRNGG2IFVsagH5ExyI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:513271045620:android:c8357edd8180c2e1802da1",
+        "android_client_info": {
+          "package_name": "com.gsp.technician_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJG9xuTg9ZGG4HTwRNGG2IFVsagH5ExyI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

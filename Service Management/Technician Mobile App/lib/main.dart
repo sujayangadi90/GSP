@@ -110,7 +110,38 @@ class _AuthWrapperState extends State<AuthWrapper> {
       messaging.onTokenRefresh.listen((newToken) {
         _registerFcmTokenWithBackend(newToken);
       });
-      
+
+      void handleNotificationClick(RemoteMessage message) {
+        final data = message.data;
+        final screen = data['screen'];
+        final ticketId = data['ticketId'] ?? data['jobId'];
+        
+        if (_token != null && mounted) {
+          if (screen == 'job_details' && ticketId != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => JobDetailsScreen(
+                  jobId: ticketId,
+                  token: _token!,
+                  apiUrl: _apiUrl,
+                ),
+              ),
+            );
+          } else if (screen == 'job_history') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => JobHistoryScreen(
+                  token: _token!,
+                  apiUrl: _apiUrl,
+                ),
+              ),
+            );
+          }
+        }
+      }
+
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -121,12 +152,18 @@ class _AuthWrapperState extends State<AuthWrapper> {
               behavior: SnackBarBehavior.floating,
               action: SnackBarAction(
                 label: 'View',
-                onPressed: () {
-                  // Additional navigation logic can go here if required
-                },
+                onPressed: () => handleNotificationClick(message),
               ),
             ),
           );
+        }
+      });
+
+      FirebaseMessaging.onMessageOpenedApp.listen(handleNotificationClick);
+
+      messaging.getInitialMessage().then((RemoteMessage? message) {
+        if (message != null) {
+          handleNotificationClick(message);
         }
       });
     } catch (e) {
