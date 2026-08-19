@@ -1,4 +1,5 @@
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getMessaging } = require('firebase-admin/messaging');
 const User = require('../models/User');
 
 let firebaseInitialized = false;
@@ -10,8 +11,8 @@ try {
   
   if (serviceAccountEnv) {
     const serviceAccount = JSON.parse(serviceAccountEnv);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+    initializeApp({
+      credential: cert(serviceAccount)
     });
     firebaseInitialized = true;
     console.log('Firebase Admin SDK initialized successfully via environment credentials.');
@@ -23,8 +24,8 @@ try {
     
     if (fs.existsSync(saPath)) {
       const serviceAccount = JSON.parse(fs.readFileSync(saPath, 'utf8'));
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
+      initializeApp({
+        credential: cert(serviceAccount)
       });
       firebaseInitialized = true;
       console.log('Firebase Admin SDK initialized successfully via local service account file.');
@@ -89,8 +90,8 @@ const sendPushNotification = async (userIds, title, body, data = {}) => {
       tokens: tokens
     };
 
-    // sendEachForMulticast sends message to list of tokens
-    const response = await admin.messaging().sendEachForMulticast(message);
+    // getMessaging() sends message to list of tokens
+    const response = await getMessaging().sendEachForMulticast(message);
     console.log(`-> Push notification successfully dispatched: ${response.successCount} sent, ${response.failureCount} failed.`);
     
     // Cleanup invalid tokens if any failures
