@@ -58,7 +58,21 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
+    _requestNotificationPermissions();
     _checkLogin();
+  }
+
+  Future<void> _requestNotificationPermissions() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    } catch (e) {
+      debugPrint('Error requesting notification permissions: $e');
+    }
   }
 
   Future<void> _checkLogin() async {
