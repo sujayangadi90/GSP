@@ -17,7 +17,8 @@ const createTicket = async (req, res) => {
     installationDetails,
     preferredVisitDate,
     remarks,
-    dealer
+    dealer,
+    invoiceImage
   } = req.body;
 
   try {
@@ -35,6 +36,8 @@ const createTicket = async (req, res) => {
 
     if (req.file) {
       ticket.invoiceImage = 'uploads/' + req.file.filename;
+    } else if (invoiceImage) {
+      ticket.invoiceImage = invoiceImage;
     }
 
     const createdTicket = await ticket.save();

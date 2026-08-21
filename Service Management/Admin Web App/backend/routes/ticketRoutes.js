@@ -30,6 +30,14 @@ router.route('/customers')
 router.route('/dashboard')
   .get(authorize('admin'), getDashboardStats);
 
+router.route('/upload')
+  .post(upload.single('invoiceImage'), (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Please upload a file' });
+    }
+    res.status(200).json({ filePath: 'uploads/' + req.file.filename });
+  });
+
 // Single ticket detail
 router.route('/:id')
   .get(getTicketById);

@@ -96,6 +96,8 @@ export default function App() {
     remarks: ''
   });
   const [invoiceFile, setInvoiceFile] = useState(null);
+  const [uploadingInvoice, setUploadingInvoice] = useState(false);
+  const [uploadedInvoicePath, setUploadedInvoicePath] = useState('');
 
   // Sidebar / Submenu states
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -899,6 +901,52 @@ export default function App() {
     }
   };
 
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setUploadingInvoice(true);
+    try {
+      const formData = new FormData();
+      formData.append('invoiceImage', file);
+      
+      const res = await fetch(`${API_BASE}/tickets/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      if (!res.ok) {
+        let errMsg = 'Failed to upload invoice copy';
+        try {
+          const errData = await res.json();
+          errMsg = errData.message || errMsg;
+        } catch (jsonErr) {
+          try {
+            const textErr = await res.text();
+            if (textErr && textErr.includes('413') && textErr.includes('Large')) {
+              errMsg = 'File is too large. Please upload an image/file smaller than 10MB.';
+            } else {
+              errMsg = textErr || errMsg;
+            }
+          } catch (textErr) {}
+        }
+        throw new Error(errMsg);
+      }
+      
+      const data = await res.json();
+      setUploadedInvoicePath(data.filePath);
+    } catch (err) {
+      alert(err.message);
+      e.target.value = null;
+      setUploadedInvoicePath('');
+    } finally {
+      setUploadingInvoice(false);
+    }
+  };
+
   const handleCreateRequest = async (e) => {
     e.preventDefault();
     
@@ -916,56 +964,49 @@ export default function App() {
 
     try {
       setLoading(true);
-      const formData = new FormData();
-      formData.append('type', newRequestForm.type);
-      formData.append('dealer', newRequestForm.dealer);
-      formData.append('preferredVisitDate', newRequestForm.preferredVisitDate);
-      formData.append('remarks', newRequestForm.remarks);
-      
-      // Customer
-      formData.append('customer[name]', newRequestForm.customer.name);
-      formData.append('customer[mobile]', newRequestForm.customer.mobile);
-      if (newRequestForm.customer.alternateMobile) {
-        formData.append('customer[alternateMobile]', newRequestForm.customer.alternateMobile);
-      }
-      formData.append('customer[address]', newRequestForm.customer.address);
-      formData.append('customer[city]', newRequestForm.customer.city);
-      formData.append('customer[pincode]', newRequestForm.customer.pincode);
-      
-      // Product
-      formData.append('product[category]', newRequestForm.product.category);
-      formData.append('product[name]', newRequestForm.product.name);
-      if (newRequestForm.product.modelNumber) {
-        formData.append('product[modelNumber]', newRequestForm.product.modelNumber);
-      }
-      if (newRequestForm.product.serialNumber) {
-        formData.append('product[serialNumber]', newRequestForm.product.serialNumber);
-      }
-      if (newRequestForm.product.purchaseDate) {
-        formData.append('product[purchaseDate]', newRequestForm.product.purchaseDate);
-      }
-      if (newRequestForm.product.invoiceNumber) {
-        formData.append('product[invoiceNumber]', newRequestForm.product.invoiceNumber);
-      }
 
-      // Type-specific
+      const payload = {
+        type: newRequestForm.type,
+        dealer: newRequestForm.dealer,
+        preferredVisitDate: newRequestForm.preferredVisitDate,
+        remarks: newRequestForm.remarks,
+        customer: {
+          name: newRequestForm.customer.name,
+          mobile: newRequestForm.customer.mobile,
+          alternateMobile: newRequestForm.customer.alternateMobile || undefined,
+          address: newRequestForm.customer.address,
+          city: newRequestForm.customer.city,
+          pincode: newRequestForm.customer.pincode
+        },
+        product: {
+          category: newRequestForm.product.category,
+          name: newRequestForm.product.name,
+          modelNumber: newRequestForm.product.modelNumber || undefined,
+          serialNumber: newRequestForm.product.serialNumber || undefined,
+          purchaseDate: newRequestForm.product.purchaseDate || undefined,
+          invoiceNumber: newRequestForm.product.invoiceNumber || undefined
+        },
+        invoiceImage: uploadedInvoicePath || undefined
+      };
+
       if (newRequestForm.type === 'service') {
-        formData.append('serviceDetails[description]', newRequestForm.serviceDetails.description);
-        formData.append('serviceDetails[priority]', newRequestForm.serviceDetails.priority);
+        payload.serviceDetails = {
+          description: newRequestForm.serviceDetails.description,
+          priority: newRequestForm.serviceDetails.priority
+        };
       } else {
-        formData.append('installationDetails[preferredDate]', newRequestForm.preferredVisitDate);
-      }
-
-      if (invoiceFile) {
-        formData.append('invoiceImage', invoiceFile);
+        payload.installationDetails = {
+          preferredDate: newRequestForm.preferredVisitDate
+        };
       }
 
       const res = await fetch(`${API_BASE}/tickets`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: formData
+        body: JSON.stringify(payload)
       });
 
       if (!res.ok) {
@@ -1001,6 +1042,7 @@ export default function App() {
         remarks: ''
       });
       setInvoiceFile(null);
+      setUploadedInvoicePath('');
       fetchData();
     } catch (err) {
       alert(`Error: ${err.message}`);
@@ -3673,10 +3715,17 @@ export default function App() {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Invoice Image / Photo</label>
                     <input 
                       type="file" 
-                      accept="image/*"
-                      className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500 cursor-pointer"
-                      onChange={e => setInvoiceFile(e.target.files[0])}
+                      accept="image/*,.pdf"
+                      className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500 cursor-pointer disabled:opacity-50"
+                      onChange={handleFileChange}
+                      disabled={uploadingInvoice}
                     />
+                    {uploadingInvoice && (
+                      <span className="text-xs text-violet-400 mt-1 block">Uploading invoice copy...</span>
+                    )}
+                    {!uploadingInvoice && uploadedInvoicePath && (
+                      <span className="text-xs text-emerald-400 mt-1 block">✓ Invoice copy uploaded successfully</span>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Remarks</label>
@@ -3693,16 +3742,20 @@ export default function App() {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
                 <button 
                   type="button" 
-                  onClick={() => setCreateRequestOpen(false)} 
+                  onClick={() => {
+                    setCreateRequestOpen(false);
+                    setUploadedInvoicePath('');
+                  }} 
                   className="px-5 py-2.5 text-sm text-slate-400 hover:text-slate-200 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  className="bg-violet-600 hover:bg-violet-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-md transition duration-200 cursor-pointer"
+                  disabled={uploadingInvoice}
+                  className="bg-violet-600 hover:bg-violet-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-md transition duration-200 cursor-pointer disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
-                  Submit Request
+                  {uploadingInvoice ? 'Uploading...' : 'Submit Request'}
                 </button>
               </div>
             </form>
