@@ -969,8 +969,23 @@ export default function App() {
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || 'Failed to create request');
+        let errMsg = 'Failed to create request';
+        try {
+          const errData = await res.json();
+          errMsg = errData.message || errMsg;
+        } catch (jsonErr) {
+          try {
+            const textErr = await res.text();
+            if (textErr && textErr.includes('413') && textErr.includes('Large')) {
+              errMsg = 'File is too large. Please upload an image/file smaller than 10MB.';
+            } else {
+              errMsg = textErr || errMsg;
+            }
+          } catch (textErr) {
+            // Ignore text read error
+          }
+        }
+        throw new Error(errMsg);
       }
 
       alert('Request created successfully!');

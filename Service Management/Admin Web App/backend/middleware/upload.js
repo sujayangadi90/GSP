@@ -19,7 +19,7 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const filetypes = /jpeg|jpg|png|webp/;
+  const filetypes = /jpeg|jpg|png|webp|pdf|heic|heif/;
   const mimetype = filetypes.test(file.mimetype) || file.mimetype === 'application/octet-stream';
   const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
 
@@ -27,7 +27,7 @@ const fileFilter = (req, file, cb) => {
     return cb(null, true);
   }
   console.log(`Rejected Upload: originalName="${file.originalname}" mimeType="${file.mimetype}"`);
-  cb(new Error('Only image files (jpeg, jpg, png, webp) are allowed!'));
+  cb(new Error('Only image and PDF files (jpeg, jpg, png, webp, pdf, heic, heif) are allowed!'));
 };
 
 const upload = multer({
