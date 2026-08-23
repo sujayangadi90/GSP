@@ -87,6 +87,14 @@ const sendPushNotification = async (userIds, title, body, data = {}) => {
     const message = {
       notification: { title, body },
       data: formattedData,
+      android: {
+        priority: 'high'
+      },
+      apns: {
+        headers: {
+          'apns-priority': '10'
+        }
+      },
       tokens: tokens
     };
 
