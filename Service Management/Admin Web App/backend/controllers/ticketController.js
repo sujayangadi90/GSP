@@ -9,6 +9,19 @@ const { sendPushNotification } = require('../utils/notification');
 // @route   POST /api/tickets
 // @access  Private/Dealer
 const createTicket = async (req, res) => {
+  // Parse nested fields from multipart/form-data if they exist as flat keys (e.g. customer[name])
+  for (const key in req.body) {
+    if (key.includes('[') && key.endsWith(']')) {
+      const parts = key.split('[');
+      const parentKey = parts[0];
+      const childKey = parts[1].slice(0, -1);
+      if (!req.body[parentKey]) {
+        req.body[parentKey] = {};
+      }
+      req.body[parentKey][childKey] = req.body[key];
+    }
+  }
+
   const {
     type,
     customer,
