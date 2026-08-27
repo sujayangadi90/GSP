@@ -25,6 +25,16 @@ const BrandSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  serviceFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  installationFee: {
+    type: Number,
+    default: 0,
+    min: 0
   }
 }, { timestamps: true });
 

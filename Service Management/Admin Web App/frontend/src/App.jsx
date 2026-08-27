@@ -109,6 +109,7 @@ export default function App() {
   const [brandForm, setBrandForm] = useState(null); // null or { id?, name, applianceId, followUpDays }
   const [cities, setCities] = useState([]);
   const [cityForm, setCityForm] = useState(null); // null or { id?, name }
+  const [feeForm, setFeeForm] = useState(null); // null or { id, brandName, applianceName, serviceFee, installationFee }
   const [admins, setAdmins] = useState([]);
   const [adminForm, setAdminForm] = useState(null); // null or { id?, name, email, password, status, permissions }
   const [customers, setCustomers] = useState([]);
@@ -515,6 +516,9 @@ export default function App() {
       if (activeTab === 'appliances_brands') {
         fetchAppliances();
         fetchBrands();
+      } else if (activeTab === 'fees_config') {
+        fetchAppliances();
+        fetchBrands();
       } else if (activeTab === 'cities') {
         fetchCities();
       } else if (activeTab === 'user_management') {
@@ -693,6 +697,23 @@ export default function App() {
     if (!window.confirm('Are you sure you want to delete this brand?')) return;
     try {
       await apiFetch(`/brands/${id}`, { method: 'DELETE' });
+      fetchBrands();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const saveFee = async (e) => {
+    e.preventDefault();
+    try {
+      await apiFetch(`/brands/${feeForm.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          serviceFee: feeForm.serviceFee,
+          installationFee: feeForm.installationFee
+        })
+      });
+      setFeeForm(null);
       fetchBrands();
     } catch (err) {
       alert(err.message);
@@ -1215,7 +1236,7 @@ export default function App() {
                   {settingsOpen ? '▲' : '▼'}
                 </span>
               </button>
-              {(settingsOpen || activeTab === 'appliances_brands' || activeTab === 'cities' || activeTab === 'user_management') && (
+              {(settingsOpen || activeTab === 'appliances_brands' || activeTab === 'cities' || activeTab === 'user_management' || activeTab === 'fees_config') && (
                 <div className="pl-6 mt-1 space-y-1">
                   <button
                     onClick={() => setActiveTab('appliances_brands')}
@@ -1237,6 +1258,13 @@ export default function App() {
                   >
                     <Users className="w-4 h-4" />
                     User Management
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('fees_config')}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'fees_config' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <ClipboardList className="w-4 h-4" />
+                    Fees Configuration
                   </button>
                 </div>
               )}
@@ -2046,6 +2074,63 @@ export default function App() {
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Fees Configuration Settings Tab */}
+          {activeTab === 'fees_config' && (
+            <div className="space-y-8">
+              <div>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight">Fees Configuration</h1>
+                <p className="text-slate-400 mt-1">Configure service and installation fees for appliance categories & brands</p>
+              </div>
+
+              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <ClipboardList className="w-5 h-5 text-violet-400" />
+                    Appliance & Brand Fees
+                  </h3>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm text-slate-300">
+                    <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase font-semibold">
+                      <tr>
+                        <th className="px-6 py-3 rounded-l-lg">Appliance Category</th>
+                        <th className="px-6 py-3">Brand</th>
+                        <th className="px-6 py-3">Service Fee</th>
+                        <th className="px-6 py-3">Installation Fee</th>
+                        <th className="px-6 py-3 rounded-r-lg text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {brands.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="text-slate-500 py-10 text-center">No brands configured yet. Please configure appliances and brands first.</td>
+                        </tr>
+                      ) : (
+                        brands.map(b => (
+                          <tr key={b._id} className="hover:bg-slate-800/20 transition duration-150">
+                            <td className="px-6 py-4 font-medium text-white">{b.appliance?.name || 'N/A'}</td>
+                            <td className="px-6 py-4 text-white font-medium">{b.name}</td>
+                            <td className="px-6 py-4 text-violet-400 font-semibold">₹ {b.serviceFee ?? 0}</td>
+                            <td className="px-6 py-4 text-indigo-400 font-semibold">₹ {b.installationFee ?? 0}</td>
+                            <td className="px-6 py-4 text-right">
+                              <button
+                                onClick={() => setFeeForm({ id: b._id, brandName: b.name, applianceName: b.appliance?.name || 'N/A', serviceFee: b.serviceFee ?? 0, installationFee: b.installationFee ?? 0 })}
+                                className="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1 cursor-pointer transition duration-150"
+                              >
+                                <Edit className="w-3.5 h-3.5" /> Edit Fee
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -3315,6 +3400,65 @@ export default function App() {
               </div>
               <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 py-2.5 rounded-lg text-sm font-bold text-white transition">
                 {cityForm.id ? 'Save Changes' : 'Create City'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Fee Form Modal */}
+      {feeForm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+              <h3 className="font-bold text-white">Configure Fees ({feeForm.brandName})</h3>
+              <button onClick={() => setFeeForm(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={saveFee} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Appliance Category</label>
+                <input
+                  disabled
+                  type="text"
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-400 cursor-not-allowed font-medium"
+                  value={feeForm.applianceName}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Brand</label>
+                <input
+                  disabled
+                  type="text"
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-400 cursor-not-allowed font-medium"
+                  value={feeForm.brandName}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Service Fee (₹)</label>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 250"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                  value={feeForm.serviceFee}
+                  onChange={e => setFeeForm({ ...feeForm, serviceFee: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Installation Fee (₹)</label>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 500"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                  value={feeForm.installationFee}
+                  onChange={e => setFeeForm({ ...feeForm, installationFee: e.target.value })}
+                />
+              </div>
+              <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 py-2.5 rounded-lg text-sm font-bold text-white transition">
+                Save Fees Configuration
               </button>
             </form>
           </div>
