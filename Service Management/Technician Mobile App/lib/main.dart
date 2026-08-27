@@ -393,8 +393,10 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _assignedCount = 0;
+  int _inProgressCount = 0;
   int _pendingCount = 0;
   int _completedCount = 0;
+  double _earnings = 0.0;
   bool _isLoading = false;
   List _jobs = [];
   int _selectedMonth = DateTime.now().month;
@@ -512,18 +514,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
       if (res.statusCode == 200) {
         final List jobsData = jsonDecode(res.body);
-        int assigned = 0, pending = 0, completed = 0;
+        int assigned = 0, inProgress = 0, pending = 0, completed = 0;
+        double earnings = 0.0;
         for (var job in jobsData) {
           final s = job['status'];
-          if (s == 'assigned' || s == 'in_progress') assigned++;
+          if (s == 'assigned') assigned++;
+          if (s == 'in_progress') inProgress++;
           if (s == 'verification_pending') pending++;
-          if (s == 'completed' || s == 'closed') completed++;
+          if (s == 'completed' || s == 'closed') {
+            completed++;
+            final type = job['type'] ?? '';
+            if (type == 'service') {
+              earnings += (job['serviceFee'] ?? 0).toDouble();
+            } else if (type == 'installation') {
+              earnings += (job['installationFee'] ?? 0).toDouble();
+            }
+          }
         }
         setState(() {
           _jobs = jobsData;
           _assignedCount = assigned;
+          _inProgressCount = inProgress;
           _pendingCount = pending;
           _completedCount = completed;
+          _earnings = earnings;
         });
       }
     } catch (e) {
@@ -612,67 +626,123 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 12),
               _isLoading 
                 ? const Center(child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator()))
-                : GridView.count(
-                    crossAxisCount: 3,
-                    shrinkWrap: true,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 1.0,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      _buildStatCard(
-                        'Assigned',
-                        _assignedCount,
-                        Colors.amber,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => JobHistoryScreen(
-                              token: widget.token,
-                              apiUrl: widget.apiUrl,
-                              initialStatus: 'assigned',
-                              initialMonth: _selectedMonth,
-                              initialYear: _selectedYear,
+                : Column(
+                      children: [
+                        GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 1.5,
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: [
+                            _buildStatCard(
+                              'Assigned',
+                              _assignedCount,
+                              Colors.amber,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => JobHistoryScreen(
+                                    token: widget.token,
+                                    apiUrl: widget.apiUrl,
+                                    initialStatus: 'assigned',
+                                    initialMonth: _selectedMonth,
+                                    initialYear: _selectedYear,
+                                  ),
+                                ),
+                              ).then((_) => _loadJobs()),
+                            ),
+                            _buildStatCard(
+                              'In Progress',
+                              _inProgressCount,
+                              Colors.cyan,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => JobHistoryScreen(
+                                    token: widget.token,
+                                    apiUrl: widget.apiUrl,
+                                    initialStatus: 'in_progress',
+                                    initialMonth: _selectedMonth,
+                                    initialYear: _selectedYear,
+                                  ),
+                                ),
+                              ).then((_) => _loadJobs()),
+                            ),
+                            _buildStatCard(
+                              'Pending Verification',
+                              _pendingCount,
+                              Colors.orange,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => JobHistoryScreen(
+                                    token: widget.token,
+                                    apiUrl: widget.apiUrl,
+                                    initialStatus: 'verification_pending',
+                                    initialMonth: _selectedMonth,
+                                    initialYear: _selectedYear,
+                                  ),
+                                ),
+                              ).then((_) => _loadJobs()),
+                            ),
+                            _buildStatCard(
+                              'Closed',
+                              _completedCount,
+                              Colors.green,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => JobHistoryScreen(
+                                    token: widget.token,
+                                    apiUrl: widget.apiUrl,
+                                    initialStatus: 'closed',
+                                    initialMonth: _selectedMonth,
+                                    initialYear: _selectedYear,
+                                  ),
+                                ),
+                              ).then((_) => _loadJobs()),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Card(
+                          margin: EdgeInsets.zero,
+                          color: const Color(0xFF1E2422),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: Colors.teal.withOpacity(0.3)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Earnings',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.tealAccent),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'For the month of ${_getMonthName(_selectedMonth)}',
+                                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  '₹ ${_earnings.toStringAsFixed(0)}',
+                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
+                                ),
+                              ],
                             ),
                           ),
-                        ).then((_) => _loadJobs()),
-                      ),
-                      _buildStatCard(
-                        'Pending Verification',
-                        _pendingCount,
-                        Colors.orange,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => JobHistoryScreen(
-                              token: widget.token,
-                              apiUrl: widget.apiUrl,
-                              initialStatus: 'verification_pending',
-                              initialMonth: _selectedMonth,
-                              initialYear: _selectedYear,
-                            ),
-                          ),
-                        ).then((_) => _loadJobs()),
-                      ),
-                      _buildStatCard(
-                        'Closed',
-                        _completedCount,
-                        Colors.green,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => JobHistoryScreen(
-                              token: widget.token,
-                              apiUrl: widget.apiUrl,
-                              initialStatus: 'closed',
-                              initialMonth: _selectedMonth,
-                              initialYear: _selectedYear,
-                            ),
-                          ),
-                        ).then((_) => _loadJobs()),
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
               const SizedBox(height: 32),
               const Text(
                 'Active Service Tickets',
@@ -1439,7 +1509,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
     if (job['timeline'] != null && job['timeline'] is List) {
       for (var entry in job['timeline']) {
         if (entry['status'] == 'assigned' && entry['timestamp'] != null) {
-          final date = DateTime.tryParse(entry['timestamp']);
+          final date = DateTime.tryParse(entry['timestamp'])?.toLocal();
           if (date != null) {
             return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
           }
@@ -1447,7 +1517,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
       }
     }
     if (job['createdAt'] != null) {
-      final date = DateTime.tryParse(job['createdAt']);
+      final date = DateTime.tryParse(job['createdAt'])?.toLocal();
       if (date != null) {
         return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
       }
@@ -1646,6 +1716,21 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                       if (sel) {
                         setState(() {
                           _selectedStatusFilter = 'assigned';
+                        });
+                        _fetchJobs();
+                      }
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: const Text('In Progress'),
+                    selected: _selectedStatusFilter == 'in_progress',
+                    onSelected: (sel) {
+                      if (sel) {
+                        setState(() {
+                          _selectedStatusFilter = 'in_progress';
                         });
                         _fetchJobs();
                       }

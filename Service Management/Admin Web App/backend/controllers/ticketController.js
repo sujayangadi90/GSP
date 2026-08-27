@@ -68,6 +68,31 @@ const createTicket = async (req, res) => {
   }
 };
 
+const attachFeesToTickets = async (tickets) => {
+  const brandsList = await Brand.find().populate('appliance');
+  const brandMap = {};
+  brandsList.forEach(b => {
+    const appName = b.appliance ? b.appliance.name.trim().toLowerCase() : '';
+    const bName = b.name.trim().toLowerCase();
+    brandMap[`${appName}_${bName}`] = b;
+  });
+
+  return tickets.map(t => {
+    const ticketObj = t.toObject();
+    const appName = t.product.category ? t.product.category.trim().toLowerCase() : '';
+    const bName = t.product.name ? t.product.name.trim().toLowerCase() : '';
+    const brandObj = brandMap[`${appName}_${bName}`];
+    if (brandObj) {
+      ticketObj.serviceFee = brandObj.serviceFee || 0;
+      ticketObj.installationFee = brandObj.installationFee || 0;
+    } else {
+      ticketObj.serviceFee = 0;
+      ticketObj.installationFee = 0;
+    }
+    return ticketObj;
+  });
+};
+
 // @desc    Get all tickets with filters
 // @route   GET /api/tickets
 // @access  Private
@@ -155,7 +180,9 @@ const getTickets = async (req, res) => {
         }
       } else if (req.user.role === 'technician') {
         if (status === 'assigned') {
-          query.status = { $in: ['assigned', 'in_progress'] };
+          query.status = 'assigned';
+        } else if (status === 'in_progress') {
+          query.status = 'in_progress';
         } else if (status === 'closed') {
           query.status = { $in: ['completed', 'closed'] };
         } else {
@@ -346,8 +373,10 @@ const getTickets = async (req, res) => {
         .skip(skip)
         .limit(l);
 
+      const ticketsWithFees = await attachFeesToTickets(tickets);
+
       return res.json({
-        data: tickets,
+        data: ticketsWithFees,
         page: p,
         limit: l,
         hasMore: (skip + tickets.length) < total
@@ -359,7 +388,9 @@ const getTickets = async (req, res) => {
       .populate('assignedTechnician', 'name code mobile')
       .sort({ createdAt: -1 });
 
-    res.json(tickets);
+    const ticketsWithFees = await attachFeesToTickets(tickets);
+
+    res.json(ticketsWithFees);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -386,7 +417,24 @@ const getTicketById = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to view this ticket' });
     }
 
-    res.json(ticket);
+    const ticketObj = ticket.toObject();
+    const appName = ticket.product.category ? ticket.product.category.trim().toLowerCase() : '';
+    const bName = ticket.product.name ? ticket.product.name.trim().toLowerCase() : '';
+    const brandObj = await Brand.findOne({
+      name: { $regex: new RegExp(`^${bName}$`, 'i') }
+    }).populate({
+      path: 'appliance',
+      match: { name: { $regex: new RegExp(`^${appName}$`, 'i') } }
+    });
+    if (brandObj && brandObj.appliance) {
+      ticketObj.serviceFee = brandObj.serviceFee || 0;
+      ticketObj.installationFee = brandObj.installationFee || 0;
+    } else {
+      ticketObj.serviceFee = 0;
+      ticketObj.installationFee = 0;
+    }
+
+    res.json(ticketObj);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
