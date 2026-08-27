@@ -2475,7 +2475,7 @@ export default function App() {
               {/* Stats Counters inside history */}
               {historyContext === 'technician' ? (
                 techStatusFilter === 'assigned' ? (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
                       <span className="text-slate-500 text-xs font-semibold uppercase">Total Requests</span>
                       <p className="text-2xl font-bold text-white mt-1">{techPerformanceStats.total}</p>
@@ -2483,10 +2483,14 @@ export default function App() {
                     <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
                       <span className="text-amber-500/80 text-xs font-semibold uppercase">In Progress / Assigned</span>
                       <p className="text-2xl font-bold text-amber-400 mt-1">{techPerformanceStats.inProgress}</p>
+                    </div>
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-violet-400 text-xs font-semibold uppercase">Earnings</span>
+                      <p className="text-2xl font-bold text-violet-400 mt-1">₹ {techPerformanceStats.earnings ?? 0}</p>
                     </div>
                   </div>
                 ) : techStatusFilter === 'completed' ? (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
                       <span className="text-emerald-500/80 text-xs font-semibold uppercase">Completed</span>
                       <p className="text-2xl font-bold text-emerald-400 mt-1">{techPerformanceStats.completed}</p>
@@ -2495,9 +2499,13 @@ export default function App() {
                       <span className="text-yellow-500/80 text-xs font-semibold uppercase">Pending Verification</span>
                       <p className="text-2xl font-bold text-yellow-400 mt-1">{techPerformanceStats.pendingVerification}</p>
                     </div>
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-violet-400 text-xs font-semibold uppercase">Earnings</span>
+                      <p className="text-2xl font-bold text-violet-400 mt-1">₹ {techPerformanceStats.earnings ?? 0}</p>
+                    </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
                       <span className="text-slate-500 text-xs font-semibold uppercase">Total Requests</span>
                       <p className="text-2xl font-bold text-white mt-1">{techPerformanceStats.total}</p>
@@ -2513,6 +2521,10 @@ export default function App() {
                     <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
                       <span className="text-yellow-500/80 text-xs font-semibold uppercase">Pending Verification</span>
                       <p className="text-2xl font-bold text-yellow-400 mt-1">{techPerformanceStats.pendingVerification}</p>
+                    </div>
+                    <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                      <span className="text-violet-400 text-xs font-semibold uppercase">Earnings</span>
+                      <p className="text-2xl font-bold text-violet-400 mt-1">₹ {techPerformanceStats.earnings ?? 0}</p>
                     </div>
                   </div>
                 )

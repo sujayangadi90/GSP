@@ -263,13 +263,42 @@ const getTickets = async (req, res) => {
           'completion.submittedAt': { $gte: start, $lte: end }
         });
 
+        const completedTicketsForEarnings = await Ticket.find({
+          assignedTechnician: technician,
+          status: { $in: ['completed', 'closed'] },
+          'completion.submittedAt': { $gte: start, $lte: end }
+        });
+
+        const brandsList = await Brand.find().populate('appliance');
+        const brandMap = {};
+        brandsList.forEach(b => {
+          const appName = b.appliance ? b.appliance.name.trim().toLowerCase() : '';
+          const bName = b.name.trim().toLowerCase();
+          brandMap[`${appName}_${bName}`] = b;
+        });
+
+        let earnings = 0;
+        completedTicketsForEarnings.forEach(t => {
+          const appName = t.product.category ? t.product.category.trim().toLowerCase() : '';
+          const bName = t.product.name ? t.product.name.trim().toLowerCase() : '';
+          const brandObj = brandMap[`${appName}_${bName}`];
+          if (brandObj) {
+            if (t.type === 'service') {
+              earnings += (brandObj.serviceFee || 0);
+            } else if (t.type === 'installation') {
+              earnings += (brandObj.installationFee || 0);
+            }
+          }
+        });
+
         return res.json({
           tickets,
           summary: {
             total: totalCount,
             completed: completedCount,
             inProgress: inProgressCount,
-            pendingVerification: pendingVerificationCount
+            pendingVerification: pendingVerificationCount,
+            earnings: earnings
           }
         });
       }
