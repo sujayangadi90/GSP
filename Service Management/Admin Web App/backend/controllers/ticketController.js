@@ -83,12 +83,33 @@ const attachFeesToTickets = async (tickets) => {
     const bName = t.product.name ? t.product.name.trim().toLowerCase() : '';
     const brandObj = brandMap[`${appName}_${bName}`];
     if (brandObj) {
-      ticketObj.serviceFee = brandObj.serviceFee || 0;
-      ticketObj.installationFee = brandObj.installationFee || 0;
+      ticketObj.serviceFee = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 0;
+      ticketObj.installationFee = brandObj.installationFee !== undefined ? brandObj.installationFee : 0;
     } else {
       ticketObj.serviceFee = 0;
       ticketObj.installationFee = 0;
     }
+
+    if (ticketObj.status === 'completed') {
+      if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null) {
+        // Use historical snapshot
+      } else {
+        if (brandObj) {
+          if (ticketObj.type === 'service') {
+            ticketObj.dealerExpense = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured';
+          } else if (ticketObj.type === 'installation') {
+            ticketObj.dealerExpense = brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured';
+          } else {
+            ticketObj.dealerExpense = 'Fee Not Configured';
+          }
+        } else {
+          ticketObj.dealerExpense = 'Fee Not Configured';
+        }
+      }
+    } else {
+      ticketObj.dealerExpense = 0;
+    }
+
     return ticketObj;
   });
 };
@@ -200,22 +221,42 @@ const getTickets = async (req, res) => {
       if (req.query.dealerFilter) {
         const start = new Date(`${fromDate}T00:00:00`);
         const end = new Date(`${toDate}T23:59:59.999`);
-        query.createdAt = { $gte: start, $lte: end };
 
-        const tickets = await Ticket.find(query)
+        const dealerTicketsQuery = {
+          dealer,
+          $or: [
+            {
+              status: { $in: ['completed', 'closed'] },
+              $or: [
+                { 'adminVerification.verifiedAt': { $gte: start, $lte: end } },
+                { 'adminVerification.verifiedAt': { $exists: false }, updatedAt: { $gte: start, $lte: end } },
+                { closedAt: { $gte: start, $lte: end } }
+              ]
+            },
+            {
+              status: { $nin: ['completed', 'closed'] },
+              createdAt: { $gte: start, $lte: end }
+            }
+          ]
+        };
+
+        const tickets = await Ticket.find(dealerTicketsQuery)
           .populate('dealer', 'name code email mobile')
           .populate('assignedTechnician', 'name code mobile')
           .sort({ createdAt: -1 });
 
-        const totalCount = await Ticket.countDocuments({
-          dealer,
-          createdAt: { $gte: start, $lte: end }
-        });
+        const ticketsWithFees = await attachFeesToTickets(tickets);
+
+        const totalCount = await Ticket.countDocuments(dealerTicketsQuery);
 
         const completedCount = await Ticket.countDocuments({
           dealer,
           status: { $in: ['completed', 'closed'] },
-          createdAt: { $gte: start, $lte: end }
+          $or: [
+            { 'adminVerification.verifiedAt': { $gte: start, $lte: end } },
+            { 'adminVerification.verifiedAt': { $exists: false }, updatedAt: { $gte: start, $lte: end } },
+            { closedAt: { $gte: start, $lte: end } }
+          ]
         });
 
         const inProgressCount = await Ticket.countDocuments({
@@ -230,13 +271,23 @@ const getTickets = async (req, res) => {
           createdAt: { $gte: start, $lte: end }
         });
 
+        let totalExpenses = 0;
+        ticketsWithFees.forEach(t => {
+          if (t.status === 'completed' || t.status === 'closed') {
+            if (typeof t.dealerExpense === 'number') {
+              totalExpenses += t.dealerExpense;
+            }
+          }
+        });
+
         return res.json({
-          tickets,
+          tickets: ticketsWithFees,
           summary: {
             total: totalCount,
             completed: completedCount,
             inProgress: inProgressCount,
-            pendingVerification: pendingVerificationCount
+            pendingVerification: pendingVerificationCount,
+            expenses: totalExpenses
           }
         });
       }
@@ -427,11 +478,31 @@ const getTicketById = async (req, res) => {
       match: { name: { $regex: new RegExp(`^${appName}$`, 'i') } }
     });
     if (brandObj && brandObj.appliance) {
-      ticketObj.serviceFee = brandObj.serviceFee || 0;
-      ticketObj.installationFee = brandObj.installationFee || 0;
+      ticketObj.serviceFee = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 0;
+      ticketObj.installationFee = brandObj.installationFee !== undefined ? brandObj.installationFee : 0;
     } else {
       ticketObj.serviceFee = 0;
       ticketObj.installationFee = 0;
+    }
+
+    if (ticketObj.status === 'completed') {
+      if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null) {
+        // Use snapshot
+      } else {
+        if (brandObj && brandObj.appliance) {
+          if (ticketObj.type === 'service') {
+            ticketObj.dealerExpense = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured';
+          } else if (ticketObj.type === 'installation') {
+            ticketObj.dealerExpense = brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured';
+          } else {
+            ticketObj.dealerExpense = 'Fee Not Configured';
+          }
+        } else {
+          ticketObj.dealerExpense = 'Fee Not Configured';
+        }
+      }
+    } else {
+      ticketObj.dealerExpense = 0;
     }
 
     res.json(ticketObj);
@@ -619,6 +690,30 @@ const verifyWork = async (req, res) => {
         reason,
         verifiedAt: Date.now()
       };
+
+      // Snapshot the fee amount
+      try {
+        const appName = ticket.product.category ? ticket.product.category.trim().toLowerCase() : '';
+        const bName = ticket.product.name ? ticket.product.name.trim().toLowerCase() : '';
+        const brandObj = await Brand.findOne({
+          name: { $regex: new RegExp(`^${bName}$`, 'i') }
+        }).populate({
+          path: 'appliance',
+          match: { name: { $regex: new RegExp(`^${appName}$`, 'i') } }
+        });
+        if (brandObj && brandObj.appliance) {
+          if (ticket.type === 'service') {
+            ticket.dealerExpense = brandObj.serviceFee !== undefined ? brandObj.serviceFee : null;
+          } else if (ticket.type === 'installation') {
+            ticket.dealerExpense = brandObj.installationFee !== undefined ? brandObj.installationFee : null;
+          }
+        } else {
+          ticket.dealerExpense = null;
+        }
+      } catch (err) {
+        console.error('Error snapshotting fee on ticket completion:', err.message);
+      }
+
       ticket.timeline.push({
         status: 'completed',
         note: `Work approved by Admin. ${reason ? `Note: ${reason}` : ''}`,

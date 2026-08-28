@@ -78,6 +78,10 @@ const TicketSchema = new mongoose.Schema({
     reason: String,
     verifiedAt: Date
   },
+  dealerExpense: {
+    type: Number,
+    min: 0
+  },
   closingRemarks: String,
   closedAt: Date,
   timeline: [TimelineSchema]

@@ -197,7 +197,8 @@ export default function App() {
     total: 0,
     completed: 0,
     inProgress: 0,
-    pendingVerification: 0
+    pendingVerification: 0,
+    expenses: 0
   });
   const [isDealerFilterApplied, setIsDealerFilterApplied] = useState(false);
 
@@ -2529,7 +2530,7 @@ export default function App() {
                   </div>
                 )
               ) : historyContext === 'dealer' ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
                     <span className="text-slate-500 text-xs font-semibold uppercase">Total Requests</span>
                     <p className="text-2xl font-bold text-white mt-1">
@@ -2558,6 +2559,22 @@ export default function App() {
                       {isDealerFilterApplied
                         ? dealerPerformanceStats.pendingVerification
                         : historyTickets.filter(t => t.status === 'verification_pending').length}
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+                    <span className="text-violet-400 text-xs font-semibold uppercase">Expenses</span>
+                    <p className="text-2xl font-bold text-violet-400 mt-1">
+                      ₹ {(isDealerFilterApplied
+                        ? (dealerPerformanceStats.expenses ?? 0)
+                        : historyTickets.reduce((acc, t) => {
+                            if (t.status === 'completed' || t.status === 'closed') {
+                              if (typeof t.dealerExpense === 'number') {
+                                return acc + t.dealerExpense;
+                              }
+                            }
+                            return acc;
+                          }, 0)
+                      ).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -2630,7 +2647,7 @@ export default function App() {
                               </span>
                             </div>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                             <div className={`grid grid-cols-1 ${ticket.status === 'completed' || ticket.status === 'closed' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-6 text-sm`}>
                               <div className="space-y-1">
                                 <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Customer Details</p>
                                 <p className="text-white font-bold">{ticket.customer?.name}</p>
@@ -2649,6 +2666,16 @@ export default function App() {
                                 <p className="text-slate-450">Tech: {ticket.assignedTechnician?.name || 'Unassigned'}</p>
                                 <p className="text-slate-500 text-xs">Created: {new Date(ticket.createdAt).toLocaleString()}</p>
                               </div>
+                              {(ticket.status === 'completed' || ticket.status === 'closed') && (
+                                <div className="space-y-1">
+                                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Expense</p>
+                                  <p className="text-white font-bold">
+                                    {typeof ticket.dealerExpense === 'number'
+                                      ? `₹ ${ticket.dealerExpense}`
+                                      : ticket.dealerExpense || 'Fee Not Configured'}
+                                  </p>
+                                </div>
+                              )}
                             </div>
 
                             {ticket.serviceDetails?.description && (
