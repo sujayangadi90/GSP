@@ -3213,7 +3213,15 @@ export default function App() {
                     <select
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
                       value={reportFilters.category}
-                      onChange={e => setReportFilters({ ...reportFilters, category: e.target.value })}
+                      onChange={e => {
+                        const newCat = e.target.value;
+                        const availableBrands = brands
+                          .filter(b => newCat === 'ALL' || (b.appliance?.name && b.appliance.name.trim().toLowerCase() === newCat.trim().toLowerCase()))
+                          .map(b => b.name);
+                        const currentBrand = reportFilters.brand;
+                        const nextBrand = (currentBrand === 'ALL' || availableBrands.includes(currentBrand)) ? currentBrand : 'ALL';
+                        setReportFilters({ ...reportFilters, category: newCat, brand: nextBrand });
+                      }}
                     >
                       <option value="ALL">ALL CATEGORIES</option>
                       {appliances.map(a => (
@@ -3231,7 +3239,11 @@ export default function App() {
                       onChange={e => setReportFilters({ ...reportFilters, brand: e.target.value })}
                     >
                       <option value="ALL">ALL BRANDS</option>
-                      {Array.from(new Set(brands.map(b => b.name))).map(brandName => (
+                      {Array.from(new Set(
+                        brands
+                          .filter(b => reportFilters.category === 'ALL' || (b.appliance?.name && b.appliance.name.trim().toLowerCase() === reportFilters.category.trim().toLowerCase()))
+                          .map(b => b.name)
+                      )).map(brandName => (
                         <option key={brandName} value={brandName}>{brandName}</option>
                       ))}
                     </select>
