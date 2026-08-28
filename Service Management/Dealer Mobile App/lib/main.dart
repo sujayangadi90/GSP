@@ -386,6 +386,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _openCount = 0;
   int _inProgressCount = 0;
   int _completedCount = 0;
+  double _expenses = 0.0;
   bool _isLoading = false;
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
@@ -414,18 +415,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (res.statusCode == 200) {
         final List tickets = jsonDecode(res.body);
         int fresh = 0, open = 0, work = 0, done = 0;
+        double expenses = 0.0;
         for (var t in tickets) {
           final s = t['status']?.toString().toLowerCase() ?? '';
           if (s == 'new') fresh++;
           if (s != 'completed' && s != 'closed' && s != 'cancelled') open++;
           if (s == 'assigned' || s == 'in_progress') work++;
-          if (s == 'completed' || s == 'closed') done++;
+          if (s == 'completed' || s == 'closed') {
+            done++;
+            final exp = t['dealerExpense'];
+            if (exp is num) {
+              expenses += exp.toDouble();
+            }
+          }
         }
         setState(() {
           _newCount = fresh;
           _openCount = open;
           _inProgressCount = work;
           _completedCount = done;
+          _expenses = expenses;
         });
       }
     } catch (e) {
@@ -582,26 +591,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 12),
               _isLoading 
                 ? const Center(child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator()))
-                : GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 1.4,
-                    physics: const NeverScrollableScrollPhysics(),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildStatCard('New Requests', _newCount, Colors.blue, () {
-                        _navigateToRequests(status: 'new');
-                      }),
-                      _buildStatCard('Total Open', _openCount, Colors.amber, () {
-                        _navigateToRequests(status: 'open');
-                      }),
-                      _buildStatCard('In Progress', _inProgressCount, Colors.orange, () {
-                        _navigateToRequests(status: 'in_progress');
-                      }),
-                      _buildStatCard('Completed', _completedCount, Colors.green, () {
-                        _navigateToRequests(status: 'completed');
-                      }),
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1.4,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          _buildStatCard('New Requests', _newCount, Colors.blue, () {
+                            _navigateToRequests(status: 'new');
+                          }),
+                          _buildStatCard('Total Open', _openCount, Colors.amber, () {
+                            _navigateToRequests(status: 'open');
+                          }),
+                          _buildStatCard('In Progress', _inProgressCount, Colors.orange, () {
+                            _navigateToRequests(status: 'in_progress');
+                          }),
+                          _buildStatCard('Completed', _completedCount, Colors.green, () {
+                            _navigateToRequests(status: 'completed');
+                          }),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withOpacity(0.12),
+                          border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.35)),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Expenses',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF818CF8),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '₹ ${_expenses.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
               const SizedBox(height: 32),
@@ -1718,9 +1763,64 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
               ]),
               const SizedBox(height: 16),
             ],
+            _buildExpenseBlock(_ticket!),
+            const SizedBox(height: 16),
             _buildTimelineBlock(_ticket!['timeline'] ?? []),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildExpenseBlock(Map<String, dynamic> ticket) {
+    final status = ticket['status']?.toString().toLowerCase() ?? '';
+    String expenseText = '';
+
+    if (status == 'completed' || status == 'closed') {
+      final exp = ticket['dealerExpense'];
+      if (exp == 'Fee Not Configured') {
+        expenseText = 'Fee Not Configured';
+      } else if (exp is num) {
+        expenseText = '₹ ${exp.toInt()}';
+      } else {
+        expenseText = 'Fee Not Configured';
+      }
+    } else if (status == 'cancelled') {
+      expenseText = '₹ 0 / Not applicable';
+    } else {
+      expenseText = 'Not yet incurred';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1B24),
+        border: Border.all(color: Colors.blueGrey.withOpacity(0.15)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'EXPENSE DETAILS',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purpleAccent),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Dealer Expense',
+            style: TextStyle(fontSize: 13, color: Colors.white70),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            expenseText,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'This amount represents the cost incurred by the dealer for the completed service or installation work, and is set automatically based on the GSP Fees Configuration.',
+            style: TextStyle(fontSize: 11, color: Colors.white38),
+          ),
+        ],
       ),
     );
   }

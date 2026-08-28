@@ -391,7 +391,24 @@ const getTickets = async (req, res) => {
       const end = new Date(toDate);
       end.setUTCHours(23, 59, 59, 999);
 
-      query.createdAt = { $gte: start, $lte: end };
+      if (req.user && req.user.role === 'dealer') {
+        query.$or = [
+          {
+            status: { $in: ['completed', 'closed'] },
+            $or: [
+              { 'adminVerification.verifiedAt': { $gte: start, $lte: end } },
+              { 'adminVerification.verifiedAt': { $exists: false }, updatedAt: { $gte: start, $lte: end } },
+              { closedAt: { $gte: start, $lte: end } }
+            ]
+          },
+          {
+            status: { $nin: ['completed', 'closed'] },
+            createdAt: { $gte: start, $lte: end }
+          }
+        ];
+      } else {
+        query.createdAt = { $gte: start, $lte: end };
+      }
     }
 
     if (search) {
