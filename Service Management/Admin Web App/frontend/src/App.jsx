@@ -747,6 +747,7 @@ export default function App() {
       } else {
         fetchData();
         fetchCities();
+        fetchAppliances();
       }
     }
   }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange]);
