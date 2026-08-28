@@ -68,6 +68,7 @@ export default function App() {
   
   // Raise Request Modal states
   const [createRequestOpen, setCreateRequestOpen] = useState(false);
+  const [custSuggestions, setCustSuggestions] = useState([]);
   const [newRequestForm, setNewRequestForm] = useState({
     dealer: '',
     type: 'installation',
@@ -777,6 +778,7 @@ export default function App() {
         fetchCities();
         fetchAppliances();
         fetchBrands();
+        fetchCustomers();
       }
     }
   }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange]);
@@ -4365,18 +4367,59 @@ export default function App() {
               <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
                 <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Customer Details</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
+                  <div className="relative">
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Customer Name *</label>
                     <input 
                       required 
                       type="text" 
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
                       value={newRequestForm.customer.name}
-                      onChange={e => setNewRequestForm({ 
-                        ...newRequestForm, 
-                        customer: { ...newRequestForm.customer, name: e.target.value } 
-                      })}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setNewRequestForm({ 
+                          ...newRequestForm, 
+                          customer: { ...newRequestForm.customer, name: val } 
+                        });
+                        if (val.trim().length >= 2) {
+                          const matches = customers.filter(c => 
+                            c.name.toLowerCase().includes(val.toLowerCase()) || 
+                            (c.mobile && c.mobile.includes(val))
+                          );
+                          setCustSuggestions(matches);
+                        } else {
+                          setCustSuggestions([]);
+                        }
+                      }}
+                      onBlur={() => setTimeout(() => setCustSuggestions([]), 350)}
                     />
+                    {custSuggestions.length > 0 && (
+                      <div className="absolute z-50 left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-40 overflow-y-auto divide-y divide-slate-700">
+                        {custSuggestions.map(c => (
+                          <button
+                            key={c.mobile}
+                            type="button"
+                            className="w-full text-left px-4 py-2 text-sm text-white hover:bg-violet-600 transition flex justify-between items-center cursor-pointer"
+                            onClick={() => {
+                              setNewRequestForm({
+                                ...newRequestForm,
+                                customer: {
+                                  name: c.name || '',
+                                  mobile: c.mobile || '',
+                                  alternateMobile: c.alternateMobile || '',
+                                  address: c.address || '',
+                                  city: c.city || '',
+                                  pincode: c.pincode || ''
+                                }
+                              });
+                              setCustSuggestions([]);
+                            }}
+                          >
+                            <span className="font-bold">{c.name}</span>
+                            <span className="text-xs text-slate-450">{c.mobile} ({c.city})</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Mobile Number *</label>
