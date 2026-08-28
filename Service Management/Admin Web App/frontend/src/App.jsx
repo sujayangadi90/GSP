@@ -3574,7 +3574,7 @@ export default function App() {
       {/* Technician Creation/Edit Modal */}
       {techForm && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
               <h3 className="font-bold text-white">{techForm.id ? 'Edit Technician Details' : 'Register New Technician'}</h3>
               <button onClick={() => setTechForm(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
