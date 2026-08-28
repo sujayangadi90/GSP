@@ -24,7 +24,8 @@ import {
   Calendar,
   Trash2,
   Edit,
-  Power
+  Power,
+  Menu
 } from 'lucide-react';
 
 const API_BASE = '/api';
@@ -38,6 +39,7 @@ export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('gsp_token') || '');
   
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, dealers, technicians, tickets
+  const [menuOpen, setMenuOpen] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1142,6 +1144,12 @@ export default function App() {
       {/* Header */}
       <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="lg:hidden flex items-center justify-center p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:text-white cursor-pointer mr-1"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <div className="bg-linear-to-tr from-violet-600 to-indigo-600 p-2 rounded-xl">
             <Wrench className="w-6 h-6 text-white" />
           </div>
@@ -1168,10 +1176,10 @@ export default function App() {
       {/* Main Container */}
       <div className="flex flex-1 flex-col lg:flex-row">
         {/* Sidebar Nav */}
-        <aside className="w-full lg:w-64 bg-slate-900/50 border-r border-slate-800 p-4 space-y-2 lg:min-h-[calc(100vh-73px)]">
+        <aside className={`${menuOpen ? 'block' : 'hidden'} lg:block w-full lg:w-64 bg-slate-900/50 border-r border-slate-800 p-4 space-y-2 lg:min-h-[calc(100vh-73px)]`}>
           {(!user || user.permissions?.dashboard !== false) && (
             <button
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => { setActiveTab('dashboard'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'dashboard' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <LayoutDashboard className="w-5 h-5" />
@@ -1180,7 +1188,7 @@ export default function App() {
           )}
           {(!user || user.permissions?.tickets !== false) && (
             <button
-              onClick={() => setActiveTab('tickets')}
+              onClick={() => { setActiveTab('tickets'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'tickets' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <TicketIcon className="w-5 h-5" />
@@ -1189,7 +1197,7 @@ export default function App() {
           )}
           {(!user || user.permissions?.customers !== false) && (
             <button
-              onClick={() => setActiveTab('customers')}
+              onClick={() => { setActiveTab('customers'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'customers' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <UserCheck className="w-5 h-5" />
@@ -1198,7 +1206,7 @@ export default function App() {
           )}
           {(!user || user.permissions?.manageDealers !== false) && (
             <button
-              onClick={() => setActiveTab('dealers')}
+              onClick={() => { setActiveTab('dealers'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'dealers' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <Users className="w-5 h-5" />
@@ -1207,7 +1215,7 @@ export default function App() {
           )}
           {(!user || user.permissions?.manageTechnicians !== false) && (
             <button
-              onClick={() => setActiveTab('technicians')}
+              onClick={() => { setActiveTab('technicians'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'technicians' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <Wrench className="w-5 h-5" />
@@ -1216,7 +1224,7 @@ export default function App() {
           )}
           {(!user || user.permissions?.followups !== false) && (
             <button
-              onClick={() => setActiveTab('followups')}
+              onClick={() => { setActiveTab('followups'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'followups' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <Calendar className="w-5 h-5" />
@@ -1240,28 +1248,28 @@ export default function App() {
               {(settingsOpen || activeTab === 'appliances_brands' || activeTab === 'cities' || activeTab === 'user_management' || activeTab === 'fees_config') && (
                 <div className="pl-6 mt-1 space-y-1">
                   <button
-                    onClick={() => setActiveTab('appliances_brands')}
+                    onClick={() => { setActiveTab('appliances_brands'); setMenuOpen(false); }}
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'appliances_brands' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
                   >
                     <Layers className="w-4 h-4" />
                     Appliances & Brands
                   </button>
                   <button
-                    onClick={() => setActiveTab('cities')}
+                    onClick={() => { setActiveTab('cities'); setMenuOpen(false); }}
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'cities' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
                   >
                     <MapPin className="w-4 h-4" />
                     Cities
                   </button>
                   <button
-                    onClick={() => setActiveTab('user_management')}
+                    onClick={() => { setActiveTab('user_management'); setMenuOpen(false); }}
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'user_management' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
                   >
                     <Users className="w-4 h-4" />
                     User Management
                   </button>
                   <button
-                    onClick={() => setActiveTab('fees_config')}
+                    onClick={() => { setActiveTab('fees_config'); setMenuOpen(false); }}
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'fees_config' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
                   >
                     <ClipboardList className="w-4 h-4" />
