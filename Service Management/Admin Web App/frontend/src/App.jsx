@@ -3077,8 +3077,17 @@ export default function App() {
                             <td className="p-4 text-sm font-semibold text-slate-200">
                               {new Date(f.dueAt).toLocaleDateString('en-GB')}
                             </td>
-                            <td className="p-4 text-sm text-white font-medium">
-                              {f.ticket?.customer?.name || 'N/A'}
+                            <td className="p-4 text-sm font-medium">
+                              {f.ticket?.customer ? (
+                                <button
+                                  onClick={() => viewHistory('customer', f.ticket.customer, 'followups')}
+                                  className="text-violet-400 hover:text-violet-300 font-bold hover:underline cursor-pointer text-left"
+                                >
+                                  {f.ticket.customer.name}
+                                </button>
+                              ) : (
+                                'N/A'
+                              )}
                             </td>
                             <td className="p-4 text-sm text-slate-300">
                               {f.ticket?.customer?.mobile || 'N/A'}
