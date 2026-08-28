@@ -599,6 +599,34 @@ export default function App() {
     setAppliedFiltersSummary(null);
   };
 
+  const handleRaiseTicketForCustomer = (cust) => {
+    setNewRequestForm({
+      dealer: '',
+      type: 'installation',
+      customer: {
+        name: cust.name || '',
+        mobile: cust.mobile || '',
+        alternateMobile: cust.alternateMobile || '',
+        address: cust.address || '',
+        city: cust.city || '',
+        pincode: cust.pincode || ''
+      },
+      product: {
+        category: '',
+        name: '',
+        modelNumber: '',
+        serialNumber: '',
+        purchaseDate: ''
+      },
+      serviceDetails: {
+        description: '',
+        preferredDate: '',
+        preferredTimeSlot: 'anytime'
+      }
+    });
+    setCreateRequestOpen(true);
+  };
+
   const exportToCSV = () => {
     if (reportsData.length === 0) {
       alert('No data to export');
@@ -2545,12 +2573,20 @@ export default function App() {
                               {cust.address} (PIN: {cust.pincode})
                             </td>
                             <td className="py-4 px-6 text-center">
-                              <button
-                                onClick={() => viewHistory('customer', cust, 'customers')}
-                                className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1.5 cursor-pointer transition shadow-sm"
-                              >
-                                <Eye className="w-4 h-4" /> History
-                              </button>
+                              <div className="flex justify-center items-center gap-2">
+                                <button
+                                  onClick={() => viewHistory('customer', cust, 'customers')}
+                                  className="bg-violet-600/20 hover:bg-violet-600 border border-violet-700/30 hover:border-violet-600 text-violet-300 hover:text-white text-xs px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1.5 cursor-pointer transition shadow-sm"
+                                >
+                                  <Eye className="w-4 h-4" /> History
+                                </button>
+                                <button
+                                  onClick={() => handleRaiseTicketForCustomer(cust)}
+                                  className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1.5 cursor-pointer transition shadow-sm"
+                                >
+                                  <Plus className="w-4 h-4" /> Raise Request
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -2621,18 +2657,29 @@ export default function App() {
                   </p>
                 </div>
 
-                {/* Sub-search Inside History */}
-                <div className="relative w-full md:w-80">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <Search className="w-5 h-5 text-slate-400" />
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Search history by ticket, category..."
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-violet-600 focus:border-transparent transition"
-                    value={historySearchQuery}
-                    onChange={e => setHistorySearchQuery(e.target.value)}
-                  />
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Sub-search Inside History */}
+                  <div className="relative w-full md:w-80">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <Search className="w-5 h-5 text-slate-400" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Search history by ticket, category..."
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-violet-600 focus:border-transparent transition"
+                      value={historySearchQuery}
+                      onChange={e => setHistorySearchQuery(e.target.value)}
+                    />
+                  </div>
+                  {historyContext === 'customer' && (
+                    <button
+                      onClick={() => handleRaiseTicketForCustomer(historyEntity)}
+                      className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150 shrink-0"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Raise Request
+                    </button>
+                  )}
                 </div>
               </div>
               
