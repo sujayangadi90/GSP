@@ -82,6 +82,10 @@ const TicketSchema = new mongoose.Schema({
     type: Number,
     min: 0
   },
+  technicianEarning: {
+    type: Number,
+    min: 0
+  },
   closingRemarks: String,
   closedAt: Date,
   timeline: [TimelineSchema]

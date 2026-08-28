@@ -123,6 +123,28 @@ export default function App() {
   const [historySearchQuery, setHistorySearchQuery] = useState('');
 
   // Dashboard Date Filter states
+  // Reports states
+  const [reportTab, setReportTab] = useState('expense');
+  const [reportFilters, setReportFilters] = useState({
+    fromDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    toDate: new Date().toISOString().split('T')[0],
+    dealer: 'ALL',
+    technician: 'ALL',
+    ticketType: 'ALL',
+    category: 'ALL',
+    brand: 'ALL'
+  });
+  const [appliedFiltersSummary, setAppliedFiltersSummary] = useState(null);
+  const [reportsData, setReportsData] = useState([]);
+  const [reportsSummary, setReportsSummary] = useState({
+    totalAmount: 0,
+    completedCount: 0,
+    serviceAmount: 0,
+    installationAmount: 0
+  });
+  const [reportsPage, setReportsPage] = useState(1);
+  const [reportsTotalCount, setReportsTotalCount] = useState(0);
+  const [reportsLoading, setReportsLoading] = useState(false);
   const getLocalDateString = (date = new Date()) => {
     const offset = date.getTimezoneOffset();
     const localDate = new Date(date.getTime() - (offset * 60 * 1000));
@@ -512,6 +534,196 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  const generateReport = async (page = 1) => {
+    setReportsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        reportType: reportTab,
+        fromDate: reportFilters.fromDate,
+        toDate: reportFilters.toDate,
+        dealer: reportFilters.dealer,
+        technician: reportFilters.technician,
+        ticketType: reportFilters.ticketType,
+        category: reportFilters.category,
+        brand: reportFilters.brand,
+        page,
+        limit: 25
+      });
+
+      const res = await fetch(`${API_BASE}/tickets/reports?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        setReportsData(json.data);
+        setReportsSummary(json.summary);
+        setReportsPage(json.page);
+        setReportsTotalCount(json.totalCount);
+        setAppliedFiltersSummary({ ...reportFilters });
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to generate report');
+      }
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Error connecting to backend');
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  const resetReportFilters = () => {
+    const fresh = {
+      fromDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      toDate: new Date().toISOString().split('T')[0],
+      dealer: 'ALL',
+      technician: 'ALL',
+      ticketType: 'ALL',
+      category: 'ALL',
+      brand: 'ALL'
+    };
+    setReportFilters(fresh);
+    setReportsData([]);
+    setReportsSummary({
+      totalAmount: 0,
+      completedCount: 0,
+      serviceAmount: 0,
+      installationAmount: 0
+    });
+    setReportsPage(1);
+    setReportsTotalCount(0);
+    setAppliedFiltersSummary(null);
+  };
+
+  const exportToCSV = () => {
+    if (reportsData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const headers = reportTab === 'expense' 
+      ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense']
+      : ['Ticket ID', 'Completed Date', 'Technician', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician Earning'];
+
+    const rows = reportsData.map(t => {
+      const completedDate = t.adminVerification?.verifiedAt 
+        ? new Date(t.adminVerification.verifiedAt).toLocaleDateString('en-GB') 
+        : t.closedAt 
+          ? new Date(t.closedAt).toLocaleDateString('en-GB') 
+          : new Date(t.updatedAt).toLocaleDateString('en-GB');
+
+      const expVal = reportTab === 'expense' ? t.dealerExpense : t.technicianEarning;
+      const amountStr = typeof expVal === 'number' ? `₹${expVal}` : expVal;
+
+      return reportTab === 'expense' ? [
+        t.ticketNumber || '—',
+        completedDate,
+        t.dealer?.name || '—',
+        (t.type || '—').toUpperCase(),
+        t.product?.category || '—',
+        t.product?.name || '—',
+        t.customer?.name || '—',
+        t.assignedTechnician?.name || '—',
+        amountStr
+      ] : [
+        t.ticketNumber || '—',
+        completedDate,
+        t.assignedTechnician?.name || '—',
+        t.dealer?.name || '—',
+        (t.type || '—').toUpperCase(),
+        t.product?.category || '—',
+        t.product?.name || '—',
+        t.customer?.name || '—',
+        amountStr
+      ];
+    });
+
+    const totalRow = reportTab === 'expense'
+      ? ['TOTAL EXPENSE', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`]
+      : ['TOTAL EARNINGS', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`];
+    
+    rows.push(totalRow);
+
+    const csvContent = [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${reportTab === 'expense' ? 'expense_report' : 'earning_report'}_${reportFilters.fromDate}_to_${reportFilters.toDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToExcel = () => {
+    if (reportsData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const headers = reportTab === 'expense' 
+      ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense']
+      : ['Ticket ID', 'Completed Date', 'Technician', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician Earning'];
+
+    const rows = reportsData.map(t => {
+      const completedDate = t.adminVerification?.verifiedAt 
+        ? new Date(t.adminVerification.verifiedAt).toLocaleDateString('en-GB') 
+        : t.closedAt 
+          ? new Date(t.closedAt).toLocaleDateString('en-GB') 
+          : new Date(t.updatedAt).toLocaleDateString('en-GB');
+
+      const expVal = reportTab === 'expense' ? t.dealerExpense : t.technicianEarning;
+      const amountStr = typeof expVal === 'number' ? `₹${expVal}` : expVal;
+
+      return reportTab === 'expense' ? [
+        t.ticketNumber || '—',
+        completedDate,
+        t.dealer?.name || '—',
+        (t.type || '—').toUpperCase(),
+        t.product?.category || '—',
+        t.product?.name || '—',
+        t.customer?.name || '—',
+        t.assignedTechnician?.name || '—',
+        amountStr
+      ] : [
+        t.ticketNumber || '—',
+        completedDate,
+        t.assignedTechnician?.name || '—',
+        t.dealer?.name || '—',
+        (t.type || '—').toUpperCase(),
+        t.product?.category || '—',
+        t.product?.name || '—',
+        t.customer?.name || '—',
+        amountStr
+      ];
+    });
+
+    const totalRow = reportTab === 'expense'
+      ? ['TOTAL EXPENSE', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`]
+      : ['TOTAL EARNINGS', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`];
+    
+    rows.push(totalRow);
+
+    const xlsContent = [headers.join('\t'), ...rows.map(e => e.join('\t'))].join('\n');
+    const blob = new Blob([xlsContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${reportTab === 'expense' ? 'expense_report' : 'earning_report'}_${reportFilters.fromDate}_to_${reportFilters.toDate}.xls`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      resetReportFilters();
+    }
+  }, [activeTab, reportTab]);
 
   // Run searches / filters trigger reload
   useEffect(() => {
@@ -1229,6 +1441,15 @@ export default function App() {
             >
               <Calendar className="w-5 h-5" />
               Follow-ups
+            </button>
+          )}
+          {(!user || user.role === 'admin') && (
+            <button
+              onClick={() => { setActiveTab('reports'); setMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'reports' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <ClipboardList className="w-5 h-5" />
+              Reports
             </button>
           )}
           {(!user || user.permissions?.settings !== false) && (
@@ -2858,7 +3079,7 @@ export default function App() {
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
                           page === followUpPage
                             ? 'bg-violet-600 text-white shadow-md'
-                            : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
+                            : 'bg-slate-850 text-slate-355 hover:bg-slate-800 hover:text-white'
                         }`}
                       >
                         {page}
@@ -2874,6 +3095,391 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Reports Tab */}
+          {activeTab === 'reports' && (
+            <div className="space-y-8">
+              {/* Page Title */}
+              <div>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight">Reports</h1>
+                <p className="text-slate-400 mt-1">Generate and export business financial reports</p>
+              </div>
+
+              {/* Tab Selector */}
+              <div className="flex border-b border-slate-800">
+                <button
+                  onClick={() => { setReportTab('expense'); setReportsData([]); setAppliedFiltersSummary(null); }}
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer ${
+                    reportTab === 'expense'
+                      ? 'border-violet-500 text-violet-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Expense Report
+                </button>
+                <button
+                  onClick={() => { setReportTab('earning'); setReportsData([]); setAppliedFiltersSummary(null); }}
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer ${
+                    reportTab === 'earning'
+                      ? 'border-violet-500 text-violet-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Earning Report
+                </button>
+              </div>
+
+              {/* Filters Block */}
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <SlidersHorizontal className="w-5 h-5 text-violet-400" />
+                  {reportTab === 'expense' ? 'Expense Report Filters' : 'Earning Report Filters'}
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* From Date */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">From Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                      value={reportFilters.fromDate}
+                      onChange={e => setReportFilters({ ...reportFilters, fromDate: e.target.value })}
+                    />
+                  </div>
+
+                  {/* To Date */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">To Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                      value={reportFilters.toDate}
+                      onChange={e => setReportFilters({ ...reportFilters, toDate: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Dealer Filter */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Dealer</label>
+                    <select
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                      value={reportFilters.dealer}
+                      onChange={e => setReportFilters({ ...reportFilters, dealer: e.target.value })}
+                    >
+                      <option value="ALL">ALL DEALERS</option>
+                      {dealers.map(d => (
+                        <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Technician Filter (Only show for Earning Report) */}
+                  {reportTab === 'earning' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Technician</label>
+                      <select
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                        value={reportFilters.technician}
+                        onChange={e => setReportFilters({ ...reportFilters, technician: e.target.value })}
+                      >
+                        <option value="ALL">ALL TECHNICIANS</option>
+                        {technicians.map(t => (
+                          <option key={t._id} value={t._id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Ticket Type */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Ticket Type</label>
+                    <select
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                      value={reportFilters.ticketType}
+                      onChange={e => setReportFilters({ ...reportFilters, ticketType: e.target.value })}
+                    >
+                      <option value="ALL">ALL</option>
+                      <option value="SERVICE">SERVICE</option>
+                      <option value="INSTALLATION">INSTALLATION</option>
+                    </select>
+                  </div>
+
+                  {/* Appliance Category */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Appliance Category</label>
+                    <select
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                      value={reportFilters.category}
+                      onChange={e => setReportFilters({ ...reportFilters, category: e.target.value })}
+                    >
+                      <option value="ALL">ALL CATEGORIES</option>
+                      {appliances.map(a => (
+                        <option key={a._id} value={a.name}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Brand */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Brand</label>
+                    <select
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                      value={reportFilters.brand}
+                      onChange={e => setReportFilters({ ...reportFilters, brand: e.target.value })}
+                    >
+                      <option value="ALL">ALL BRANDS</option>
+                      {Array.from(new Set(brands.map(b => b.name))).map(brandName => (
+                        <option key={brandName} value={brandName}>{brandName}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    onClick={resetReportFilters}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-5 py-2.5 rounded-xl text-sm font-bold transition cursor-pointer"
+                  >
+                    RESET
+                  </button>
+                  <button
+                    onClick={() => generateReport(1)}
+                    className="bg-violet-600 hover:bg-violet-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition cursor-pointer"
+                  >
+                    GENERATE REPORT
+                  </button>
+                </div>
+              </div>
+
+              {/* Report Content */}
+              {reportsLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-violet-600"></div>
+                  <p className="text-slate-400 text-sm font-medium">Generating report...</p>
+                </div>
+              ) : appliedFiltersSummary ? (
+                <div className="space-y-6">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        {reportTab === 'expense' ? 'TOTAL EXPENSE' : 'TOTAL EARNINGS'}
+                      </span>
+                      <span className="text-2xl font-black text-white mt-2">
+                        ₹ {reportsSummary.totalAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">COMPLETED TICKETS</span>
+                      <span className="text-2xl font-black text-white mt-2">{reportsSummary.completedCount}</span>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        {reportTab === 'expense' ? 'SERVICE EXPENSE' : 'SERVICE EARNINGS'}
+                      </span>
+                      <span className="text-2xl font-black text-violet-400 mt-2">
+                        ₹ {reportsSummary.serviceAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        {reportTab === 'expense' ? 'INSTALLATION EXPENSE' : 'INSTALLATION EARNINGS'}
+                      </span>
+                      <span className="text-2xl font-black text-indigo-400 mt-2">
+                        ₹ {reportsSummary.installationAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Applied Filters Summary & Export Block */}
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Applied Filters</p>
+                      <div className="text-sm text-slate-200 font-semibold space-y-0.5">
+                        <div>Period: <span className="text-slate-400">{new Date(appliedFiltersSummary.fromDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – {new Date(appliedFiltersSummary.toDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
+                        <div>Dealer: <span className="text-slate-400">{appliedFiltersSummary.dealer === 'ALL' ? 'All Dealers' : dealers.find(d => d._id === appliedFiltersSummary.dealer)?.name || 'N/A'}</span></div>
+                        {reportTab === 'earning' && (
+                          <div>Technician: <span className="text-slate-400">{appliedFiltersSummary.technician === 'ALL' ? 'All Technicians' : technicians.find(t => t._id === appliedFiltersSummary.technician)?.name || 'N/A'}</span></div>
+                        )}
+                        <div>Type: <span className="text-slate-400 capitalize">{appliedFiltersSummary.ticketType}</span></div>
+                        <div>Category: <span className="text-slate-400">{appliedFiltersSummary.category}</span></div>
+                        <div>Brand: <span className="text-slate-400">{appliedFiltersSummary.brand}</span></div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={exportToCSV}
+                        className="bg-slate-800 hover:bg-slate-700 text-white text-xs px-4 py-2.5 rounded-lg font-bold transition cursor-pointer"
+                      >
+                        EXPORT CSV
+                      </button>
+                      <button
+                        onClick={exportToExcel}
+                        className="bg-slate-800 hover:bg-slate-700 text-white text-xs px-4 py-2.5 rounded-lg font-bold transition cursor-pointer"
+                      >
+                        EXPORT EXCEL
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Report Data Table */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-800/50 border-b border-slate-800">
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ticket ID</th>
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Completed Date</th>
+                            {reportTab === 'expense' ? (
+                              <>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Dealer</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ticket Type</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Appliance Category</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Brand</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Technician</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Dealer Expense</th>
+                              </>
+                            ) : (
+                              <>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Technician</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Dealer</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ticket Type</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Appliance Category</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Brand</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Technician Earning</th>
+                              </>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                          {reportsData.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} className="p-8 text-center text-slate-500 text-sm font-medium">
+                                {reportTab === 'expense' ? 'No expense records found' : 'No earning records found'}
+                              </td>
+                            </tr>
+                          ) : (
+                            reportsData.map(t => {
+                              const completedDate = t.adminVerification?.verifiedAt 
+                                ? new Date(t.adminVerification.verifiedAt).toLocaleDateString('en-GB') 
+                                : t.closedAt 
+                                  ? new Date(t.closedAt).toLocaleDateString('en-GB') 
+                                  : new Date(t.updatedAt).toLocaleDateString('en-GB');
+
+                              const expVal = reportTab === 'expense' ? t.dealerExpense : t.technicianEarning;
+                              const amountText = typeof expVal === 'number' ? `₹ ${expVal}` : expVal;
+
+                              return (
+                                <tr key={t._id} className="hover:bg-slate-800/20 transition duration-150">
+                                  <td className="p-4 text-sm font-bold text-white">
+                                    <button 
+                                      onClick={() => setSelectedTicket(t)}
+                                      className="hover:text-violet-400 transition cursor-pointer text-left"
+                                    >
+                                      {t.ticketNumber}
+                                    </button>
+                                  </td>
+                                  <td className="p-4 text-sm text-slate-300">{completedDate}</td>
+                                  {reportTab === 'expense' ? (
+                                    <>
+                                      <td className="p-4 text-sm text-slate-200 font-medium">{t.dealer?.name || 'N/A'}</td>
+                                      <td className="p-4 text-sm">
+                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${t.type === 'service' ? 'bg-amber-950 text-amber-400' : 'bg-blue-950 text-blue-400'}`}>
+                                          {(t.type || '').toUpperCase()}
+                                        </span>
+                                      </td>
+                                      <td className="p-4 text-sm text-slate-300">{t.product?.category || 'N/A'}</td>
+                                      <td className="p-4 text-sm text-slate-300">{t.product?.name || 'N/A'}</td>
+                                      <td className="p-4 text-sm text-slate-300">{t.customer?.name || 'N/A'}</td>
+                                      <td className="p-4 text-sm text-slate-300">{t.assignedTechnician?.name || 'N/A'}</td>
+                                      <td className={`p-4 text-sm text-right font-bold ${expVal === 'Fee Not Configured' ? 'text-red-400' : 'text-violet-400'}`}>
+                                        {amountText}
+                                      </td>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <td className="p-4 text-sm text-slate-200 font-medium">{t.assignedTechnician?.name || 'N/A'}</td>
+                                      <td className="p-4 text-sm text-slate-300">{t.dealer?.name || 'N/A'}</td>
+                                      <td className="p-4 text-sm">
+                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${t.type === 'service' ? 'bg-amber-950 text-amber-400' : 'bg-blue-950 text-blue-400'}`}>
+                                          {(t.type || '').toUpperCase()}
+                                        </span>
+                                      </td>
+                                      <td className="p-4 text-sm text-slate-300">{t.product?.category || 'N/A'}</td>
+                                      <td className="p-4 text-sm text-slate-300">{t.product?.name || 'N/A'}</td>
+                                      <td className="p-4 text-sm text-slate-300">{t.customer?.name || 'N/A'}</td>
+                                      <td className={`p-4 text-sm text-right font-bold ${expVal === 'Fee Not Configured' ? 'text-red-400' : 'text-emerald-400'}`}>
+                                        {amountText}
+                                      </td>
+                                    </>
+                                  )}
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination / Total Block */}
+                    {reportsData.length > 0 && (
+                      <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-slate-300">
+                            {reportTab === 'expense' ? 'TOTAL EXPENSE:' : 'TOTAL EARNINGS:'}
+                          </span>
+                          <span className="text-lg font-black text-white">
+                            ₹ {reportsSummary.totalAmount.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between flex-wrap gap-4">
+                          <div className="text-xs text-slate-400">
+                            Showing <span className="font-semibold text-slate-200">{(reportsPage - 1) * 25 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(reportsPage * 25, reportsTotalCount)}</span> of <span className="font-semibold text-slate-200">{reportsTotalCount}</span> records
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => generateReport(reportsPage - 1)}
+                              disabled={reportsPage === 1}
+                              className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold cursor-pointer"
+                            >
+                              Previous
+                            </button>
+                            {Array.from({ length: Math.ceil(reportsTotalCount / 25) }, (_, i) => i + 1).map(page => (
+                              <button
+                                key={page}
+                                onClick={() => generateReport(page)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                                  page === reportsPage
+                                    ? 'bg-violet-600 text-white shadow-md'
+                                    : 'bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white'
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            ))}
+                            <button
+                              onClick={() => generateReport(reportsPage + 1)}
+                              disabled={reportsPage === Math.max(1, Math.ceil(reportsTotalCount / 25))}
+                              className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-355 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold cursor-pointer"
+                            >
+                              Next
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
         </main>

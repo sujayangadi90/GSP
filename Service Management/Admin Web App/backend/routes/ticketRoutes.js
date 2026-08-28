@@ -11,13 +11,17 @@ const {
   cancelTicket,
   getCustomers,
   getDashboardStats,
-  sendCustomAdminMessage
+  sendCustomAdminMessage,
+  getReports
 } = require('../controllers/ticketController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const router = express.Router();
 
 router.use(protect);
+
+router.route('/reports')
+  .get(authorize('admin'), getReports);
 
 // Unified routes for query & create
 router.route('/')

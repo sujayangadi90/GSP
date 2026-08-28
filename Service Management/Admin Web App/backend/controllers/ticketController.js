@@ -106,8 +106,25 @@ const attachFeesToTickets = async (tickets) => {
           ticketObj.dealerExpense = 'Fee Not Configured';
         }
       }
+
+      if (ticketObj.technicianEarning !== undefined && ticketObj.technicianEarning !== null) {
+        // Use historical snapshot
+      } else {
+        if (brandObj) {
+          if (ticketObj.type === 'service') {
+            ticketObj.technicianEarning = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured';
+          } else if (ticketObj.type === 'installation') {
+            ticketObj.technicianEarning = brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured';
+          } else {
+            ticketObj.technicianEarning = 'Fee Not Configured';
+          }
+        } else {
+          ticketObj.technicianEarning = 'Fee Not Configured';
+        }
+      }
     } else {
       ticketObj.dealerExpense = 0;
+      ticketObj.technicianEarning = 0;
     }
 
     return ticketObj;
@@ -347,25 +364,11 @@ const getTickets = async (req, res) => {
           'completion.submittedAt': { $gte: start, $lte: end }
         });
 
-        const brandsList = await Brand.find().populate('appliance');
-        const brandMap = {};
-        brandsList.forEach(b => {
-          const appName = b.appliance ? b.appliance.name.trim().toLowerCase() : '';
-          const bName = b.name.trim().toLowerCase();
-          brandMap[`${appName}_${bName}`] = b;
-        });
-
+        const completedTicketsWithFees = await attachFeesToTickets(completedTicketsForEarnings);
         let earnings = 0;
-        completedTicketsForEarnings.forEach(t => {
-          const appName = t.product.category ? t.product.category.trim().toLowerCase() : '';
-          const bName = t.product.name ? t.product.name.trim().toLowerCase() : '';
-          const brandObj = brandMap[`${appName}_${bName}`];
-          if (brandObj) {
-            if (t.type === 'service') {
-              earnings += (brandObj.serviceFee || 0);
-            } else if (t.type === 'installation') {
-              earnings += (brandObj.installationFee || 0);
-            }
+        completedTicketsWithFees.forEach(t => {
+          if (typeof t.technicianEarning === 'number') {
+            earnings += t.technicianEarning;
           }
         });
 
@@ -518,8 +521,25 @@ const getTicketById = async (req, res) => {
           ticketObj.dealerExpense = 'Fee Not Configured';
         }
       }
+
+      if (ticketObj.technicianEarning !== undefined && ticketObj.technicianEarning !== null) {
+        // Use snapshot
+      } else {
+        if (brandObj && brandObj.appliance) {
+          if (ticketObj.type === 'service') {
+            ticketObj.technicianEarning = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured';
+          } else if (ticketObj.type === 'installation') {
+            ticketObj.technicianEarning = brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured';
+          } else {
+            ticketObj.technicianEarning = 'Fee Not Configured';
+          }
+        } else {
+          ticketObj.technicianEarning = 'Fee Not Configured';
+        }
+      }
     } else {
       ticketObj.dealerExpense = 0;
+      ticketObj.technicianEarning = 0;
     }
 
     res.json(ticketObj);
@@ -721,11 +741,14 @@ const verifyWork = async (req, res) => {
         if (brandObj && brandObj.appliance) {
           if (ticket.type === 'service') {
             ticket.dealerExpense = brandObj.serviceFee !== undefined ? brandObj.serviceFee : null;
+            ticket.technicianEarning = brandObj.serviceFee !== undefined ? brandObj.serviceFee : null;
           } else if (ticket.type === 'installation') {
             ticket.dealerExpense = brandObj.installationFee !== undefined ? brandObj.installationFee : null;
+            ticket.technicianEarning = brandObj.installationFee !== undefined ? brandObj.installationFee : null;
           }
         } else {
           ticket.dealerExpense = null;
+          ticket.technicianEarning = null;
         }
       } catch (err) {
         console.error('Error snapshotting fee on ticket completion:', err.message);
@@ -1056,6 +1079,110 @@ const sendCustomAdminMessage = async (req, res) => {
   }
 };
 
+const getReports = async (req, res) => {
+  try {
+    const { reportType, fromDate, toDate, dealer, technician, ticketType, category, brand, page, limit } = req.query;
+
+    if (!reportType || !fromDate || !toDate) {
+      return res.status(400).json({ message: 'reportType, fromDate, and toDate are required' });
+    }
+
+    const start = new Date(`${fromDate}T00:00:00`);
+    const end = new Date(`${toDate}T23:59:59.999`);
+
+    const query = {
+      status: { $in: ['completed', 'closed'] },
+      $or: [
+        { 'adminVerification.verifiedAt': { $gte: start, $lte: end } },
+        { 'adminVerification.verifiedAt': { $exists: false }, updatedAt: { $gte: start, $lte: end } },
+        { closedAt: { $gte: start, $lte: end } }
+      ]
+    };
+
+    if (dealer && dealer !== 'ALL') {
+      query.dealer = dealer;
+    }
+
+    if (technician && technician !== 'ALL') {
+      query.assignedTechnician = technician;
+    }
+
+    if (ticketType && ticketType !== 'ALL') {
+      query.type = ticketType.toLowerCase();
+    }
+
+    if (category && category !== 'ALL') {
+      query['product.category'] = { $regex: new RegExp(`^${category.trim()}$`, 'i') };
+    }
+
+    if (brand && brand !== 'ALL') {
+      query['product.name'] = { $regex: new RegExp(`^${brand.trim()}$`, 'i') };
+    }
+
+    const allMatchingTickets = await Ticket.find(query)
+      .populate('dealer', 'name code')
+      .populate('assignedTechnician', 'name');
+
+    const allTicketsWithFees = await attachFeesToTickets(allMatchingTickets);
+
+    let totalAmount = 0;
+    let serviceAmount = 0;
+    let installationAmount = 0;
+    let completedCount = 0;
+
+    allTicketsWithFees.forEach(t => {
+      const exp = reportType === 'expense' ? t.dealerExpense : t.technicianEarning;
+      if (typeof exp === 'number') {
+        totalAmount += exp;
+        completedCount++;
+        if (t.type === 'service') {
+          serviceAmount += exp;
+        } else if (t.type === 'installation') {
+          serviceAmount += exp; // wait! If type is installation, add to installationAmount! Oh wait: serviceAmount += exp if type == service, else installationAmount += exp!
+        }
+      }
+    });
+
+    // Let's fix that block:
+    serviceAmount = 0;
+    installationAmount = 0;
+    allTicketsWithFees.forEach(t => {
+      const exp = reportType === 'expense' ? t.dealerExpense : t.technicianEarning;
+      if (typeof exp === 'number') {
+        totalAmount += exp;
+        completedCount++;
+        if (t.type === 'service') {
+          serviceAmount += exp;
+        } else if (t.type === 'installation') {
+          installationAmount += exp;
+        }
+      }
+    });
+
+    const p = parseInt(page, 10) || 1;
+    const l = parseInt(limit, 10) || 25;
+    const skip = (p - 1) * l;
+
+    const paginatedTickets = allTicketsWithFees.slice(skip, skip + l);
+
+    res.json({
+      data: paginatedTickets,
+      summary: {
+        totalAmount,
+        completedCount: allMatchingTickets.length,
+        serviceAmount,
+        installationAmount
+      },
+      page: p,
+      limit: l,
+      totalCount: allMatchingTickets.length,
+      hasMore: (skip + paginatedTickets.length) < allMatchingTickets.length
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createTicket,
   getTickets,
@@ -1068,5 +1195,6 @@ module.exports = {
   cancelTicket,
   getCustomers,
   getDashboardStats,
-  sendCustomAdminMessage
+  sendCustomAdminMessage,
+  getReports
 };
