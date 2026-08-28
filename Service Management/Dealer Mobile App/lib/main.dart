@@ -617,34 +617,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6366F1).withOpacity(0.12),
-                          border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.35)),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Expenses',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF818CF8),
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ExpenseHistoryScreen(
+                                token: widget.token,
+                                apiUrl: widget.apiUrl,
+                                dealerCode: widget.user['code'] ?? '—',
+                                initialMonth: _selectedMonth,
+                                initialYear: _selectedYear,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '₹ ${_expenses.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                              style: const TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
+                          ).then((_) => _loadStats());
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withOpacity(0.12),
+                            border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.35)),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Expenses',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF818CF8),
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              Text(
+                                '₹ ${_expenses.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -2021,6 +2038,483 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class ExpenseHistoryScreen extends StatefulWidget {
+  final String token;
+  final String apiUrl;
+  final String dealerCode;
+  final int initialMonth;
+  final int initialYear;
+
+  const ExpenseHistoryScreen({
+    super.key,
+    required this.token,
+    required this.apiUrl,
+    required this.dealerCode,
+    required this.initialMonth,
+    required this.initialYear,
+  });
+
+  @override
+  State<ExpenseHistoryScreen> createState() => _ExpenseHistoryScreenState();
+}
+
+class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
+  late int _selectedMonth;
+  late int _selectedYear;
+  String _selectedType = 'ALL'; // 'ALL', 'SERVICE', 'INSTALLATION'
+  List<dynamic> _allCompletedTickets = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMonth = widget.initialMonth;
+    _selectedYear = widget.initialYear;
+    _loadExpenses();
+  }
+
+  Future<void> _loadExpenses() async {
+    setState(() => _isLoading = true);
+    try {
+      final firstDay = DateTime(_selectedYear, _selectedMonth, 1);
+      final lastDay = DateTime(_selectedYear, _selectedMonth + 1, 0);
+      final fromDateStr = "${firstDay.year}-${firstDay.month.toString().padLeft(2, '0')}-01";
+      final toDateStr = "${lastDay.year}-${lastDay.month.toString().padLeft(2, '0')}-${lastDay.day.toString().padLeft(2, '0')}";
+
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/tickets?fromDate=$fromDateStr&toDate=$toDateStr'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}'
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final List tickets = jsonDecode(res.body);
+        final filtered = tickets.where((t) {
+          final s = t['status']?.toString().toLowerCase() ?? '';
+          if (s == 'completed' || s == 'closed') {
+            final exp = t['dealerExpense'];
+            return exp != null;
+          }
+          return false;
+        }).toList();
+
+        setState(() {
+          _allCompletedTickets = filtered;
+        });
+      }
+    } catch (e) {
+      print('Error fetching expenses: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<dynamic> get _filteredTickets {
+    if (_selectedType == 'ALL') {
+      return _allCompletedTickets;
+    }
+    return _allCompletedTickets.where((t) {
+      final type = t['type']?.toString().toUpperCase() ?? '';
+      return type == _selectedType;
+    }).toList();
+  }
+
+  double get _totalExpenses {
+    double total = 0.0;
+    for (var t in _filteredTickets) {
+      final exp = t['dealerExpense'];
+      if (exp is num) {
+        total += exp.toDouble();
+      }
+    }
+    return total;
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return '—';
+    try {
+      final parsed = DateTime.parse(dateStr).toLocal();
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  Widget _buildTypeFilterButton(String type) {
+    final isSelected = _selectedType == type;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedType = type;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF6366F1) : const Color(0xFF1E1B24),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF818CF8) : Colors.blueGrey.withOpacity(0.15),
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            type,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: isSelected ? Colors.white : Colors.white70,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTicketCard(Map<String, dynamic> ticket) {
+    final ticketId = ticket['ticketNumber'] ?? '—';
+    final type = ticket['type']?.toString().toUpperCase() ?? '—';
+    final category = ticket['product']?['category'] ?? '—';
+    final brand = ticket['product']?['name'] ?? '—';
+    final customer = ticket['customer']?['name'] ?? '—';
+
+    String completedDate = '—';
+    if (ticket['adminVerification']?['verifiedAt'] != null) {
+      completedDate = _formatDate(ticket['adminVerification']['verifiedAt'].toString());
+    } else if (ticket['closedAt'] != null) {
+      completedDate = _formatDate(ticket['closedAt'].toString());
+    } else if (ticket['updatedAt'] != null) {
+      completedDate = _formatDate(ticket['updatedAt'].toString());
+    }
+
+    final exp = ticket['dealerExpense'];
+    String expenseText = '';
+    if (exp == 'Fee Not Configured') {
+      expenseText = 'Fee Not Configured';
+    } else if (exp is num) {
+      expenseText = '₹ ${exp.toInt()}';
+    } else {
+      expenseText = 'Fee Not Configured';
+    }
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TicketDetailsScreen(
+              ticketId: ticket['_id'],
+              token: widget.token,
+              apiUrl: widget.apiUrl,
+            ),
+          ),
+        ).then((_) => _loadExpenses());
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1B24),
+          border: Border.all(color: Colors.blueGrey.withOpacity(0.15)),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  ticketId,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: type == 'INSTALLATION' 
+                        ? const Color(0xFF0E7490).withOpacity(0.2) 
+                        : const Color(0xFFB45309).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: type == 'INSTALLATION' 
+                          ? const Color(0xFF22D3EE).withOpacity(0.4) 
+                          : const Color(0xFFFBBF24).withOpacity(0.4),
+                    ),
+                  ),
+                  child: Text(
+                    type,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: type == 'INSTALLATION' ? const Color(0xFF22D3EE) : const Color(0xFFFBBF24),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '$category • $brand',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white.withOpacity(0.9)),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Customer', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    const SizedBox(height: 2),
+                    Text(customer, style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.75), fontWeight: FontWeight.w500)),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text('Completed', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    const SizedBox(height: 2),
+                    Text(completedDate, style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.75), fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ],
+            ),
+            const Divider(color: Colors.white10, height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Dealer Expense',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white70),
+                ),
+                Text(
+                  expenseText,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: expenseText == 'Fee Not Configured' ? Colors.redAccent : const Color(0xFF818CF8),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredTickets;
+
+    Widget listBody;
+    if (_isLoading) {
+      listBody = const Center(child: CircularProgressIndicator());
+    } else if (filtered.isEmpty) {
+      final monthsList = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      final monthName = monthsList[_selectedMonth - 1];
+      
+      String emptyMessage = '';
+      if (_selectedType == 'ALL') {
+        emptyMessage = 'No expenses found for $monthName $_selectedYear.';
+      } else if (_selectedType == 'SERVICE') {
+        emptyMessage = 'No service expenses found.';
+      } else if (_selectedType == 'INSTALLATION') {
+        emptyMessage = 'No installation expenses found.';
+      }
+
+      listBody = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Text(
+            emptyMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+        ),
+      );
+    } else {
+      listBody = ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: filtered.length,
+        itemBuilder: (context, idx) => _buildTicketCard(filtered[idx]),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Expense History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text('Dealer Code: ${widget.dealerCode}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadExpenses,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      value: _selectedMonth,
+                      decoration: InputDecoration(
+                        labelText: 'Month',
+                        labelStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                        filled: true,
+                        fillColor: const Color(0xFF0F172A),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF334155)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF334155)),
+                        ),
+                      ),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      dropdownColor: const Color(0xFF0F172A),
+                      items: const [
+                        DropdownMenuItem(value: 1, child: Text('Jan')),
+                        DropdownMenuItem(value: 2, child: Text('Feb')),
+                        DropdownMenuItem(value: 3, child: Text('Mar')),
+                        DropdownMenuItem(value: 4, child: Text('Apr')),
+                        DropdownMenuItem(value: 5, child: Text('May')),
+                        DropdownMenuItem(value: 6, child: Text('Jun')),
+                        DropdownMenuItem(value: 7, child: Text('Jul')),
+                        DropdownMenuItem(value: 8, child: Text('Aug')),
+                        DropdownMenuItem(value: 9, child: Text('Sep')),
+                        DropdownMenuItem(value: 10, child: Text('Oct')),
+                        DropdownMenuItem(value: 11, child: Text('Nov')),
+                        DropdownMenuItem(value: 12, child: Text('Dec')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _selectedMonth = val;
+                          });
+                          _loadExpenses();
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      value: _selectedYear,
+                      decoration: InputDecoration(
+                        labelText: 'Year',
+                        labelStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                        filled: true,
+                        fillColor: const Color(0xFF0F172A),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF334155)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF334155)),
+                        ),
+                      ),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      dropdownColor: const Color(0xFF0F172A),
+                      items: [2024, 2025, 2026, 2027, 2028].map((y) {
+                        return DropdownMenuItem(value: y, child: Text(y.toString()));
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _selectedYear = val;
+                          });
+                          _loadExpenses();
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withOpacity(0.12),
+                        border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.35)),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('TOTAL EXPENSES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF818CF8))),
+                          const SizedBox(height: 8),
+                          Text(
+                            '₹ ${_totalExpenses.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.12),
+                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.35)),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('COMPLETED TICKETS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF34D399))),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${filtered.length}',
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  _buildTypeFilterButton('ALL'),
+                  const SizedBox(width: 10),
+                  _buildTypeFilterButton('SERVICE'),
+                  const SizedBox(width: 10),
+                  _buildTypeFilterButton('INSTALLATION'),
+                ],
+              ),
+              const SizedBox(height: 24),
+              listBody,
+            ],
+          ),
+        ),
       ),
     );
   }
