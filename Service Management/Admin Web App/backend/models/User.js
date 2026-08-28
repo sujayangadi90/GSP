@@ -43,6 +43,10 @@ const UserSchema = new mongoose.Schema({
     followups: { type: Boolean, default: true },
     settings: { type: Boolean, default: true }
   },
+  appliances: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Appliance'
+  }],
   fcmTokens: [String]
 }, { timestamps: true });
 

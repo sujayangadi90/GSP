@@ -20,7 +20,7 @@ const getTechnicians = async (req, res) => {
       ];
     }
 
-    const technicians = await User.find(query).select('-password').sort({ createdAt: -1 });
+    const technicians = await User.find(query).populate('appliances', 'name').select('-password').sort({ createdAt: -1 });
     res.json(technicians);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -31,7 +31,7 @@ const getTechnicians = async (req, res) => {
 // @route   POST /api/technicians
 // @access  Private/Admin
 const addTechnician = async (req, res) => {
-  const { name, mobile, email, password } = req.body;
+  const { name, mobile, email, password, appliances } = req.body;
 
   try {
     const techExists = await User.findOne({ email });
@@ -56,7 +56,8 @@ const addTechnician = async (req, res) => {
       email,
       password: password || 'tech@123', // default password if not provided
       role: 'technician',
-      code
+      code,
+      appliances: appliances || []
     });
 
     res.status(201).json({
@@ -64,7 +65,8 @@ const addTechnician = async (req, res) => {
       name: technician.name,
       code: technician.code,
       email: technician.email,
-      mobile: technician.mobile
+      mobile: technician.mobile,
+      appliances: technician.appliances
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -84,6 +86,9 @@ const updateTechnician = async (req, res) => {
     technician.name = req.body.name || technician.name;
     technician.mobile = req.body.mobile || technician.mobile;
     technician.email = req.body.email || technician.email;
+    if (req.body.appliances !== undefined) {
+      technician.appliances = req.body.appliances;
+    }
 
     if (req.body.password) {
       technician.password = req.body.password;
@@ -96,7 +101,8 @@ const updateTechnician = async (req, res) => {
       code: updatedTech.code,
       email: updatedTech.email,
       mobile: updatedTech.mobile,
-      status: updatedTech.status
+      status: updatedTech.status,
+      appliances: updatedTech.appliances
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
