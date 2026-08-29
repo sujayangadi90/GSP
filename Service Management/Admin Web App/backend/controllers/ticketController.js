@@ -37,6 +37,7 @@ const createTicket = async (req, res) => {
     invoiceImage
   } = req.body;
 
+  try {
     let ticketDealer = null;
     let ticketSource = 'dealer';
     if (req.user.role === 'admin') {
