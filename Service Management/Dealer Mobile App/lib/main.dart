@@ -940,6 +940,8 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
       if (widget.type == 'service') {
         request.fields['serviceDetails[description]'] = _serviceDesc.text.trim();
         request.fields['serviceDetails[priority]'] = _priority;
+      } else {
+        request.fields['installationDetails[priority]'] = _priority;
       }
 
       if (_visitDateController.text.isNotEmpty) {
@@ -1123,11 +1125,22 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                     _buildSectionHeader('Service Details'),
                     _buildTextField(_serviceDesc, 'Problem Description', maxLines: 3, required: false),
                     const SizedBox(height: 8),
-                    const Text('Priority', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    const Text('Priority *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
                     Row(
                       children: [
                         _buildPriorityRadio('low', 'Low'),
-                        _buildPriorityRadio('medium', 'Medium'),
+                        _buildPriorityRadio('medium', 'Mid'),
+                        _buildPriorityRadio('high', 'High'),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 24),
+                    _buildSectionHeader('Installation Details'),
+                    const Text('Priority *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
+                    Row(
+                      children: [
+                        _buildPriorityRadio('low', 'Low'),
+                        _buildPriorityRadio('medium', 'Mid'),
                         _buildPriorityRadio('high', 'High'),
                       ],
                     ),
@@ -1619,6 +1632,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
 
   Widget _buildTicketCard(Map<String, dynamic> t) {
     final status = t['status'] ?? 'new';
+    final priority = (t['installationDetails']?['priority'] ?? t['serviceDetails']?['priority'] ?? 'medium').toString().toLowerCase();
     Color statusColor = Colors.blue;
     if (status == 'assigned') statusColor = Colors.amber;
     if (status == 'in_progress') statusColor = Colors.orange;
@@ -1638,16 +1652,51 @@ class _TicketListScreenState extends State<TicketListScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(t['ticketNumber'] ?? 'TKT-????', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                status.replaceAll('_', ' ').toUpperCase(),
-                style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
-              ),
+            Row(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: (priority == 'high'
+                        ? Colors.red
+                        : priority == 'low'
+                            ? Colors.blueGrey
+                            : Colors.amber).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: (priority == 'high'
+                          ? Colors.redAccent
+                          : priority == 'low'
+                              ? Colors.grey
+                              : Colors.amberAccent).withOpacity(0.5),
+                    ),
+                  ),
+                  child: Text(
+                    priority == 'medium' ? 'MID PRIORITY' : '${priority.toUpperCase()} PRIORITY',
+                    style: TextStyle(
+                      color: priority == 'high'
+                          ? Colors.redAccent
+                          : priority == 'low'
+                              ? Colors.grey[300]
+                              : Colors.amberAccent,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    status.replaceAll('_', ' ').toUpperCase(),
+                    style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1762,6 +1811,8 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
               'Name: ${_ticket!['product']['name']}',
               'Model: ${_ticket!['product']['modelNumber'] ?? 'N/A'}',
               'Serial: ${_ticket!['product']['serialNumber'] ?? 'N/A'}',
+              'Scope: ${_ticket!['type'].toString().toUpperCase()}',
+              'Priority: ${((_ticket!['installationDetails']?['priority'] ?? _ticket!['serviceDetails']?['priority'] ?? 'medium').toString()).toLowerCase() == 'medium' ? 'MID' : ((_ticket!['installationDetails']?['priority'] ?? _ticket!['serviceDetails']?['priority'] ?? 'medium').toString()).toUpperCase()}',
             ]),
             const SizedBox(height: 16),
             _buildDetailBlock('Technician Details', [

@@ -46,7 +46,8 @@ const TicketSchema = new mongoose.Schema({
     priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' }
   },
   installationDetails: {
-    preferredDate: String
+    preferredDate: String,
+    priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' }
   },
   preferredVisitDate: String,
   remarks: String,

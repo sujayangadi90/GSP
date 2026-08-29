@@ -815,6 +815,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final city = job['customer']['city'] ?? 'N/A';
     final type = job['type'] ?? 'service';
     final product = job['product']['name'] ?? 'N/A';
+    final priority = (job['installationDetails']?['priority'] ?? job['serviceDetails']?['priority'] ?? 'medium').toString().toLowerCase();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -831,6 +832,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text(number, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             Row(
               children: [
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: (priority == 'high'
+                        ? Colors.red
+                        : priority == 'low'
+                            ? Colors.blueGrey
+                            : Colors.amber).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: (priority == 'high'
+                          ? Colors.redAccent
+                          : priority == 'low'
+                              ? Colors.grey
+                              : Colors.amberAccent).withOpacity(0.5),
+                    ),
+                  ),
+                  child: Text(
+                    priority == 'medium' ? 'MID PRIORITY' : '${priority.toUpperCase()} PRIORITY',
+                    style: TextStyle(
+                      color: priority == 'high'
+                          ? Colors.redAccent
+                          : priority == 'low'
+                              ? Colors.grey[300]
+                              : Colors.amberAccent,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
                 if (job['adminVerification'] != null && job['adminVerification']['status'] == 'rejected')
                   Container(
                     margin: const EdgeInsets.only(right: 8),
@@ -1325,6 +1357,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               'Model: ${_job!['product']['modelNumber'] ?? 'N/A'}',
               'Serial: ${_job!['product']['serialNumber'] ?? 'N/A'}',
               'Scope: ${_job!['type'].toString().toUpperCase()}',
+              'Priority: ${((_job!['installationDetails']?['priority'] ?? _job!['serviceDetails']?['priority'] ?? 'medium').toString()).toLowerCase() == 'medium' ? 'MID' : ((_job!['installationDetails']?['priority'] ?? _job!['serviceDetails']?['priority'] ?? 'medium').toString()).toUpperCase()}',
               if (_job!['serviceDetails']?['description'] != null)
                 'Issue: ${_job!['serviceDetails']['description']}',
             ]),

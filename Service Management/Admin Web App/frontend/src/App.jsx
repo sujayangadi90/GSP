@@ -393,7 +393,8 @@ export default function App() {
       priority: 'medium'
     },
     installationDetails: {
-      preferredDate: ''
+      preferredDate: '',
+      priority: 'medium'
     },
     preferredVisitDate: '',
     remarks: ''
@@ -1998,7 +1999,8 @@ export default function App() {
         };
       } else {
         payload.installationDetails = {
-          preferredDate: newRequestForm.preferredVisitDate
+          preferredDate: newRequestForm.preferredVisitDate,
+          priority: newRequestForm.installationDetails?.priority || 'medium'
         };
       }
 
@@ -2756,7 +2758,22 @@ export default function App() {
                               <p className="text-xs text-slate-400">{ticket.customer.city}</p>
                             </td>
                             <td className="px-6 py-4 capitalize text-slate-300">
-                              {ticket.type}
+                              <div>{ticket.type}</div>
+                              {(() => {
+                                const priority = ticket.installationDetails?.priority || ticket.serviceDetails?.priority;
+                                if (!priority) return null;
+                                const isHigh = priority.toLowerCase() === 'high';
+                                const isLow = priority.toLowerCase() === 'low';
+                                return (
+                                  <span className={`inline-block mt-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded ${
+                                    isHigh ? 'bg-red-950/80 text-red-400 border border-red-800/60' :
+                                    isLow ? 'bg-slate-800 text-slate-400 border border-slate-700' :
+                                    'bg-amber-950/80 text-amber-300 border border-amber-800/60'
+                                  }`}>
+                                    {priority.toLowerCase() === 'medium' ? 'Mid' : priority} Priority
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-6 py-4">
                               <p className="font-medium text-slate-300">{ticket.dealer?.name || 'N/A'}</p>
@@ -6881,6 +6898,23 @@ export default function App() {
                             : 'Flexible'}
                       </p>
                     </div>
+                    <div>
+                      <p className="text-xs text-slate-500 font-semibold">Priority Level</p>
+                      {(() => {
+                        const pri = selectedTicket.installationDetails?.priority || selectedTicket.serviceDetails?.priority || 'medium';
+                        const isHigh = pri.toLowerCase() === 'high';
+                        const isLow = pri.toLowerCase() === 'low';
+                        return (
+                          <span className={`inline-block mt-1 text-xs font-black uppercase px-2.5 py-1 rounded-lg ${
+                            isHigh ? 'bg-red-950/80 text-red-400 border border-red-800/60' :
+                            isLow ? 'bg-slate-800 text-slate-400 border border-slate-700' :
+                            'bg-amber-950/80 text-amber-300 border border-amber-800/60'
+                          }`}>
+                            {pri.toLowerCase() === 'medium' ? 'Mid Priority' : `${pri} Priority`}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     {selectedTicket.serviceDetails?.description && (
                       <div className="col-span-2">
                         <p className="text-xs text-slate-500 font-semibold">Problem / Issue Description</p>
@@ -7736,7 +7770,7 @@ export default function App() {
               </div>
 
               {/* Type-Specific Details */}
-              {newRequestForm.type === 'service' && (
+              {newRequestForm.type === 'service' ? (
                 <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
                   <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Service Request Details</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -7761,6 +7795,31 @@ export default function App() {
                         onChange={e => setNewRequestForm({ 
                           ...newRequestForm, 
                           serviceDetails: { ...newRequestForm.serviceDetails, priority: e.target.value } 
+                        })}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
+                  <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Installation Request Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Priority *</label>
+                      <select 
+                        required 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer"
+                        value={newRequestForm.installationDetails?.priority || 'medium'}
+                        onChange={e => setNewRequestForm({ 
+                          ...newRequestForm, 
+                          installationDetails: { 
+                            ...newRequestForm.installationDetails, 
+                            priority: e.target.value 
+                          } 
                         })}
                       >
                         <option value="low">Low</option>
