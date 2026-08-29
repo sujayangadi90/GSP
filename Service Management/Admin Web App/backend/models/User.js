@@ -47,6 +47,10 @@ const UserSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Appliance'
   }],
+  drivingLicense: String,
+  aadhar: String,
+  insurance: String,
+  pincodes: [String],
   fcmTokens: [String]
 }, { timestamps: true });
 

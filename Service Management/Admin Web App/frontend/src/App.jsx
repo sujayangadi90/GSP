@@ -808,7 +808,7 @@ export default function App() {
         if (tab === 'tickets' && !perms.tickets) return false;
         if (tab === 'customers' && !perms.customers) return false;
         if (tab === 'dealers' && !perms.manageDealers) return false;
-        if (tab === 'technicians' && !perms.manageTechnicians) return false;
+        if ((tab === 'technicians' || tab === 'add-technician' || tab === 'edit-technician') && !perms.manageTechnicians) return false;
         if (tab === 'followups' && !perms.followups) return false;
         if (tab === 'appliances_brands' && !perms.settings) return false;
         if (tab === 'cities' && !perms.settings) return false;
@@ -1049,22 +1049,26 @@ export default function App() {
     }
   };
 
-  // Tech actions
   const saveTech = async (e) => {
     e.preventDefault();
     try {
+      const cleanForm = {
+        ...techForm,
+        pincodes: (techForm.pincodes || []).map(p => p.trim()).filter(Boolean)
+      };
       if (techForm.id) {
         await apiFetch(`/technicians/${techForm.id}`, {
           method: 'PUT',
-          body: JSON.stringify(techForm)
+          body: JSON.stringify(cleanForm)
         });
       } else {
         await apiFetch('/technicians', {
           method: 'POST',
-          body: JSON.stringify(techForm)
+          body: JSON.stringify(cleanForm)
         });
       }
       setTechForm(null);
+      setActiveTab('technicians');
       fetchData();
     } catch (err) {
       alert(err.message);
@@ -1212,6 +1216,41 @@ export default function App() {
       setUploadedInvoicePath('');
     } finally {
       setUploadingInvoice(false);
+    }
+  };
+
+  const handleTechDocUpload = async (e, fieldName) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const res = await fetch(`${API_BASE}/technicians/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      if (!res.ok) {
+        let errMsg = 'Failed to upload document';
+        try {
+          const errData = await res.json();
+          errMsg = errData.message || errMsg;
+        } catch (errJson) {}
+        throw new Error(errMsg);
+      }
+      
+      const data = await res.json();
+      setTechForm(prev => ({
+        ...prev,
+        [fieldName]: data.filePath
+      }));
+    } catch (err) {
+      alert(err.message);
+      e.target.value = null;
     }
   };
 
@@ -1460,7 +1499,7 @@ export default function App() {
           {(!user || user.permissions?.manageTechnicians !== false) && (
             <button
               onClick={() => { setActiveTab('technicians'); setMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'technicians' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${(activeTab === 'technicians' || activeTab === 'add-technician' || activeTab === 'edit-technician') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <Wrench className="w-5 h-5" />
               Manage Technicians
@@ -2081,7 +2120,20 @@ export default function App() {
                   <p className="text-slate-400 mt-1">Manage field service technicians and activations</p>
                 </div>
                 <button
-                  onClick={() => setTechForm({ name: '', mobile: '', email: '', password: '', appliances: [] })}
+                  onClick={() => {
+                    setTechForm({ 
+                      name: '', 
+                      mobile: '', 
+                      email: '', 
+                      password: '', 
+                      appliances: [],
+                      drivingLicense: '',
+                      aadhar: '',
+                      insurance: '',
+                      pincodes: []
+                    });
+                    setActiveTab('add-technician');
+                  }}
                   className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150"
                 >
                   <Plus className="w-4 h-4" />
@@ -2126,18 +2178,56 @@ export default function App() {
                           ))}
                         </div>
                       )}
+                      {tech.pincodes && tech.pincodes.length > 0 && (
+                        <p className="text-xs text-slate-400 mt-2">
+                          <span className="text-slate-500 font-semibold">Pincodes served:</span> {tech.pincodes.join(', ')}
+                        </p>
+                      )}
+                      <div className="mt-3 pt-2 border-t border-slate-800/60 space-y-1.5">
+                        <p className="text-xs text-slate-500 font-semibold">Documents:</p>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          {tech.drivingLicense ? (
+                            <a href={`${API_BASE}/${tech.drivingLicense}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
+                              DL ✓
+                            </a>
+                          ) : (
+                            <span className="text-slate-600">DL ✗</span>
+                          )}
+                          {tech.aadhar ? (
+                            <a href={`${API_BASE}/${tech.aadhar}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
+                              Aadhar ✓
+                            </a>
+                          ) : (
+                            <span className="text-slate-600">Aadhar ✗</span>
+                          )}
+                          {tech.insurance ? (
+                            <a href={`${API_BASE}/${tech.insurance}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
+                              Insurance ✓
+                            </a>
+                          ) : (
+                            <span className="text-slate-600">Insurance ✗</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     <div className="mt-6 flex items-center justify-between border-t border-slate-800 pt-4">
                       <button
-                        onClick={() => setTechForm({ 
-                          id: tech._id, 
-                          name: tech.name, 
-                          mobile: tech.mobile, 
-                          email: tech.email, 
-                          password: '',
-                          appliances: tech.appliances ? tech.appliances.map(a => typeof a === 'object' ? a._id : a) : []
-                        })}
+                        onClick={() => {
+                          setTechForm({ 
+                            id: tech._id, 
+                            name: tech.name, 
+                            mobile: tech.mobile, 
+                            email: tech.email, 
+                            password: '',
+                            appliances: tech.appliances ? tech.appliances.map(a => typeof a === 'object' ? a._id : a) : [],
+                            drivingLicense: tech.drivingLicense || '',
+                            aadhar: tech.aadhar || '',
+                            insurance: tech.insurance || '',
+                            pincodes: tech.pincodes || []
+                          });
+                          setActiveTab('edit-technician');
+                        }}
                         className="text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer"
                       >
                         Edit Details
@@ -2161,6 +2251,230 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Add/Edit Technician Standalone Page */}
+          {(activeTab === 'add-technician' || activeTab === 'edit-technician') && techForm && (
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight">
+                    {activeTab === 'edit-technician' ? 'Edit Technician Details' : 'Register New Technician'}
+                  </h1>
+                  <p className="text-slate-400 mt-1">
+                    {activeTab === 'edit-technician' ? `Update profile and credentials for ${techForm.name || 'Technician'}` : 'Configure credentials, appliances, documents and coverage'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setTechForm(null); setActiveTab('technicians'); }}
+                  className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 px-5 rounded-xl border border-slate-700 text-sm cursor-pointer transition duration-150"
+                >
+                  Back to List
+                </button>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-2xl">
+                <form onSubmit={saveTech} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Technician Name</label>
+                      <input 
+                        required 
+                        type="text" 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                        value={techForm.name} 
+                        onChange={e => setTechForm({...techForm, name: e.target.value})} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Mobile Number</label>
+                      <input 
+                        required 
+                        type="text" 
+                        maxLength={10}
+                        placeholder="10 digit mobile number"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                        value={techForm.mobile} 
+                        onChange={e => setTechForm({
+                          ...techForm, 
+                          mobile: e.target.value.replace(/\D/g, '').slice(0, 10)
+                        })} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Email Address</label>
+                      <input 
+                        required 
+                        type="email" 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                        value={techForm.email} 
+                        onChange={e => setTechForm({...techForm, email: e.target.value})} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Password</label>
+                      <input 
+                        type="text" 
+                        placeholder={activeTab === 'edit-technician' ? "Keep blank to leave unchanged" : "Password (default: tech@123)"} 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                        value={techForm.password || ''} 
+                        onChange={e => setTechForm({...techForm, password: e.target.value})} 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Associate Appliances</label>
+                    <div className="bg-slate-850 border border-slate-800 rounded-xl p-4 max-h-40 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {appliances.map(app => {
+                        const isChecked = techForm.appliances ? techForm.appliances.includes(app._id) : false;
+                        return (
+                          <label key={app._id} className="flex items-center gap-2.5 text-sm text-slate-200 cursor-pointer p-1.5 hover:bg-slate-800/40 rounded-lg">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                let list = [...(techForm.appliances || [])];
+                                if (e.target.checked) {
+                                  list.push(app._id);
+                                } else {
+                                  list = list.filter(id => id !== app._id);
+                                }
+                                setTechForm({ ...techForm, appliances: list });
+                              }}
+                              className="rounded border-slate-600 bg-slate-700 text-violet-600 focus:ring-violet-500 w-4 h-4"
+                            />
+                            <span>{app.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Document Uploads section */}
+                  <div className="space-y-4 border-t border-slate-800 pt-5">
+                    <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Upload Verification Documents</h3>
+                    <p className="text-xs text-slate-400">Accepted formats: Jpeg, PDF. Max size: 10MB.</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Driving License */}
+                      <div className="bg-slate-850 border border-slate-800 p-4 rounded-xl space-y-3">
+                        <label className="block text-xs font-semibold text-slate-400 uppercase">Driving License</label>
+                        {techForm.drivingLicense ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs bg-slate-800 p-2 rounded-lg">
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1">✓ Uploaded</span>
+                              <a href={`${API_BASE}/${techForm.drivingLicense}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline">View</a>
+                            </div>
+                            <input 
+                              type="file" 
+                              accept=".jpeg,.jpg,.png,.pdf"
+                              onChange={(e) => handleTechDocUpload(e, 'drivingLicense')}
+                              className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
+                            />
+                          </div>
+                        ) : (
+                          <input 
+                            type="file" 
+                            accept=".jpeg,.jpg,.png,.pdf"
+                            required={activeTab === 'add-technician'}
+                            onChange={(e) => handleTechDocUpload(e, 'drivingLicense')}
+                            className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
+                          />
+                        )}
+                      </div>
+
+                      {/* Aadhar */}
+                      <div className="bg-slate-850 border border-slate-800 p-4 rounded-xl space-y-3">
+                        <label className="block text-xs font-semibold text-slate-400 uppercase">Aadhar Card</label>
+                        {techForm.aadhar ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs bg-slate-800 p-2 rounded-lg">
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1">✓ Uploaded</span>
+                              <a href={`${API_BASE}/${techForm.aadhar}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline">View</a>
+                            </div>
+                            <input 
+                              type="file" 
+                              accept=".jpeg,.jpg,.png,.pdf"
+                              onChange={(e) => handleTechDocUpload(e, 'aadhar')}
+                              className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
+                            />
+                          </div>
+                        ) : (
+                          <input 
+                            type="file" 
+                            accept=".jpeg,.jpg,.png,.pdf"
+                            required={activeTab === 'add-technician'}
+                            onChange={(e) => handleTechDocUpload(e, 'aadhar')}
+                            className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
+                          />
+                        )}
+                      </div>
+
+                      {/* Insurance */}
+                      <div className="bg-slate-850 border border-slate-800 p-4 rounded-xl space-y-3">
+                        <label className="block text-xs font-semibold text-slate-400 uppercase">Insurance Policy</label>
+                        {techForm.insurance ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs bg-slate-800 p-2 rounded-lg">
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1">✓ Uploaded</span>
+                              <a href={`${API_BASE}/${techForm.insurance}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline">View</a>
+                            </div>
+                            <input 
+                              type="file" 
+                              accept=".jpeg,.jpg,.png,.pdf"
+                              onChange={(e) => handleTechDocUpload(e, 'insurance')}
+                              className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
+                            />
+                          </div>
+                        ) : (
+                          <input 
+                            type="file" 
+                            accept=".jpeg,.jpg,.png,.pdf"
+                            required={activeTab === 'add-technician'}
+                            onChange={(e) => handleTechDocUpload(e, 'insurance')}
+                            className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pincodes serving */}
+                  <div className="border-t border-slate-800 pt-5">
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Served Pincodes</label>
+                    <input 
+                      type="text" 
+                      placeholder="Enter pincodes separated by commas (e.g. 110001, 110002, 110003)"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                      value={techForm.pincodes ? techForm.pincodes.join(', ') : ''} 
+                      onChange={e => {
+                        const arr = e.target.value.split(',');
+                        setTechForm({ ...techForm, pincodes: arr });
+                      }} 
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">Specify all postal pincodes this technician is available to service.</p>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-5 border-t border-slate-800">
+                    <button 
+                      type="button" 
+                      onClick={() => { setTechForm(null); setActiveTab('technicians'); }} 
+                      className="px-5 py-2.5 text-sm text-slate-400 hover:text-slate-200 cursor-pointer font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-6 rounded-xl text-sm cursor-pointer shadow-lg hover:shadow-violet-600/20 transition duration-150"
+                    >
+                      Save Technician
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
@@ -3624,78 +3938,6 @@ export default function App() {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
                 <button type="button" onClick={() => setDealerForm(null)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 cursor-pointer">Cancel</button>
                 <button type="submit" className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer">Save Dealer</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Technician Creation/Edit Modal */}
-      {techForm && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-y-auto max-h-[90vh]">
-            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
-              <h3 className="font-bold text-white">{techForm.id ? 'Edit Technician Details' : 'Register New Technician'}</h3>
-              <button onClick={() => setTechForm(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={saveTech} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Technician Name</label>
-                <input required type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" value={techForm.name} onChange={e => setTechForm({...techForm, name: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Mobile Number</label>
-                <input 
-                  required 
-                  type="text" 
-                  maxLength={10}
-                  placeholder="10 digit mobile"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" 
-                  value={techForm.mobile} 
-                  onChange={e => setTechForm({
-                    ...techForm, 
-                    mobile: e.target.value.replace(/\D/g, '').slice(0, 10)
-                  })} 
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Email Address</label>
-                <input required type="email" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" value={techForm.email} onChange={e => setTechForm({...techForm, email: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Password</label>
-                <input type="text" placeholder={techForm.id ? "Keep blank to leave unchanged" : "Password (default: tech@123)"} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" value={techForm.password} onChange={e => setTechForm({...techForm, password: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-2">Associate Appliances</label>
-                <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 max-h-32 overflow-y-auto space-y-2">
-                  {appliances.map(app => {
-                    const isChecked = techForm.appliances ? techForm.appliances.includes(app._id) : false;
-                    return (
-                      <label key={app._id} className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            let list = [...(techForm.appliances || [])];
-                            if (e.target.checked) {
-                              list.push(app._id);
-                            } else {
-                              list = list.filter(id => id !== app._id);
-                            }
-                            setTechForm({ ...techForm, appliances: list });
-                          }}
-                          className="rounded border-slate-600 bg-slate-700 text-violet-600 focus:ring-violet-500"
-                        />
-                        <span>{app.name}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                <button type="button" onClick={() => setTechForm(null)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 cursor-pointer">Cancel</button>
-                <button type="submit" className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer">Save Technician</button>
               </div>
             </form>
           </div>

@@ -31,7 +31,7 @@ const getTechnicians = async (req, res) => {
 // @route   POST /api/technicians
 // @access  Private/Admin
 const addTechnician = async (req, res) => {
-  const { name, mobile, email, password, appliances } = req.body;
+  const { name, mobile, email, password, appliances, drivingLicense, aadhar, insurance, pincodes } = req.body;
 
   try {
     const techExists = await User.findOne({ email });
@@ -57,7 +57,11 @@ const addTechnician = async (req, res) => {
       password: password || 'tech@123', // default password if not provided
       role: 'technician',
       code,
-      appliances: appliances || []
+      appliances: appliances || [],
+      drivingLicense: drivingLicense || '',
+      aadhar: aadhar || '',
+      insurance: insurance || '',
+      pincodes: pincodes || []
     });
 
     res.status(201).json({
@@ -66,8 +70,27 @@ const addTechnician = async (req, res) => {
       code: technician.code,
       email: technician.email,
       mobile: technician.mobile,
-      appliances: technician.appliances
+      appliances: technician.appliances,
+      drivingLicense: technician.drivingLicense,
+      aadhar: technician.aadhar,
+      insurance: technician.insurance,
+      pincodes: technician.pincodes
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get technician by ID
+// @route   GET /api/technicians/:id
+// @access  Private/Admin
+const getTechnicianById = async (req, res) => {
+  try {
+    const technician = await User.findById(req.params.id).populate('appliances', 'name').select('-password');
+    if (!technician || technician.role !== 'technician') {
+      return res.status(404).json({ message: 'Technician not found' });
+    }
+    res.json(technician);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -94,6 +117,22 @@ const updateTechnician = async (req, res) => {
       technician.password = req.body.password;
     }
 
+    if (req.body.drivingLicense !== undefined) {
+      technician.drivingLicense = req.body.drivingLicense;
+    }
+
+    if (req.body.aadhar !== undefined) {
+      technician.aadhar = req.body.aadhar;
+    }
+
+    if (req.body.insurance !== undefined) {
+      technician.insurance = req.body.insurance;
+    }
+
+    if (req.body.pincodes !== undefined) {
+      technician.pincodes = req.body.pincodes;
+    }
+
     const updatedTech = await technician.save();
     res.json({
       _id: updatedTech._id,
@@ -102,7 +141,11 @@ const updateTechnician = async (req, res) => {
       email: updatedTech.email,
       mobile: updatedTech.mobile,
       status: updatedTech.status,
-      appliances: updatedTech.appliances
+      appliances: updatedTech.appliances,
+      drivingLicense: updatedTech.drivingLicense,
+      aadhar: updatedTech.aadhar,
+      insurance: updatedTech.insurance,
+      pincodes: updatedTech.pincodes
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -128,4 +171,4 @@ const toggleTechnicianStatus = async (req, res) => {
   }
 };
 
-module.exports = { getTechnicians, addTechnician, updateTechnician, toggleTechnicianStatus };
+module.exports = { getTechnicians, addTechnician, getTechnicianById, updateTechnician, toggleTechnicianStatus };
