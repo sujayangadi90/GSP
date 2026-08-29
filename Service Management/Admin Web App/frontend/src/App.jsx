@@ -26,7 +26,11 @@ import {
   Edit,
   Power,
   Menu,
-  Package
+  Package,
+  Video,
+  Film,
+  Play,
+  Upload
 } from 'lucide-react';
 
 const API_BASE = '/api';
@@ -543,6 +547,19 @@ export default function App() {
   const [ticketPage, setTicketPage] = useState(1);
   const [historyPage, setHistoryPage] = useState(1);
 
+  // Dealer Video States
+  const [dealerVideos, setDealerVideos] = useState([]);
+  const [dealerVideosLoading, setDealerVideosLoading] = useState(false);
+  const [dealerVideoModalOpen, setDealerVideoModalOpen] = useState(false);
+  const [isUploadingDealerVideo, setIsUploadingDealerVideo] = useState(false);
+  const [dealerVideoForm, setDealerVideoForm] = useState({
+    monthYear: new Date().toISOString().slice(0, 7), // "YYYY-MM"
+    title: '',
+    description: '',
+    videoUrl: ''
+  });
+  const [activePlayingVideo, setActivePlayingVideo] = useState(null);
+
   // Filters & Searches
   const [dealerSearch, setDealerSearch] = useState('');
   const [techSearch, setTechSearch] = useState('');
@@ -853,6 +870,9 @@ export default function App() {
       if (type === 'technician') {
         setHistoryTickets(data.tickets);
         setTechPerformanceStats(data.summary);
+      } else if (type === 'dealer') {
+        setHistoryTickets(data);
+        fetchDealerVideos(entity._id);
       } else {
         setHistoryTickets(data);
       }
@@ -860,6 +880,91 @@ export default function App() {
       alert(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDealerVideos = async (dealerId) => {
+    if (!dealerId) return;
+    try {
+      setDealerVideosLoading(true);
+      const data = await apiFetch(`/dealers/${dealerId}/videos`);
+      setDealerVideos(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching dealer videos:', err);
+      setDealerVideos([]);
+    } finally {
+      setDealerVideosLoading(false);
+    }
+  };
+
+  const handleDealerVideoFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      setIsUploadingDealerVideo(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${API_BASE}/dealers/upload-video`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      if (!res.ok) {
+        let errMsg = 'Failed to upload video file';
+        try {
+          const errData = await res.json();
+          errMsg = errData.message || errMsg;
+        } catch (errJson) {}
+        throw new Error(errMsg);
+      }
+      const data = await res.json();
+      setDealerVideoForm(prev => ({
+        ...prev,
+        videoUrl: data.filePath
+      }));
+    } catch (err) {
+      alert(err.message);
+      e.target.value = null;
+    } finally {
+      setIsUploadingDealerVideo(false);
+    }
+  };
+
+  const handleSaveDealerVideo = async (e) => {
+    e.preventDefault();
+    if (!dealerVideoForm.videoUrl) {
+      alert('Please upload a video file first');
+      return;
+    }
+    try {
+      await apiFetch(`/dealers/${historyEntity._id}/videos`, {
+        method: 'POST',
+        body: JSON.stringify(dealerVideoForm)
+      });
+      setDealerVideoModalOpen(false);
+      setDealerVideoForm({
+        monthYear: new Date().toISOString().slice(0, 7),
+        title: '',
+        description: '',
+        videoUrl: ''
+      });
+      fetchDealerVideos(historyEntity._id);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteDealerVideo = async (videoId) => {
+    if (!window.confirm('Are you sure you want to delete this monthly video?')) return;
+    try {
+      await apiFetch(`/dealers/videos/${videoId}`, {
+        method: 'DELETE'
+      });
+      fetchDealerVideos(historyEntity._id);
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -4753,6 +4858,106 @@ export default function App() {
                 </div>
               )}
 
+              {/* Dealer Monthly Video Section */}
+              {historyContext === 'dealer' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Film className="w-5 h-5 text-violet-400" />
+                        Monthly Dealer Update & Training Videos
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Upload and manage monthly video briefings for {historyEntity?.name}
+                      </p>
+                    </div>
+                    {(!user || user.role === 'admin') && (
+                      <button
+                        onClick={() => {
+                          setDealerVideoForm({
+                            monthYear: new Date().toISOString().slice(0, 7),
+                            title: '',
+                            description: '',
+                            videoUrl: ''
+                          });
+                          setDealerVideoModalOpen(true);
+                        }}
+                        className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-4 rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-md transition duration-150 self-start sm:self-auto shrink-0"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Upload Monthly Video
+                      </button>
+                    )}
+                  </div>
+
+                  {dealerVideosLoading ? (
+                    <div className="py-8 text-center text-slate-400 text-xs">
+                      Loading dealer videos...
+                    </div>
+                  ) : dealerVideos.length === 0 ? (
+                    <div className="py-10 text-center text-slate-500 text-sm italic bg-slate-950/30 rounded-xl border border-slate-800/60">
+                      No monthly videos uploaded for this dealer yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {dealerVideos.map(vid => {
+                        const monthLabel = (() => {
+                          try {
+                            const [y, m] = vid.monthYear.split('-');
+                            const d = new Date(parseInt(y), parseInt(m) - 1, 1);
+                            return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                          } catch (e) {
+                            return vid.monthYear;
+                          }
+                        })();
+
+                        return (
+                          <div key={vid._id} className="bg-slate-850/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between hover:border-slate-700 transition duration-150 shadow-md">
+                            <div className="space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase px-2.5 py-1 rounded-md bg-violet-950/60 text-violet-300 border border-violet-800/40">
+                                  {monthLabel}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  {new Date(vid.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+
+                              <h4 className="font-bold text-white text-sm truncate" title={vid.title}>
+                                {vid.title}
+                              </h4>
+                              {vid.description && (
+                                <p className="text-xs text-slate-400 line-clamp-2" title={vid.description}>
+                                  {vid.description}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                              <button
+                                onClick={() => setActivePlayingVideo(vid)}
+                                className="flex-1 bg-violet-600/20 hover:bg-violet-600 border border-violet-700/40 hover:border-violet-600 text-violet-300 hover:text-white font-bold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer transition"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-current" /> Watch Video
+                              </button>
+                              {(!user || user.role === 'admin') && (
+                                <button
+                                  onClick={() => handleDeleteDealerVideo(vid._id)}
+                                  className="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-rose-950/40 transition cursor-pointer"
+                                  title="Delete Video"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {historyContext === 'customer' && (
                 <div className="flex border-b border-slate-800 gap-6 mb-6">
                   <button
@@ -7349,6 +7554,153 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Dealer Video Upload Modal */}
+      {dealerVideoModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden my-8">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                <Film className="w-5 h-5 text-violet-400" />
+                Upload Monthly Dealer Video
+              </h3>
+              <button 
+                onClick={() => setDealerVideoModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDealerVideo} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+                  Target Month & Year *
+                </label>
+                <input
+                  required
+                  type="month"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                  value={dealerVideoForm.monthYear}
+                  onChange={e => setDealerVideoForm({ ...dealerVideoForm, monthYear: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+                  Video Title / Topic *
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. August 2026 Monthly Product Briefing & Policies"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-violet-500"
+                  value={dealerVideoForm.title}
+                  onChange={e => setDealerVideoForm({ ...dealerVideoForm, title: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+                  Description / Key Notes (Optional)
+                </label>
+                <textarea
+                  rows="2"
+                  placeholder="Short note or summary of what is covered in this video..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-violet-500"
+                  value={dealerVideoForm.description}
+                  onChange={e => setDealerVideoForm({ ...dealerVideoForm, description: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+                  Select Video File (.mp4, .mov, .webm) *
+                </label>
+                <input
+                  type="file"
+                  required={!dealerVideoForm.videoUrl}
+                  accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/*"
+                  onChange={handleDealerVideoFileUpload}
+                  disabled={isUploadingDealerVideo}
+                  className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-violet-600 file:text-white hover:file:bg-violet-500 cursor-pointer disabled:opacity-50"
+                />
+                {isUploadingDealerVideo && (
+                  <p className="text-xs text-violet-400 mt-1.5 flex items-center gap-1.5">
+                    <span className="inline-block animate-spin">⏳</span> Uploading video file... please wait
+                  </p>
+                )}
+                {!isUploadingDealerVideo && dealerVideoForm.videoUrl && (
+                  <p className="text-xs text-emerald-400 mt-1.5 font-semibold">
+                    ✓ Video file uploaded successfully
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setDealerVideoModalOpen(false)}
+                  className="px-4 py-2 text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploadingDealerVideo || !dealerVideoForm.videoUrl}
+                  className="bg-violet-600 hover:bg-violet-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white font-bold py-2.5 px-5 rounded-xl text-xs shadow-md cursor-pointer transition"
+                >
+                  Save & Publish Video
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Video Player Modal */}
+      {activePlayingVideo && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden my-8">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <div>
+                <h3 className="font-bold text-white text-base truncate">
+                  {activePlayingVideo.title}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Month: {activePlayingVideo.monthYear} • Uploaded by: {activePlayingVideo.uploadedByName || 'Admin'}
+                </p>
+              </div>
+              <button 
+                onClick={() => setActivePlayingVideo(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center">
+                <video 
+                  controls 
+                  autoPlay
+                  className="w-full h-full object-contain"
+                  src={`${API_BASE}/${activePlayingVideo.videoUrl}`}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+
+              {activePlayingVideo.description && (
+                <div className="bg-slate-850 p-4 rounded-xl border border-slate-800">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase mb-1">Description / Notes</h4>
+                  <p className="text-sm text-slate-200 whitespace-pre-wrap">{activePlayingVideo.description}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

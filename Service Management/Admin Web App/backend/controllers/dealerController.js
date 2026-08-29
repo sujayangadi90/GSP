@@ -126,4 +126,74 @@ const toggleDealerStatus = async (req, res) => {
   }
 };
 
-module.exports = { getDealers, addDealer, updateDealer, toggleDealerStatus };
+const DealerVideo = require('../models/DealerVideo');
+
+// @desc    Get videos for a dealer
+// @route   GET /api/dealers/:id/videos
+// @access  Private
+const getDealerVideos = async (req, res) => {
+  try {
+    const videos = await DealerVideo.find({ dealer: req.params.id }).sort({ monthYear: -1, createdAt: -1 });
+    res.json(videos);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Upload / add video for a dealer
+// @route   POST /api/dealers/:id/videos
+// @access  Private/Admin
+const uploadDealerVideo = async (req, res) => {
+  try {
+    const { monthYear, title, description, videoUrl } = req.body;
+    if (!monthYear || !title || !videoUrl) {
+      return res.status(400).json({ message: 'Month/Year, title, and video file are required' });
+    }
+
+    const dealer = await User.findById(req.params.id);
+    if (!dealer || dealer.role !== 'dealer') {
+      return res.status(404).json({ message: 'Dealer not found' });
+    }
+
+    const video = await DealerVideo.create({
+      dealer: dealer._id,
+      monthYear,
+      title,
+      description: description || '',
+      videoUrl,
+      uploadedBy: req.user?._id,
+      uploadedByName: req.user?.name || 'Admin'
+    });
+
+    res.status(201).json(video);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Delete a dealer video
+// @route   DELETE /api/dealers/videos/:videoId
+// @access  Private/Admin
+const deleteDealerVideo = async (req, res) => {
+  try {
+    const video = await DealerVideo.findById(req.params.videoId);
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+
+    await DealerVideo.findByIdAndDelete(req.params.videoId);
+    res.json({ message: 'Video deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { 
+  getDealers, 
+  addDealer, 
+  updateDealer, 
+  toggleDealerStatus,
+  getDealerVideos,
+  uploadDealerVideo,
+  deleteDealerVideo
+};
