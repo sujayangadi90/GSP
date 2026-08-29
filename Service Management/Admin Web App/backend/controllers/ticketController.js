@@ -58,18 +58,40 @@ const createTicket = async (req, res) => {
     
     // Sync to Customer collection
     try {
-      await Customer.findOneAndUpdate(
-        { mobile: customer.mobile },
-        {
+      let applianceId = null;
+      if (product && product.category) {
+        const foundAppliance = await Appliance.findOne({
+          name: { $regex: new RegExp(`^${product.category.trim()}$`, 'i') }
+        });
+        if (foundAppliance) {
+          applianceId = foundAppliance._id;
+        }
+      }
+
+      let dbCustomer = await Customer.findOne({ mobile: customer.mobile });
+      if (!dbCustomer) {
+        dbCustomer = new Customer({
           name: customer.name,
           mobile: customer.mobile,
           alternateMobile: customer.alternateMobile || '',
           address: customer.address,
           city: customer.city,
-          pincode: customer.pincode
-        },
-        { upsert: true, new: true }
-      );
+          pincode: customer.pincode,
+          appliances: []
+        });
+      } else {
+        dbCustomer.name = customer.name;
+        dbCustomer.alternateMobile = customer.alternateMobile || dbCustomer.alternateMobile || '';
+        dbCustomer.address = customer.address;
+        dbCustomer.city = customer.city;
+        dbCustomer.pincode = customer.pincode;
+      }
+
+      if (applianceId && !dbCustomer.appliances.includes(applianceId)) {
+        dbCustomer.appliances.push(applianceId);
+      }
+
+      await dbCustomer.save();
     } catch (err) {
       console.error('Failed to sync customer details:', err);
     }
