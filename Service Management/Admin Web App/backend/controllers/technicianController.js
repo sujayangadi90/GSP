@@ -31,7 +31,7 @@ const getTechnicians = async (req, res) => {
 // @route   POST /api/technicians
 // @access  Private/Admin
 const addTechnician = async (req, res) => {
-  const { name, mobile, email, password, appliances, drivingLicense, aadhar, insurance, pincodes } = req.body;
+  const { name, mobile, email, password, appliances, profilePic, drivingLicense, aadhar, insurance, pincodes } = req.body;
 
   try {
     const techExists = await User.findOne({ email });
@@ -58,6 +58,7 @@ const addTechnician = async (req, res) => {
       role: 'technician',
       code,
       appliances: appliances || [],
+      profilePic: profilePic || '',
       drivingLicense: drivingLicense || '',
       aadhar: aadhar || '',
       insurance: insurance || '',
@@ -70,6 +71,7 @@ const addTechnician = async (req, res) => {
       code: technician.code,
       email: technician.email,
       mobile: technician.mobile,
+      profilePic: technician.profilePic,
       appliances: technician.appliances,
       drivingLicense: technician.drivingLicense,
       aadhar: technician.aadhar,
@@ -117,6 +119,10 @@ const updateTechnician = async (req, res) => {
       technician.password = req.body.password;
     }
 
+    if (req.body.profilePic !== undefined) {
+      technician.profilePic = req.body.profilePic;
+    }
+
     if (req.body.drivingLicense !== undefined) {
       technician.drivingLicense = req.body.drivingLicense;
     }
@@ -141,6 +147,7 @@ const updateTechnician = async (req, res) => {
       email: updatedTech.email,
       mobile: updatedTech.mobile,
       status: updatedTech.status,
+      profilePic: updatedTech.profilePic,
       appliances: updatedTech.appliances,
       drivingLicense: updatedTech.drivingLicense,
       aadhar: updatedTech.aadhar,

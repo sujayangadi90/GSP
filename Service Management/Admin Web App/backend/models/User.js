@@ -47,6 +47,7 @@ const UserSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Appliance'
   }],
+  profilePic: String,
   drivingLicense: String,
   aadhar: String,
   insurance: String,

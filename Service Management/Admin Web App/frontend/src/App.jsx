@@ -2804,6 +2804,7 @@ export default function App() {
                       email: '', 
                       password: '', 
                       appliances: [],
+                      profilePic: '',
                       drivingLicense: '',
                       aadhar: '',
                       insurance: '',
@@ -2847,7 +2848,23 @@ export default function App() {
                           <span className="absolute top-6 right-6 bg-slate-800 text-slate-300 font-bold text-xs px-2.5 py-1 rounded-lg font-mono">
                             {tech.code}
                           </span>
-                          <h3 className="text-lg font-bold text-white pr-20">{tech.name}</h3>
+                          <div className="flex items-center gap-3.5 pr-20">
+                            {tech.profilePic ? (
+                              <img 
+                                src={`${API_BASE}/${tech.profilePic}`} 
+                                alt={tech.name} 
+                                className="w-12 h-12 rounded-full object-cover border-2 border-violet-500/50 shadow-md shrink-0"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-violet-950/60 border border-violet-700/50 flex items-center justify-center text-violet-300 font-bold text-base shadow-md shrink-0">
+                                {tech.name ? tech.name.charAt(0).toUpperCase() : 'T'}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <h3 className="text-lg font-bold text-white truncate">{tech.name}</h3>
+                              <p className="text-xs text-slate-400 font-mono">{tech.code}</p>
+                            </div>
+                          </div>
                           
                           <div className="mt-4 space-y-2 text-sm text-slate-300">
                             <p className="flex items-center gap-2">
@@ -2909,6 +2926,7 @@ export default function App() {
                                 email: tech.email, 
                                 password: '',
                                 appliances: tech.appliances ? tech.appliances.map(a => typeof a === 'object' ? a._id : a) : [],
+                                profilePic: tech.profilePic || '',
                                 drivingLicense: tech.drivingLicense || '',
                                 aadhar: tech.aadhar || '',
                                 insurance: tech.insurance || '',
@@ -3006,6 +3024,46 @@ export default function App() {
 
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-2xl">
                 <form onSubmit={saveTech} className="space-y-6">
+                  {/* Profile Picture Upload Section */}
+                  <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-slate-850 border border-slate-800 rounded-2xl">
+                    <div className="relative group">
+                      {techForm.profilePic ? (
+                        <img 
+                          src={`${API_BASE}/${techForm.profilePic}`} 
+                          alt="Technician Profile" 
+                          className="w-24 h-24 rounded-full object-cover border-4 border-violet-600/50 shadow-xl"
+                        />
+                      ) : (
+                        <div className="w-24 h-24 rounded-full bg-slate-800 border-2 border-dashed border-slate-600 flex flex-col items-center justify-center text-slate-400">
+                          <UserCheck className="w-8 h-8 text-slate-500 mb-1" />
+                          <span className="text-[10px] font-semibold uppercase">No Photo</span>
+                        </div>
+                      )}
+                      {techForm.profilePic && (
+                        <button
+                          type="button"
+                          onClick={() => setTechForm({ ...techForm, profilePic: '' })}
+                          className="absolute -top-1 -right-1 bg-red-600 hover:bg-red-500 text-white rounded-full p-1 shadow-lg transition"
+                          title="Remove Photo"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex-1 text-center sm:text-left space-y-2">
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                        Profile Picture
+                      </label>
+                      <p className="text-xs text-slate-400">Upload a clear passport size or face photo (JPG, PNG). Max 5MB.</p>
+                      <input 
+                        type="file" 
+                        accept="image/jpeg,image/png,image/jpg"
+                        onChange={(e) => handleTechDocUpload(e, 'profilePic')}
+                        className="w-full sm:w-auto text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-violet-600 file:text-white hover:file:bg-violet-500 cursor-pointer transition"
+                      />
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Technician Name</label>
