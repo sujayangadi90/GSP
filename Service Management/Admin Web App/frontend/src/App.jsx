@@ -560,6 +560,23 @@ export default function App() {
   });
   const [activePlayingVideo, setActivePlayingVideo] = useState(null);
 
+  // Video Library States
+  const [videoLibraryItems, setVideoLibraryItems] = useState([]);
+  const [videoLibraryLoading, setVideoLibraryLoading] = useState(false);
+  const [videoLibrarySearch, setVideoLibrarySearch] = useState('');
+  const [videoLibraryApplianceFilter, setVideoLibraryApplianceFilter] = useState('');
+  const [videoLibraryBrandFilter, setVideoLibraryBrandFilter] = useState('');
+  const [videoLibraryModal, setVideoLibraryModal] = useState(false); // false | 'add' | 'edit'
+  const [videoLibraryForm, setVideoLibraryForm] = useState({
+    id: '',
+    title: '',
+    appliance: '',
+    brand: '',
+    description: '',
+    videoUrl: ''
+  });
+  const [activePlayingLibraryVideo, setActivePlayingLibraryVideo] = useState(null);
+
   // Filters & Searches
   const [dealerSearch, setDealerSearch] = useState('');
   const [techSearch, setTechSearch] = useState('');
@@ -968,6 +985,71 @@ export default function App() {
     }
   };
 
+  // Video Library Operations
+  const fetchVideoLibraryItems = async () => {
+    try {
+      setVideoLibraryLoading(true);
+      const params = new URLSearchParams();
+      if (videoLibraryApplianceFilter) params.append('appliance', videoLibraryApplianceFilter);
+      if (videoLibraryBrandFilter) params.append('brand', videoLibraryBrandFilter);
+      if (videoLibrarySearch) params.append('search', videoLibrarySearch);
+
+      const data = await apiFetch(`/video-library?${params.toString()}`);
+      setVideoLibraryItems(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching video library:', err);
+      setVideoLibraryItems([]);
+    } finally {
+      setVideoLibraryLoading(false);
+    }
+  };
+
+  const handleSaveVideoLibraryItem = async (e) => {
+    e.preventDefault();
+    if (!videoLibraryForm.title || !videoLibraryForm.appliance || !videoLibraryForm.brand || !videoLibraryForm.videoUrl) {
+      alert('Please fill all required fields: Title, Appliance, Brand, and Video link');
+      return;
+    }
+
+    try {
+      if (videoLibraryForm.id) {
+        await apiFetch(`/video-library/${videoLibraryForm.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(videoLibraryForm)
+        });
+      } else {
+        await apiFetch('/video-library', {
+          method: 'POST',
+          body: JSON.stringify(videoLibraryForm)
+        });
+      }
+      setVideoLibraryModal(false);
+      setVideoLibraryForm({
+        id: '',
+        title: '',
+        appliance: '',
+        brand: '',
+        description: '',
+        videoUrl: ''
+      });
+      fetchVideoLibraryItems();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteVideoLibraryItem = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this video item from the library?')) return;
+    try {
+      await apiFetch(`/video-library/${id}`, {
+        method: 'DELETE'
+      });
+      fetchVideoLibraryItems();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const generateReport = async (page = 1) => {
     setReportsLoading(true);
     try {
@@ -1208,6 +1290,10 @@ export default function App() {
         fetchFollowUps();
       } else if (activeTab === 'inventory') {
         fetchInventory();
+      } else if (activeTab === 'video_library') {
+        fetchVideoLibraryItems();
+        fetchAppliances();
+        fetchBrands();
       } else if (activeTab === 'dashboard') {
         fetchDashboardData();
       } else {
@@ -2148,6 +2234,15 @@ export default function App() {
             >
               <ClipboardList className="w-5 h-5" />
               Reports
+            </button>
+          )}
+          {(!user || user.role === 'admin') && (
+            <button
+              onClick={() => { setActiveTab('video_library'); setMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'video_library' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <Video className="w-5 h-5" />
+              Video Library
             </button>
           )}
           {(!user || user.permissions?.settings !== false) && (
@@ -5971,6 +6066,181 @@ export default function App() {
               ) : null}
             </div>
           )}
+
+          {/* Video Library Main Tab */}
+          {activeTab === 'video_library' && (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                    <Video className="w-8 h-8 text-violet-400" />
+                    Video Library
+                  </h1>
+                  <p className="text-slate-400 mt-1">
+                    Manage reference & training videos classified by appliance and brand
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    const firstApp = appliances[0]?._id || '';
+                    setVideoLibraryForm({
+                      id: '',
+                      title: '',
+                      appliance: firstApp,
+                      brand: brands.find(b => (b.appliance?._id || b.appliance) === firstApp)?._id || '',
+                      description: '',
+                      videoUrl: ''
+                    });
+                    setVideoLibraryModal('add');
+                  }}
+                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150 self-start sm:self-auto shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Video
+                </button>
+              </div>
+
+              {/* Filters Bar */}
+              <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-wrap items-center gap-4">
+                <div className="flex-1 min-w-[220px] relative">
+                  <Search className="w-5 h-5 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search videos by title or description..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                    value={videoLibrarySearch}
+                    onChange={e => setVideoLibrarySearch(e.target.value)}
+                  />
+                </div>
+
+                <div className="w-full sm:w-48">
+                  <select
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                    value={videoLibraryApplianceFilter}
+                    onChange={e => {
+                      setVideoLibraryApplianceFilter(e.target.value);
+                      setVideoLibraryBrandFilter('');
+                    }}
+                  >
+                    <option value="">All Appliances</option>
+                    {appliances.map(app => (
+                      <option key={app._id} value={app._id}>{app.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-full sm:w-48">
+                  <select
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                    value={videoLibraryBrandFilter}
+                    onChange={e => setVideoLibraryBrandFilter(e.target.value)}
+                  >
+                    <option value="">All Brands</option>
+                    {brands
+                      .filter(b => !videoLibraryApplianceFilter || (b.appliance?._id || b.appliance) === videoLibraryApplianceFilter)
+                      .map(b => (
+                        <option key={b._id} value={b._id}>{b.name}</option>
+                      ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={fetchVideoLibraryItems}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-4 rounded-xl text-sm border border-slate-700 transition cursor-pointer"
+                >
+                  Filter
+                </button>
+              </div>
+
+              {/* Videos Grid */}
+              {videoLibraryLoading ? (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-16 text-center text-slate-400 text-sm">
+                  Loading Video Library...
+                </div>
+              ) : videoLibraryItems.length === 0 ? (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-16 text-center space-y-3">
+                  <Film className="w-12 h-12 text-slate-600 mx-auto" />
+                  <h3 className="text-lg font-bold text-white">No Videos Found</h3>
+                  <p className="text-sm text-slate-500 max-w-md mx-auto">
+                    No videos match your search or filter criteria. Click "Add Video" to add educational and training resources.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {videoLibraryItems.map(item => (
+                    <div
+                      key={item._id}
+                      className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 hover:shadow-2xl transition duration-200"
+                    >
+                      <div className="space-y-3">
+                        {/* Appliance & Brand Badges */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-black uppercase px-2.5 py-1 rounded-lg bg-violet-950/60 text-violet-300 border border-violet-800/40">
+                            {item.appliance?.name || 'Appliance'}
+                          </span>
+                          <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
+                            {item.brand?.name || 'Brand'}
+                          </span>
+                        </div>
+
+                        <h3 className="text-base font-bold text-white line-clamp-2" title={item.title}>
+                          {item.title}
+                        </h3>
+
+                        {item.description && (
+                          <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed" title={item.description}>
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="mt-5 pt-4 border-t border-slate-800/80 space-y-3">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono truncate">
+                          <span className="truncate" title={item.videoUrl}>
+                            🔗 {item.videoUrl.replace(/^https?:\/\//, '')}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setActivePlayingLibraryVideo(item)}
+                            className="flex-1 bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" /> Watch Video
+                          </button>
+                          <button
+                            onClick={() => {
+                              setVideoLibraryForm({
+                                id: item._id,
+                                title: item.title,
+                                appliance: item.appliance?._id || item.appliance,
+                                brand: item.brand?._id || item.brand,
+                                description: item.description || '',
+                                videoUrl: item.videoUrl
+                              });
+                              setVideoLibraryModal('edit');
+                            }}
+                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+                            title="Edit Video Item"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteVideoLibraryItem(item._id)}
+                            className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-900/50 transition cursor-pointer"
+                            title="Delete Video Item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </main>
       </div>
 
@@ -7700,6 +7970,221 @@ export default function App() {
                   <p className="text-sm text-slate-200 whitespace-pre-wrap">{activePlayingVideo.description}</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Library Add / Edit Modal */}
+      {videoLibraryModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden my-8">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                <Video className="w-5 h-5 text-violet-400" />
+                {videoLibraryModal === 'edit' ? 'Edit Video Library Item' : 'Add Video to Library'}
+              </h3>
+              <button 
+                onClick={() => setVideoLibraryModal(false)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveVideoLibraryItem} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+                  Video Title *
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Inverter AC Installation Standard Operating Procedure"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-violet-500"
+                  value={videoLibraryForm.title}
+                  onChange={e => setVideoLibraryForm({ ...videoLibraryForm, title: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+                    Select Appliance *
+                  </label>
+                  <select
+                    required
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                    value={videoLibraryForm.appliance}
+                    onChange={e => {
+                      const appVal = e.target.value;
+                      const availableBrands = brands.filter(b => (b.appliance?._id || b.appliance) === appVal);
+                      setVideoLibraryForm({ 
+                        ...videoLibraryForm, 
+                        appliance: appVal,
+                        brand: availableBrands[0]?._id || ''
+                      });
+                    }}
+                  >
+                    <option value="">-- Choose Appliance --</option>
+                    {appliances.map(app => (
+                      <option key={app._id} value={app._id}>{app.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+                    Select Brand *
+                  </label>
+                  <select
+                    required
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                    value={videoLibraryForm.brand}
+                    onChange={e => setVideoLibraryForm({ ...videoLibraryForm, brand: e.target.value })}
+                  >
+                    <option value="">-- Choose Brand --</option>
+                    {brands
+                      .filter(b => !videoLibraryForm.appliance || (b.appliance?._id || b.appliance) === videoLibraryForm.appliance)
+                      .map(b => (
+                        <option key={b._id} value={b._id}>{b.name}</option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+                  Video Link (URL or Embed) *
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. https://www.youtube.com/watch?v=... or https://..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-violet-500 font-mono text-xs"
+                  value={videoLibraryForm.videoUrl}
+                  onChange={e => setVideoLibraryForm({ ...videoLibraryForm, videoUrl: e.target.value })}
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Supports YouTube, Vimeo, direct MP4, or cloud video links.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+                  Description / Topic Notes
+                </label>
+                <textarea
+                  rows="3"
+                  placeholder="Key steps, timestamp highlights, or diagnostic points covered in this video..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-violet-500"
+                  value={videoLibraryForm.description}
+                  onChange={e => setVideoLibraryForm({ ...videoLibraryForm, description: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setVideoLibraryModal(false)}
+                  className="px-4 py-2 text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl text-xs shadow-md cursor-pointer transition"
+                >
+                  {videoLibraryModal === 'edit' ? 'Update Video' : 'Save to Library'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Video Library Player Modal */}
+      {activePlayingLibraryVideo && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden my-8">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-violet-950 text-violet-300 border border-violet-800/40">
+                    {activePlayingLibraryVideo.appliance?.name || 'Appliance'}
+                  </span>
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                    {activePlayingLibraryVideo.brand?.name || 'Brand'}
+                  </span>
+                </div>
+                <h3 className="font-bold text-white text-base truncate">
+                  {activePlayingLibraryVideo.title}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setActivePlayingLibraryVideo(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center">
+                {(() => {
+                  const url = activePlayingLibraryVideo.videoUrl || '';
+                  // Check for YouTube URL
+                  const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+                  if (ytMatch && ytMatch[1]) {
+                    return (
+                      <iframe
+                        className="w-full h-full"
+                        src={`https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`}
+                        title={activePlayingLibraryVideo.title}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    );
+                  }
+                  // Check for Vimeo URL
+                  const vimeoMatch = url.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|)(\d+)/);
+                  if (vimeoMatch && vimeoMatch[3]) {
+                    return (
+                      <iframe
+                        className="w-full h-full"
+                        src={`https://player.vimeo.com/video/${vimeoMatch[3]}?autoplay=1`}
+                        title={activePlayingLibraryVideo.title}
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                      />
+                    );
+                  }
+                  // Native HTML5 video or direct link
+                  const videoSrc = url.startsWith('http') ? url : `${API_BASE}/${url}`;
+                  return (
+                    <video 
+                      controls 
+                      autoPlay
+                      className="w-full h-full object-contain"
+                      src={videoSrc}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  );
+                })()}
+              </div>
+
+              {activePlayingLibraryVideo.description && (
+                <div className="bg-slate-850 p-4 rounded-xl border border-slate-800">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase mb-1">Description / Notes</h4>
+                  <p className="text-sm text-slate-200 whitespace-pre-wrap">{activePlayingLibraryVideo.description}</p>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-xs text-slate-400 pt-2 border-t border-slate-800/80">
+                <span>Link: <a href={activePlayingLibraryVideo.videoUrl} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline">{activePlayingLibraryVideo.videoUrl}</a></span>
+                <span>Added: {new Date(activePlayingLibraryVideo.createdAt).toLocaleDateString()}</span>
+              </div>
             </div>
           </div>
         </div>
