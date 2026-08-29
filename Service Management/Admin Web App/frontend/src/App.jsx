@@ -59,6 +59,16 @@ export default function App() {
   const [customerForm, setCustomerForm] = useState(null); // null or { name, mobile, alternateMobile, address, city, pincode, appliances }
   const [selectedTicket, setSelectedTicket] = useState(null); // null or ticket details object
   const [selectedCustomerDetails, setSelectedCustomerDetails] = useState(null); // null or customer object
+  const [amcs, setAmcs] = useState([]);
+  const [amcFilters, setAmcFilters] = useState({
+    search: '',
+    amcType: '',
+    status: '',
+    appliance: '',
+    fromDate: '',
+    toDate: ''
+  });
+  const [amcForm, setAmcForm] = useState(null); // null or form fields object
   const [assignTechId, setAssignTechId] = useState('');
   const [assignNotes, setAssignNotes] = useState('');
   const [verificationForm, setVerificationForm] = useState({ status: 'approved', reason: '' });
@@ -71,6 +81,9 @@ export default function App() {
   // Raise Request Modal states
   const [createRequestOpen, setCreateRequestOpen] = useState(false);
   const [custSuggestions, setCustSuggestions] = useState([]);
+  const [amcCustSuggestions, setAmcCustSuggestions] = useState([]);
+  const [applianceHistory, setApplianceHistory] = useState(null); // null or { customer, appliance }
+  const [customerHistoryTab, setCustomerHistoryTab] = useState('tickets'); // 'tickets' or 'amcs'
   const [newRequestForm, setNewRequestForm] = useState({
     dealer: '',
     type: 'installation',
@@ -453,6 +466,15 @@ export default function App() {
     }
   };
 
+  const fetchAmcs = async () => {
+    try {
+      const data = await apiFetch(`/amcs?search=${amcFilters.search}&amcType=${amcFilters.amcType}&status=${amcFilters.status}&appliance=${amcFilters.appliance}&fromDate=${amcFilters.fromDate}&toDate=${amcFilters.toDate}`);
+      setAmcs(data);
+    } catch (err) {
+      console.error('Error fetching AMCs:', err);
+    }
+  };
+
   const fetchDealerHistory = async () => {
     if (!dealerFromDate || !dealerToDate) {
       alert('Both dates are mandatory.');
@@ -771,6 +793,9 @@ export default function App() {
         fetchAdmins();
       } else if (activeTab === 'customers') {
         fetchCustomers();
+      } else if (activeTab === 'amcs') {
+        fetchAmcs();
+        fetchAppliances();
       } else if (activeTab === 'followups') {
         fetchFollowUps();
       } else if (activeTab === 'dashboard') {
@@ -783,7 +808,7 @@ export default function App() {
         fetchCustomers();
       }
     }
-  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange]);
+  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters]);
 
   useEffect(() => {
     setCustomerPage(1);
@@ -809,6 +834,7 @@ export default function App() {
         if (tab === 'dashboard' && !perms.dashboard) return false;
         if (tab === 'tickets' && !perms.tickets) return false;
         if ((tab === 'customers' || tab === 'add-customer') && !perms.customers) return false;
+        if ((tab === 'amcs' || tab === 'add-amc' || tab === 'edit-amc' || tab === 'renew-amc') && !perms.customers) return false;
         if (tab === 'dealers' && !perms.manageDealers) return false;
         if ((tab === 'technicians' || tab === 'add-technician' || tab === 'edit-technician') && !perms.manageTechnicians) return false;
         if (tab === 'followups' && !perms.followups) return false;
@@ -1087,6 +1113,40 @@ export default function App() {
       setCustomerForm(null);
       setActiveTab('customers');
       fetchCustomers();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const saveAmc = async (e) => {
+    e.preventDefault();
+    try {
+      if (amcForm.id) {
+        await apiFetch(`/amcs/${amcForm.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(amcForm)
+        });
+      } else {
+        await apiFetch('/amcs', {
+          method: 'POST',
+          body: JSON.stringify(amcForm)
+        });
+      }
+      setAmcForm(null);
+      setActiveTab('amcs');
+      fetchAmcs();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleCancelAmc = async (id) => {
+    if (!window.confirm('Are you sure you want to cancel this AMC Contract?')) return;
+    try {
+      await apiFetch(`/amcs/${id}/cancel`, {
+        method: 'PATCH'
+      });
+      fetchAmcs();
     } catch (err) {
       alert(err.message);
     }
@@ -1502,6 +1562,15 @@ export default function App() {
             >
               <UserCheck className="w-5 h-5" />
               Customers
+            </button>
+          )}
+          {(!user || user.permissions?.customers !== false) && (
+            <button
+              onClick={() => { setActiveTab('amcs'); setMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${(activeTab === 'amcs' || activeTab === 'add-amc' || activeTab === 'edit-amc' || activeTab === 'renew-amc') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <ClipboardList className="w-5 h-5" />
+              AMC Contracts
             </button>
           )}
           {(!user || user.permissions?.manageDealers !== false) && (
@@ -3150,6 +3219,575 @@ export default function App() {
             </div>
           )}
 
+          {/* AMC Contracts Tab */}
+          {activeTab === 'amcs' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight">AMC Contracts Directory</h1>
+                  <p className="text-slate-400 mt-1">Manage customer Annual Maintenance Contracts and visits</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const nextYear = new Date();
+                    nextYear.setFullYear(nextYear.getFullYear() + 1);
+                    nextYear.setDate(nextYear.getDate() - 1);
+                    const endStr = nextYear.toISOString().split('T')[0];
+
+                    setAmcForm({
+                      customer: '',
+                      customerName: '',
+                      appliance: '',
+                      startDate: todayStr,
+                      endDate: endStr,
+                      amcType: 'service_only',
+                      amcAmount: 0,
+                      visitsIncluded: 4,
+                      visitsUsed: 0,
+                      includedServices: '',
+                      notes: ''
+                    });
+                    setActiveTab('add-amc');
+                  }}
+                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150 shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create AMC Contract
+                </button>
+              </div>
+
+              {/* Filters Area */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Customer / Mobile</label>
+                  <input
+                    type="text"
+                    placeholder="Search customer..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                    value={amcFilters.search}
+                    onChange={e => setAmcFilters({ ...amcFilters, search: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Appliance</label>
+                  <select
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                    value={amcFilters.appliance}
+                    onChange={e => setAmcFilters({ ...amcFilters, appliance: e.target.value })}
+                  >
+                    <option value="">All Appliances</option>
+                    {appliances.map(app => (
+                      <option key={app._id} value={app._id}>{app.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase">AMC Type</label>
+                  <select
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                    value={amcFilters.amcType}
+                    onChange={e => setAmcFilters({ ...amcFilters, amcType: e.target.value })}
+                  >
+                    <option value="">All Types</option>
+                    <option value="service_only">Service Only</option>
+                    <option value="part_service">Part + Service</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Status</label>
+                  <select
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                    value={amcFilters.status}
+                    onChange={e => setAmcFilters({ ...amcFilters, status: e.target.value })}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="upcoming">Upcoming</option>
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <div className="flex gap-2 items-end">
+                  <button
+                    onClick={() => setAmcFilters({ search: '', amcType: '', status: '', appliance: '', fromDate: '', toDate: '' })}
+                    className="w-full bg-slate-850 hover:bg-slate-800 text-slate-350 hover:text-white border border-slate-750 text-xs py-2 px-3 rounded-lg font-bold transition duration-150 cursor-pointer"
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              </div>
+
+              {/* AMC Contracts Table */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400 text-xs font-bold uppercase bg-slate-950/40">
+                        <th className="py-4 px-6">Customer Name</th>
+                        <th className="py-4 px-6">Appliance</th>
+                        <th className="py-4 px-6">Contract Type</th>
+                        <th className="py-4 px-6">Amount</th>
+                        <th className="py-4 px-6">Duration</th>
+                        <th className="py-4 px-6">Visits (Used/Total)</th>
+                        <th className="py-4 px-6">Status</th>
+                        <th className="py-4 px-6 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                      {amcs.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="py-12 text-center text-slate-500 text-sm">
+                            No AMC Contracts found.
+                          </td>
+                        </tr>
+                      ) : (
+                        amcs.map(amc => {
+                          const remaining = amc.visitsIncluded - amc.visitsUsed;
+                          return (
+                            <tr key={amc._id} className="hover:bg-slate-800/25 transition duration-150 text-sm">
+                              <td className="py-4 px-6 font-bold text-white">
+                                <div>{amc.customer?.name}</div>
+                                <div className="text-xs text-slate-500 font-mono mt-0.5">{amc.customer?.mobile}</div>
+                              </td>
+                              <td className="py-4 px-6">
+                                <button
+                                  onClick={() => setApplianceHistory({ customer: amc.customer?._id, appliance: amc.appliance?._id, applianceName: amc.appliance?.name, customerName: amc.customer?.name })}
+                                  className="text-violet-400 hover:underline hover:text-violet-300 font-semibold cursor-pointer text-left"
+                                >
+                                  {amc.appliance?.name}
+                                </button>
+                              </td>
+                              <td className="py-4 px-6">
+                                <span className="capitalize">{amc.amcType ? amc.amcType.replace('_', ' ') : '—'}</span>
+                              </td>
+                              <td className="py-4 px-6 font-semibold">
+                                ₹ {amc.amcAmount}
+                              </td>
+                              <td className="py-4 px-6 text-slate-400 text-xs">
+                                <div>{new Date(amc.startDate).toLocaleDateString()}</div>
+                                <div className="text-[10px] text-slate-550">to {new Date(amc.endDate).toLocaleDateString()}</div>
+                              </td>
+                              <td className="py-4 px-6 font-semibold">
+                                <span className="text-slate-300">{amc.visitsUsed}</span>
+                                <span className="text-slate-600"> / {amc.visitsIncluded}</span>
+                                <div className="text-[10px] font-normal text-slate-500 mt-0.5">({remaining} remaining)</div>
+                              </td>
+                              <td className="py-4 px-6">
+                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${
+                                  amc.status === 'active' ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-700/35' :
+                                  amc.status === 'upcoming' ? 'bg-blue-950/40 text-blue-400 border border-blue-750/35' :
+                                  amc.status === 'expired' ? 'bg-slate-800 text-slate-400 border border-slate-700/35' :
+                                  'bg-red-950/40 text-red-400 border border-red-700/35'
+                                }`}>
+                                  {amc.status}
+                                </span>
+                              </td>
+                              <td className="py-4 px-6 text-center">
+                                <div className="flex justify-center items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setAmcForm({
+                                        id: amc._id,
+                                        customer: amc.customer?._id,
+                                        customerName: amc.customer?.name,
+                                        appliance: amc.appliance?._id,
+                                        startDate: amc.startDate.split('T')[0],
+                                        endDate: amc.endDate.split('T')[0],
+                                        amcType: amc.amcType,
+                                        amcAmount: amc.amcAmount,
+                                        visitsIncluded: amc.visitsIncluded,
+                                        visitsUsed: amc.visitsUsed,
+                                        includedServices: amc.includedServices,
+                                        notes: amc.notes
+                                      });
+                                      setActiveTab('edit-amc');
+                                    }}
+                                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-sm text-slate-300"
+                                  >
+                                    Edit
+                                  </button>
+                                  {amc.status !== 'cancelled' && (
+                                    <button
+                                      onClick={() => handleCancelAmc(amc._id)}
+                                      className="bg-red-950/40 hover:bg-red-900/30 border border-red-900/40 text-red-400 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-sm"
+                                    >
+                                      Cancel
+                                    </button>
+                                  )}
+                                  {(amc.status === 'expired' || amc.status === 'cancelled' || amc.status === 'active') && (
+                                    <button
+                                      onClick={() => {
+                                        // Set Start Date to day after end date of previous contract
+                                        const end = new Date(amc.endDate);
+                                        end.setDate(end.getDate() + 1);
+                                        const startStr = end.toISOString().split('T')[0];
+                                        
+                                        const newEnd = new Date(end);
+                                        newEnd.setFullYear(newEnd.getFullYear() + 1);
+                                        newEnd.setDate(newEnd.getDate() - 1);
+                                        const endStr = newEnd.toISOString().split('T')[0];
+
+                                        setAmcForm({
+                                          customer: amc.customer?._id,
+                                          customerName: amc.customer?.name,
+                                          appliance: amc.appliance?._id,
+                                          startDate: startStr,
+                                          endDate: endStr,
+                                          amcType: amc.amcType,
+                                          amcAmount: amc.amcAmount,
+                                          visitsIncluded: amc.visitsIncluded,
+                                          visitsUsed: 0,
+                                          includedServices: amc.includedServices,
+                                          notes: amc.notes
+                                        });
+                                        setActiveTab('renew-amc');
+                                      }}
+                                      className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-sm"
+                                    >
+                                      Renew
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Create/Edit/Renew AMC Page */}
+          {(activeTab === 'add-amc' || activeTab === 'edit-amc' || activeTab === 'renew-amc') && amcForm && (
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight">
+                    {activeTab === 'edit-amc' ? 'Edit AMC Details' : activeTab === 'renew-amc' ? 'Renew AMC Contract' : 'Create AMC Contract'}
+                  </h1>
+                  <p className="text-slate-400 mt-1">Configure service policies, coverage, visits, and amounts</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setAmcForm(null); setActiveTab('amcs'); }}
+                  className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 px-5 rounded-xl border border-slate-700 text-sm cursor-pointer transition duration-150"
+                >
+                  Back to List
+                </button>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-2xl">
+                <form onSubmit={saveAmc} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Customer Selection */}
+                    <div className="relative">
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Search Customer *</label>
+                      <input 
+                        required 
+                        type="text" 
+                        placeholder="Type customer name or mobile..."
+                        disabled={activeTab === 'edit-amc' || activeTab === 'renew-amc'}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 disabled:opacity-50 disabled:cursor-not-allowed" 
+                        value={amcForm.customerName || ''} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setAmcForm({ ...amcForm, customerName: val, customer: '', appliance: '' });
+                          if (val.trim().length >= 2) {
+                            const matches = customers.filter(c => 
+                              c.name.toLowerCase().includes(val.toLowerCase()) || 
+                              (c.mobile && c.mobile.includes(val))
+                            );
+                            setAmcCustSuggestions(matches);
+                          } else {
+                            setAmcCustSuggestions([]);
+                          }
+                        }}
+                      />
+                      {amcCustSuggestions.length > 0 && (
+                        <div className="absolute z-50 left-0 right-0 mt-1 bg-slate-850 border border-slate-750 rounded-lg shadow-xl max-h-40 overflow-y-auto divide-y divide-slate-700">
+                          {amcCustSuggestions.map(c => (
+                            <button
+                              key={c._id}
+                              type="button"
+                              className="w-full text-left px-4 py-2 text-sm text-white hover:bg-violet-600 transition flex justify-between items-center cursor-pointer"
+                              onClick={() => {
+                                setAmcForm({
+                                  ...amcForm,
+                                  customer: c._id,
+                                  customerName: c.name,
+                                  appliance: ''
+                                });
+                                setAmcCustSuggestions([]);
+                              }}
+                            >
+                              <span className="font-bold">{c.name}</span>
+                              <span className="text-xs text-slate-450">{c.mobile}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Customer Appliance */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Customer Appliance *</label>
+                      <select
+                        required
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        value={amcForm.appliance || ''}
+                        onChange={e => setAmcForm({ ...amcForm, appliance: e.target.value })}
+                        disabled={!amcForm.customer || activeTab === 'edit-amc' || activeTab === 'renew-amc'}
+                      >
+                        <option value="">Select Appliance</option>
+                        {(() => {
+                          const selectedCust = customers.find(c => c._id === amcForm.customer);
+                          if (!selectedCust || !selectedCust.appliances) return null;
+                          return selectedCust.appliances.map(app => (
+                            <option key={app._id} value={app._id}>{app.name}</option>
+                          ));
+                        })()}
+                      </select>
+                      {!amcForm.customer && (
+                        <p className="text-[10px] text-slate-500 mt-1">Please select a customer first to load their appliances.</p>
+                      )}
+                      {amcForm.customer && (() => {
+                        const selectedCust = customers.find(c => c._id === amcForm.customer);
+                        if (!selectedCust || !selectedCust.appliances || selectedCust.appliances.length === 0) {
+                          return <p className="text-[10px] text-amber-500 mt-1">This customer has no appliances. Please add appliances to their profile first.</p>;
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Start Date */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Start Date *</label>
+                      <input 
+                        required
+                        type="date"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                        value={amcForm.startDate}
+                        onChange={e => {
+                          const start = new Date(e.target.value);
+                          const end = new Date(start);
+                          end.setFullYear(end.getFullYear() + 1);
+                          end.setDate(end.getDate() - 1);
+                          const endStr = end.toISOString().split('T')[0];
+                          setAmcForm({ ...amcForm, startDate: e.target.value, endDate: endStr });
+                        }}
+                      />
+                    </div>
+
+                    {/* End Date */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">End Date *</label>
+                      <input 
+                        required
+                        type="date"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                        value={amcForm.endDate}
+                        onChange={e => setAmcForm({ ...amcForm, endDate: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* AMC Type */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">AMC Type *</label>
+                      <select
+                        required
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                        value={amcForm.amcType}
+                        onChange={e => setAmcForm({ ...amcForm, amcType: e.target.value })}
+                      >
+                        <option value="service_only">Service Only (Parts chargeable)</option>
+                        <option value="part_service">Part + Service (Parts covered)</option>
+                      </select>
+                    </div>
+
+                    {/* AMC Amount */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">AMC Amount (INR) *</label>
+                      <input 
+                        required
+                        type="number"
+                        min={0}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                        value={amcForm.amcAmount}
+                        onChange={e => setAmcForm({ ...amcForm, amcAmount: Number(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Visits Included */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Visits Included *</label>
+                      <input 
+                        required
+                        type="number"
+                        min={1}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                        value={amcForm.visitsIncluded}
+                        onChange={e => setAmcForm({ ...amcForm, visitsIncluded: Number(e.target.value) })}
+                      />
+                    </div>
+
+                    {/* Visits Used */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Visits Used</label>
+                      <input 
+                        type="number"
+                        min={0}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                        value={amcForm.visitsUsed || 0}
+                        onChange={e => setAmcForm({ ...amcForm, visitsUsed: Number(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Included Services */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Included Services & Coverage details</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Specify services covered under this AMC contract (e.g. 4 wet washings, electrical checks...)"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                      value={amcForm.includedServices || ''}
+                      onChange={e => setAmcForm({ ...amcForm, includedServices: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Internal Notes</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Add any specific comments or terms..."
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                      value={amcForm.notes || ''}
+                      onChange={e => setAmcForm({ ...amcForm, notes: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-5 border-t border-slate-800">
+                    <button 
+                      type="button" 
+                      onClick={() => { setAmcForm(null); setActiveTab('amcs'); }} 
+                      className="px-5 py-2.5 text-sm text-slate-400 hover:text-slate-200 cursor-pointer font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-6 rounded-xl text-sm cursor-pointer shadow-lg hover:shadow-violet-600/20 transition duration-150"
+                    >
+                      Save Contract
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Appliance History & Service Cards Details Modal */}
+          {applianceHistory && (
+            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">
+                <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+                  <div>
+                    <h3 className="font-extrabold text-white text-lg">Appliance Service & AMC History</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Customer: {applianceHistory.customerName} • Appliance: {applianceHistory.applianceName}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setApplianceHistory(null)} 
+                    className="text-slate-400 hover:text-slate-200 cursor-pointer"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                  {/* AMC Contracts history for this appliance */}
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 border-b border-slate-800 pb-1">AMC Contracts</h4>
+                    {(() => {
+                      const list = amcs.filter(a => a.customer?._id === applianceHistory.customer && a.appliance?._id === applianceHistory.appliance);
+                      if (list.length === 0) return <p className="text-xs text-slate-500">No AMC Contracts found for this appliance.</p>;
+                      return (
+                        <div className="space-y-2">
+                          {list.map(a => (
+                            <div key={a._id} className="bg-slate-850 border border-slate-800/80 p-3 rounded-lg flex items-center justify-between text-xs">
+                              <div>
+                                <p className="font-bold text-white capitalize">{a.amcType.replace('_', ' ')} • ₹ {a.amcAmount}</p>
+                                <p className="text-slate-450 mt-0.5">
+                                  {new Date(a.startDate).toLocaleDateString()} to {new Date(a.endDate).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                                a.status === 'active' ? 'bg-emerald-950 text-emerald-400' :
+                                a.status === 'upcoming' ? 'bg-blue-950 text-blue-400' :
+                                'bg-slate-800 text-slate-400'
+                              }`}>
+                                {a.status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Service Ticket history for this appliance */}
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 border-b border-slate-800 pb-1">Service & Maintenance Tickets</h4>
+                    {(() => {
+                      const list = tickets.filter(t => 
+                        t.customer?.mobile && 
+                        customers.find(c => c._id === applianceHistory.customer)?.mobile === t.customer.mobile &&
+                        t.product?.category.toLowerCase() === applianceHistory.applianceName.toLowerCase()
+                      );
+                      if (list.length === 0) return <p className="text-xs text-slate-500">No ticket service history found for this appliance.</p>;
+                      return (
+                        <div className="space-y-2">
+                          {list.map(t => (
+                            <div key={t._id} className="bg-slate-850 border border-slate-800/80 p-3 rounded-lg flex items-center justify-between text-xs">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-white">{t.ticketNumber}</span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 capitalize">{t.type}</span>
+                                </div>
+                                <p className="text-slate-450 mt-1">{t.product?.name} (Serial: {t.product?.serialNumber || 'N/A'})</p>
+                                <p className="text-slate-500 mt-0.5">{new Date(t.createdAt).toLocaleDateString()} • {t.serviceDetails?.description}</p>
+                              </div>
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 capitalize">{t.status}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+                <div className="bg-slate-850 px-6 py-4 flex justify-end border-t border-slate-800">
+                  <button 
+                    onClick={() => setApplianceHistory(null)} 
+                    className="bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold py-2 px-5 rounded-lg text-sm border border-slate-750 cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Inline History View Page */}
           {activeTab === 'history_view' && (
             <div className="space-y-8">
@@ -3411,8 +4049,90 @@ export default function App() {
                 </div>
               )}
 
-              {/* Requests List */}
-              <div className="space-y-4">
+              {historyContext === 'customer' && (
+                <div className="flex border-b border-slate-800 gap-6 mb-6">
+                  <button
+                    onClick={() => setCustomerHistoryTab('tickets')}
+                    className={`pb-3 text-sm font-bold transition relative cursor-pointer ${
+                      customerHistoryTab === 'tickets' ? 'text-violet-400' : 'text-slate-455 hover:text-slate-200'
+                    }`}
+                  >
+                    Service History (Tickets)
+                    {customerHistoryTab === 'tickets' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setCustomerHistoryTab('amcs')}
+                    className={`pb-3 text-sm font-bold transition relative cursor-pointer ${
+                      customerHistoryTab === 'amcs' ? 'text-violet-400' : 'text-slate-455 hover:text-slate-200'
+                    }`}
+                  >
+                    AMC Contracts
+                    {customerHistoryTab === 'amcs' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500" />
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {historyContext === 'customer' && customerHistoryTab === 'amcs' ? (
+                <div className="space-y-4">
+                  {(() => {
+                    const custAmcs = amcs.filter(a => a.customer?._id === historyEntity?._id || a.customer?.mobile === historyEntity?.mobile);
+                    if (custAmcs.length === 0) {
+                      return (
+                        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl py-16 text-center text-slate-500 text-sm">
+                          No AMC Contracts found for this customer.
+                        </div>
+                      );
+                    }
+                    return custAmcs.map(amc => {
+                      const remaining = amc.visitsIncluded - amc.visitsUsed;
+                      return (
+                        <div key={amc._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 hover:shadow-xl transition duration-150">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg font-black text-white">{amc.appliance?.name}</span>
+                              <span className="text-xs px-2.5 py-1 rounded-full font-bold uppercase bg-violet-955 text-violet-400 border border-violet-900/50">
+                                {amc.amcType ? amc.amcType.replace('_', ' ') : ''}
+                              </span>
+                            </div>
+                            <span className={`text-xs px-3 py-1.5 rounded-xl font-bold uppercase ${
+                              amc.status === 'active' ? 'bg-emerald-950 text-emerald-400' :
+                              amc.status === 'upcoming' ? 'bg-blue-950 text-blue-400' :
+                              'bg-slate-800 text-slate-400'
+                            }`}>
+                              {amc.status}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                            <div className="space-y-1">
+                              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Contract Details</p>
+                              <p className="text-white font-bold">Amount: ₹ {amc.amcAmount}</p>
+                              <p className="text-slate-450">
+                                Period: {new Date(amc.startDate).toLocaleDateString()} to {new Date(amc.endDate).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Visits Status</p>
+                              <p className="text-white font-bold">Visits Included: {amc.visitsIncluded}</p>
+                              <p className="text-slate-455">Visits Used: {amc.visitsUsed} ({remaining} remaining)</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Included Services & Notes</p>
+                              <p className="text-slate-300 italic">"{amc.includedServices || 'None specified'}"</p>
+                              {amc.notes && <p className="text-slate-450 mt-1 text-xs">Note: {amc.notes}</p>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              ) : (
+                /* Requests List */
+                <div className="space-y-4">
                 {(() => {
                   const filtered = historyTickets.filter(t => {
                     const s = historySearchQuery.toLowerCase();
@@ -3533,6 +4253,7 @@ export default function App() {
                   );
                 })()}
               </div>
+              )}
             </div>
           )}
 
