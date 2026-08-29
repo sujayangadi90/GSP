@@ -84,6 +84,18 @@ export default function App() {
   const [amcCustSuggestions, setAmcCustSuggestions] = useState([]);
   const [applianceHistory, setApplianceHistory] = useState(null); // null or { customer, appliance }
   const [customerHistoryTab, setCustomerHistoryTab] = useState('tickets'); // 'tickets' or 'amcs'
+  const [selectedFollowUpNotes, setSelectedFollowUpNotes] = useState(null); // null or followup object
+  const [newNoteText, setNewNoteText] = useState('');
+  const [showCreateFollowUp, setShowCreateFollowUp] = useState(false);
+  const [newFollowUpForm, setNewFollowUpForm] = useState({
+    category: 'service',
+    dueAt: '',
+    customerId: '',
+    customerName: '',
+    applianceId: '',
+    noteText: ''
+  });
+  const [followUpCustSuggestions, setFollowUpCustSuggestions] = useState([]);
   const [newRequestForm, setNewRequestForm] = useState({
     dealer: '',
     type: 'installation',
@@ -246,7 +258,8 @@ export default function App() {
   const [followUps, setFollowUps] = useState([]);
   const [followUpFilters, setFollowUpFilters] = useState({
     fromDate: new Date().toISOString().split('T')[0],
-    toDate: new Date().toISOString().split('T')[0]
+    toDate: new Date().toISOString().split('T')[0],
+    category: ''
   });
 
   // Pagination states
@@ -450,7 +463,7 @@ export default function App() {
 
   const fetchFollowUps = async () => {
     try {
-      const data = await apiFetch(`/followups?fromDate=${followUpFilters.fromDate}&toDate=${followUpFilters.toDate}`);
+      const data = await apiFetch(`/followups?fromDate=${followUpFilters.fromDate}&toDate=${followUpFilters.toDate}&category=${followUpFilters.category}`);
       setFollowUps(data);
     } catch (err) {
       console.error(err);
@@ -1154,6 +1167,78 @@ export default function App() {
         method: 'PATCH'
       });
       fetchAmcs();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const submitCreateFollowUp = async (e) => {
+    e.preventDefault();
+    try {
+      let amcId = undefined;
+      let ticketId = undefined;
+
+      if (newFollowUpForm.category === 'amc') {
+        const matchingAmcs = amcs.filter(a => a.customer?._id === newFollowUpForm.customerId && a.appliance?._id === newFollowUpForm.applianceId);
+        if (matchingAmcs.length === 0) {
+          return alert('No AMC contract found for this customer and selected appliance. Please create an AMC contract first.');
+        }
+        amcId = matchingAmcs[0]._id;
+      } else {
+        const matchingTickets = tickets.filter(t => 
+          t.customer?.mobile && 
+          customers.find(c => c._id === newFollowUpForm.customerId)?.mobile === t.customer.mobile &&
+          t.product?.category.toLowerCase() === appliances.find(a => a._id === newFollowUpForm.applianceId)?.name.toLowerCase()
+        );
+        if (matchingTickets.length > 0) {
+          ticketId = matchingTickets[0]._id;
+        } else {
+          const anyTicket = tickets.filter(t => t.customer?.mobile === customers.find(c => c._id === newFollowUpForm.customerId)?.mobile);
+          if (anyTicket.length > 0) {
+            ticketId = anyTicket[0]._id;
+          } else {
+            return alert('No service tickets found for this customer. Please raise a request first to schedule a service follow-up.');
+          }
+        }
+      }
+
+      await apiFetch('/followups', {
+        method: 'POST',
+        body: JSON.stringify({
+          category: newFollowUpForm.category,
+          dueAt: newFollowUpForm.dueAt,
+          amc: amcId,
+          ticket: ticketId,
+          noteText: newFollowUpForm.noteText
+        })
+      });
+
+      setShowCreateFollowUp(false);
+      setNewFollowUpForm({
+        category: 'service',
+        dueAt: '',
+        customerId: '',
+        customerName: '',
+        applianceId: '',
+        noteText: ''
+      });
+      fetchFollowUps();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const submitFollowUpNote = async (e) => {
+    e.preventDefault();
+    if (!newNoteText.trim()) return;
+    try {
+      const updated = await apiFetch(`/followups/${selectedFollowUpNotes._id}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ text: newNoteText })
+      });
+      setSelectedFollowUpNotes(updated);
+      setNewNoteText('');
+      fetchFollowUps();
     } catch (err) {
       alert(err.message);
     }
@@ -4271,9 +4356,28 @@ export default function App() {
           {/* Follow-ups Tab */}
           {activeTab === 'followups' && (
             <div className="space-y-8">
-              <div>
-                <h1 className="text-3xl font-extrabold text-white tracking-tight">Follow-ups Dashboard</h1>
-                <p className="text-slate-400 mt-1">Manage scheduled customer follow-up actions</p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight">Follow-ups Dashboard</h1>
+                  <p className="text-slate-400 mt-1">Manage scheduled customer follow-up actions</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setNewFollowUpForm({
+                      category: 'service',
+                      dueAt: new Date().toISOString().split('T')[0],
+                      customerId: '',
+                      customerName: '',
+                      applianceId: '',
+                      noteText: ''
+                    });
+                    setShowCreateFollowUp(true);
+                  }}
+                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150 shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  Schedule Follow-up
+                </button>
               </div>
 
               {/* Filters */}
@@ -4282,7 +4386,7 @@ export default function App() {
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">From Date</label>
                   <input
                     type="date"
-                    className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
                     value={followUpFilters.fromDate}
                     onChange={e => setFollowUpFilters({ ...followUpFilters, fromDate: e.target.value })}
                   />
@@ -4291,10 +4395,22 @@ export default function App() {
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">To Date</label>
                   <input
                     type="date"
-                    className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
                     value={followUpFilters.toDate}
                     onChange={e => setFollowUpFilters({ ...followUpFilters, toDate: e.target.value })}
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Category</label>
+                  <select
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                    value={followUpFilters.category}
+                    onChange={e => setFollowUpFilters({ ...followUpFilters, category: e.target.value })}
+                  >
+                    <option value="">All Categories</option>
+                    <option value="service">Service</option>
+                    <option value="amc">AMC</option>
+                  </select>
                 </div>
               </div>
 
@@ -4303,77 +4419,102 @@ export default function App() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-slate-800/50 border-b border-slate-800">
-                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Due Date</th>
-                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</th>
-                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Mobile</th>
-                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Appliance</th>
-                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Brand</th>
-                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Address</th>
-                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                        <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                      <tr className="bg-slate-800/50 border-b border-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <th className="p-4">Due Date</th>
+                        <th className="p-4">Category</th>
+                        <th className="p-4">Customer</th>
+                        <th className="p-4">Mobile</th>
+                        <th className="p-4">Appliance</th>
+                        <th className="p-4">Reference Details</th>
+                        <th className="p-4">Address</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
                       {followUps.length === 0 ? (
                         <tr>
-                          <td colSpan="8" className="p-8 text-center text-slate-500 text-sm">No follow-ups found for the selected date range.</td>
+                          <td colSpan="9" className="p-8 text-center text-slate-500 text-sm">No follow-ups found for the selected criteria.</td>
                         </tr>
                       ) : (
-                        followUps.slice((followUpPage - 1) * 15, followUpPage * 15).map(f => (
-                          <tr key={f._id} className="hover:bg-slate-800/20 transition">
-                            <td className="p-4 text-sm font-semibold text-slate-200">
-                              {new Date(f.dueAt).toLocaleDateString('en-GB')}
-                            </td>
-                            <td className="p-4 text-sm font-medium">
-                              {f.ticket?.customer ? (
-                                <button
-                                  onClick={() => viewHistory('customer', f.ticket.customer, 'followups')}
-                                  className="text-violet-400 hover:text-violet-300 font-bold hover:underline cursor-pointer text-left"
-                                >
-                                  {f.ticket.customer.name}
-                                </button>
-                              ) : (
-                                'N/A'
-                              )}
-                            </td>
-                            <td className="p-4 text-sm text-slate-300">
-                              {f.ticket?.customer?.mobile || 'N/A'}
-                            </td>
-                            <td className="p-4 text-sm text-slate-300">
-                              {f.ticket?.product?.category || 'N/A'}
-                            </td>
-                            <td className="p-4 text-sm text-slate-300">
-                              {f.ticket?.product?.name || 'N/A'}
-                            </td>
-                            <td className="p-4 text-sm text-slate-400 truncate max-w-xs">
-                              {f.ticket?.customer?.address || 'N/A'}
-                            </td>
-                            <td className="p-4 text-sm">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${f.status === 'new' ? 'bg-violet-950 text-violet-300' : 'bg-emerald-950 text-emerald-400'}`}>
-                                {f.status === 'new' ? 'New' : 'Closed'}
-                              </span>
-                            </td>
-                            <td className="p-4 text-sm text-right space-x-2">
-                              {f.ticket && (
-                                <button
-                                  onClick={() => setSelectedTicket(f.ticket)}
-                                  className="text-xs font-bold text-violet-400 hover:text-violet-300 cursor-pointer"
-                                >
-                                  View Ticket
-                                </button>
-                              )}
-                              {f.status === 'new' && (
-                                <button
-                                  onClick={() => markFollowUpClosed(f._id)}
-                                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold cursor-pointer"
-                                >
-                                  Mark Closed
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))
+                        followUps.slice((followUpPage - 1) * 15, followUpPage * 15).map(f => {
+                          // Resolve details based on category
+                          const isAmc = f.category === 'amc';
+                          const cust = isAmc ? f.amc?.customer : f.ticket?.customer;
+                          const applianceName = isAmc ? f.amc?.appliance?.name : f.ticket?.product?.category;
+                          const refDetails = isAmc ? `AMC (Amount: ₹${f.amc?.amcAmount || 0})` : `Ticket: ${f.ticket?.ticketNumber || 'N/A'}`;
+
+                          return (
+                            <tr key={f._id} className="hover:bg-slate-800/20 transition text-sm">
+                              <td className="p-4 font-semibold text-slate-200">
+                                {new Date(f.dueAt).toLocaleDateString('en-GB')}
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase ${isAmc ? 'bg-cyan-950 text-cyan-400 border border-cyan-900/50' : 'bg-slate-800 text-slate-450'}`}>
+                                  {f.category || 'service'}
+                                </span>
+                              </td>
+                              <td className="p-4 font-medium">
+                                {cust ? (
+                                  <button
+                                    onClick={() => viewHistory('customer', cust, 'followups')}
+                                    className="text-violet-400 hover:text-violet-300 font-bold hover:underline cursor-pointer text-left"
+                                  >
+                                    {cust.name}
+                                  </button>
+                                ) : (
+                                  'N/A'
+                                )}
+                              </td>
+                              <td className="p-4 text-slate-300 font-mono text-xs">
+                                {cust?.mobile || 'N/A'}
+                              </td>
+                              <td className="p-4 text-slate-300">
+                                {applianceName || 'N/A'}
+                              </td>
+                              <td className="p-4 text-xs text-slate-350">
+                                {refDetails}
+                              </td>
+                              <td className="p-4 text-slate-400 truncate max-w-xs" title={cust?.address}>
+                                {cust?.address || 'N/A'}
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase ${f.status === 'new' ? 'bg-violet-950 text-violet-300' : 'bg-emerald-950 text-emerald-400'}`}>
+                                  {f.status === 'new' ? 'New' : 'Closed'}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-center justify-center gap-2.5">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedFollowUpNotes(f);
+                                      setNewNoteText('');
+                                    }}
+                                    className="bg-slate-850 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-sm"
+                                  >
+                                    Notes ({f.notes?.length || 0})
+                                  </button>
+                                  {!isAmc && f.ticket && (
+                                    <button
+                                      onClick={() => setSelectedTicket(f.ticket)}
+                                      className="text-xs font-bold text-violet-400 hover:text-violet-300 cursor-pointer"
+                                    >
+                                      Ticket
+                                    </button>
+                                  )}
+                                  {f.status === 'new' && (
+                                    <button
+                                      onClick={() => markFollowUpClosed(f._id)}
+                                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-md"
+                                    >
+                                      Close
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -4959,6 +5100,213 @@ export default function App() {
                 Close Details
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Manual Follow-up Modal */}
+      {showCreateFollowUp && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <h3 className="font-extrabold text-white text-lg">Schedule New Follow-up</h3>
+              <button 
+                onClick={() => setShowCreateFollowUp(false)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form onSubmit={submitCreateFollowUp}>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Category *</label>
+                  <select
+                    required
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                    value={newFollowUpForm.category}
+                    onChange={e => setNewFollowUpForm({ ...newFollowUpForm, category: e.target.value, customerId: '', customerName: '', applianceId: '' })}
+                  >
+                    <option value="service">Service (Service tickets follow-up)</option>
+                    <option value="amc">AMC (AMC contract follow-up)</option>
+                  </select>
+                </div>
+
+                <div className="relative">
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Search Customer *</label>
+                  <input 
+                    required 
+                    type="text" 
+                    placeholder="Type customer name or mobile..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                    value={newFollowUpForm.customerName} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setNewFollowUpForm({ ...newFollowUpForm, customerName: val, customerId: '', applianceId: '' });
+                      if (val.trim().length >= 2) {
+                        const matches = customers.filter(c => 
+                          c.name.toLowerCase().includes(val.toLowerCase()) || 
+                          (c.mobile && c.mobile.includes(val))
+                        );
+                        setFollowUpCustSuggestions(matches);
+                      } else {
+                        setFollowUpCustSuggestions([]);
+                      }
+                    }}
+                  />
+                  {followUpCustSuggestions.length > 0 && (
+                    <div className="absolute z-50 left-0 right-0 mt-1 bg-slate-850 border border-slate-750 rounded-lg shadow-xl max-h-40 overflow-y-auto divide-y divide-slate-700">
+                      {followUpCustSuggestions.map(c => (
+                        <button
+                          key={c._id}
+                          type="button"
+                          className="w-full text-left px-4 py-2 text-xs text-white hover:bg-violet-600 transition flex justify-between items-center cursor-pointer"
+                          onClick={() => {
+                            setNewFollowUpForm({
+                              ...newFollowUpForm,
+                              customerId: c._id,
+                              customerName: c.name,
+                              applianceId: ''
+                            });
+                            setFollowUpCustSuggestions([]);
+                          }}
+                        >
+                          <span className="font-bold">{c.name}</span>
+                          <span className="text-xs text-slate-450">{c.mobile}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Customer Appliance *</label>
+                  <select
+                    required
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                    value={newFollowUpForm.applianceId}
+                    onChange={e => setNewFollowUpForm({ ...newFollowUpForm, applianceId: e.target.value })}
+                    disabled={!newFollowUpForm.customerId}
+                  >
+                    <option value="">Select Appliance</option>
+                    {(() => {
+                      const selectedCust = customers.find(c => c._id === newFollowUpForm.customerId);
+                      if (!selectedCust || !selectedCust.appliances) return null;
+                      return selectedCust.appliances.map(app => (
+                        <option key={app._id} value={app._id}>{app.name}</option>
+                      ));
+                    })()}
+                  </select>
+                  {!newFollowUpForm.customerId && (
+                    <p className="text-[10px] text-slate-500 mt-1">Please select a customer first to load their appliances.</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Due Date *</label>
+                  <input
+                    required
+                    type="date"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                    value={newFollowUpForm.dueAt}
+                    onChange={e => setNewFollowUpForm({ ...newFollowUpForm, dueAt: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Notes / Description *</label>
+                  <textarea
+                    required
+                    rows={2}
+                    placeholder="Enter instructions, remarks or agenda for this follow-up..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                    value={newFollowUpForm.noteText}
+                    onChange={e => setNewFollowUpForm({ ...newFollowUpForm, noteText: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="bg-slate-850 px-6 py-4 flex items-center justify-end gap-3 border-t border-slate-800">
+                <button 
+                  type="button" 
+                  onClick={() => setShowCreateFollowUp(false)} 
+                  className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer shadow-md transition"
+                >
+                  Schedule Follow-up
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Follow-up Notes Thread Modal */}
+      {selectedFollowUpNotes && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <div>
+                <h3 className="font-extrabold text-white text-lg">Follow-up Notes Thread</h3>
+                <p className="text-xs text-slate-400 mt-0.5 capitalize">
+                  Category: {selectedFollowUpNotes.category} • Due: {new Date(selectedFollowUpNotes.dueAt).toLocaleDateString('en-GB')}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedFollowUpNotes(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-955/20">
+              {(!selectedFollowUpNotes.notes || selectedFollowUpNotes.notes.length === 0) ? (
+                <p className="text-center text-slate-500 py-8 text-sm italic">No comments or notes added yet.</p>
+              ) : (
+                selectedFollowUpNotes.notes.map((note, index) => (
+                  <div key={note._id || index} className="bg-slate-850/65 border border-slate-800/80 p-3.5 rounded-xl space-y-1.5 shadow-xs">
+                    <div className="flex justify-between items-center text-xs text-slate-450">
+                      <span className="font-bold text-violet-400">{note.author}</span>
+                      <span>{new Date(note.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p className="text-sm text-slate-200 whitespace-pre-wrap">{note.text}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <form onSubmit={submitFollowUpNote} className="p-4 bg-slate-900 border-t border-slate-800/85 space-y-3">
+              <div>
+                <textarea
+                  required
+                  rows={2}
+                  placeholder="Type a new comment or update to the thread..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                  value={newNoteText}
+                  onChange={e => setNewNoteText(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2.5">
+                <button 
+                  type="button" 
+                  onClick={() => setSelectedFollowUpNotes(null)} 
+                  className="px-4 py-2 text-xs text-slate-400 hover:text-slate-200 cursor-pointer font-semibold"
+                >
+                  Close Thread
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-4 rounded-lg text-xs cursor-pointer shadow-md transition"
+                >
+                  Add Note
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

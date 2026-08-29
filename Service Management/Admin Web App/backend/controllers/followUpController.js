@@ -5,11 +5,13 @@ const FollowUp = require('../models/FollowUp');
 // @access  Private/Admin
 const getFollowUps = async (req, res) => {
   try {
-    const { fromDate, toDate } = req.query;
+    const { fromDate, toDate, category } = req.query;
 
     let query = {};
+    if (category) {
+      query.category = category;
+    }
     if (fromDate && toDate) {
-      // Set boundary times: start of fromDate to end of toDate
       const start = new Date(fromDate);
       start.setUTCHours(0, 0, 0, 0);
 
@@ -27,9 +29,88 @@ const getFollowUps = async (req, res) => {
           select: 'name code mobile email'
         }
       })
+      .populate({
+        path: 'amc',
+        populate: [
+          { path: 'customer' },
+          { path: 'appliance' }
+        ]
+      })
       .sort({ dueAt: 1 });
 
     res.json(followUps);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Create a custom follow-up manually
+// @route   POST /api/followups
+// @access  Private/Admin
+const createFollowUp = async (req, res) => {
+  try {
+    const { category, dueAt, ticket, amc, noteText } = req.body;
+    const followUp = new FollowUp({
+      category: category || 'service',
+      dueAt,
+      ticket: ticket || undefined,
+      amc: amc || undefined,
+      status: 'new'
+    });
+
+    if (noteText) {
+      followUp.notes = [{
+        text: noteText,
+        author: req.user ? req.user.name : 'Admin'
+      }];
+    }
+
+    const saved = await followUp.save();
+    const populated = await FollowUp.findById(saved._id)
+      .populate({
+        path: 'ticket',
+        populate: { path: 'dealer', select: 'name code mobile email' }
+      })
+      .populate({
+        path: 'amc',
+        populate: [{ path: 'customer' }, { path: 'appliance' }]
+      });
+
+    res.status(201).json(populated);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Add a note to a follow-up notes thread
+// @route   POST /api/followups/:id/notes
+// @access  Private/Admin
+const addFollowUpNote = async (req, res) => {
+  try {
+    const { text } = req.body;
+    const followUp = await FollowUp.findById(req.params.id);
+    if (!followUp) {
+      return res.status(404).json({ message: 'Follow-up not found' });
+    }
+
+    followUp.notes.push({
+      text,
+      author: req.user ? req.user.name : 'Admin'
+    });
+
+    await followUp.save();
+
+    const populated = await FollowUp.findById(req.params.id)
+      .populate({
+        path: 'ticket',
+        populate: { path: 'dealer', select: 'name code mobile email' }
+      })
+      .populate({
+        path: 'amc',
+        populate: [{ path: 'customer' }, { path: 'appliance' }]
+      });
+
+    res.json(populated);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -47,9 +128,19 @@ const closeFollowUp = async (req, res) => {
 
     followUp.status = 'closed';
     followUp.closedAt = new Date();
-    const updatedFollowUp = await followUp.save();
+    await followUp.save();
 
-    res.json(updatedFollowUp);
+    const populated = await FollowUp.findById(req.params.id)
+      .populate({
+        path: 'ticket',
+        populate: { path: 'dealer', select: 'name code mobile email' }
+      })
+      .populate({
+        path: 'amc',
+        populate: [{ path: 'customer' }, { path: 'appliance' }]
+      });
+
+    res.json(populated);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -57,5 +148,7 @@ const closeFollowUp = async (req, res) => {
 
 module.exports = {
   getFollowUps,
+  createFollowUp,
+  addFollowUpNote,
   closeFollowUp
 };

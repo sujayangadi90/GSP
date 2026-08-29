@@ -1,6 +1,7 @@
 const Amc = require('../models/Amc');
 const Customer = require('../models/Customer');
 const Appliance = require('../models/Appliance');
+const FollowUp = require('../models/FollowUp');
 
 const calculateStatus = (startDate, endDate, currentStatus) => {
   if (currentStatus === 'cancelled') return 'cancelled';
@@ -32,6 +33,25 @@ const createAmc = async (req, res) => {
       notes: notes || '',
       status
     });
+
+    // Auto-schedule FollowUp visits evenly across contract period
+    try {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = end.getTime() - start.getTime();
+      const count = Number(visitsIncluded) || 4;
+      for (let i = 1; i <= count; i++) {
+        const dueTime = start.getTime() + (diffTime * i) / (count + 1);
+        await FollowUp.create({
+          amc: amc._id,
+          category: 'amc',
+          dueAt: new Date(dueTime),
+          status: 'new'
+        });
+      }
+    } catch (followUpErr) {
+      console.error('Failed to auto-schedule AMC follow-ups:', followUpErr.message);
+    }
 
     const populated = await Amc.findById(amc._id).populate('customer').populate('appliance');
     res.status(201).json(populated);
