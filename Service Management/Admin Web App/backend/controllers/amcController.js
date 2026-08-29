@@ -46,9 +46,25 @@ const createAmc = async (req, res) => {
           amc: amc._id,
           category: 'amc',
           dueAt: new Date(dueTime),
-          status: 'new'
+          status: 'new',
+          notes: [{
+            text: `Scheduled maintenance checkup visit #${i} under AMC contract.`,
+            author: 'System'
+          }]
         });
       }
+
+      // Schedule Expiry Follow-up
+      await FollowUp.create({
+        amc: amc._id,
+        category: 'amc',
+        dueAt: end,
+        status: 'new',
+        notes: [{
+          text: 'AMC Contract Expiry Follow-up. Contact customer to pitch AMC renewal.',
+          author: 'System'
+        }]
+      });
     } catch (followUpErr) {
       console.error('Failed to auto-schedule AMC follow-ups:', followUpErr.message);
     }
