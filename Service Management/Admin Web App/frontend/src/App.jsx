@@ -7050,8 +7050,10 @@ export default function App() {
                             </p>
                             <div className="divide-y divide-slate-800 text-xs">
                               {comp.usedParts.map((item, pIdx) => {
-                                const partName = item.part?.name || item.name || (typeof item.part === 'string' ? item.part : 'Part');
-                                const partSku = item.part?.sku || item.sku || '';
+                                const partId = typeof item.part === 'string' ? item.part : (item.part?._id || item.part);
+                                const invMatch = inventory.find(inv => inv._id === partId);
+                                const partName = item.part?.name || item.name || invMatch?.name || (typeof item.part === 'string' ? (invMatch?.name || item.part) : 'Spare Part');
+                                const partSku = item.part?.sku || item.sku || invMatch?.sku || '';
                                 return (
                                   <div key={pIdx} className="py-1.5 flex items-center justify-between text-slate-300">
                                     <div>

@@ -249,6 +249,8 @@ const getTickets = async (req, res) => {
           .populate('dealer', 'name code email mobile')
           .populate('assignedTechnician', 'name code mobile')
           .populate('createdBy', 'name code email mobile role')
+          .populate('completion.usedParts.part', 'name sku sellingPrice')
+          .populate('completionHistory.usedParts.part', 'name sku sellingPrice')
           .sort({ createdAt: -1 });
 
         // filter in memory
@@ -321,6 +323,8 @@ const getTickets = async (req, res) => {
           .populate('dealer', 'name code email mobile')
           .populate('assignedTechnician', 'name code mobile')
           .populate('createdBy', 'name code email mobile role')
+          .populate('completion.usedParts.part', 'name sku sellingPrice')
+          .populate('completionHistory.usedParts.part', 'name sku sellingPrice')
           .sort({ createdAt: -1 });
 
         const ticketsWithFees = await attachFeesToTickets(tickets);
@@ -371,15 +375,42 @@ const getTickets = async (req, res) => {
       }
     }
     
-    if (technician && req.user.role === 'admin') {
-      query.assignedTechnician = technician;
+    // Technician performance detail tickets
+    if (technician && performanceFilter && fromDate && toDate) {
+      const start = new Date(`${fromDate}T00:00:00`);
+      const end = new Date(`${toDate}T23:59:59.999`);
 
-      if (performanceFilter) {
-        const start = new Date(`${fromDate}T00:00:00`);
-        const end = new Date(`${toDate}T23:59:59.999`);
+      if (performanceFilter === 'rejected') {
+        const historyTickets = await Ticket.find({
+          'timeline.status': 'assigned',
+          'timeline.note': { $regex: 'rejected', $options: 'i' }
+        })
+          .populate('dealer', 'name code email mobile')
+          .populate('assignedTechnician', 'name code mobile')
+          .populate('createdBy', 'name code email mobile role')
+          .populate('completion.usedParts.part', 'name sku sellingPrice')
+          .populate('completionHistory.usedParts.part', 'name sku sellingPrice')
+          .sort({ createdAt: -1 });
 
+        const filtered = historyTickets.filter(t => {
+          return t.timeline.some(item => {
+            const isMatch = item.note && item.note.toLowerCase().includes('rejected');
+            const inRange = new Date(item.timestamp) >= start && new Date(item.timestamp) <= end;
+            return isMatch && inRange;
+          });
+        });
+
+        const ticketsWithFees = await attachFeesToTickets(filtered);
+        return res.json(ticketsWithFees);
+      } else {
+        query.assignedTechnician = technician;
         if (performanceFilter === 'assigned') {
-          query.timeline = { $elemMatch: { status: 'assigned', timestamp: { $gte: start, $lte: end } } };
+          query.timeline = {
+            $elemMatch: {
+              status: 'assigned',
+              timestamp: { $gte: start, $lte: end }
+            }
+          };
         } else if (performanceFilter === 'completed') {
           query.status = { $in: ['completed', 'closed'] };
           query['completion.submittedAt'] = { $gte: start, $lte: end };
@@ -395,6 +426,8 @@ const getTickets = async (req, res) => {
           .populate('dealer', 'name code email mobile')
           .populate('assignedTechnician', 'name code mobile')
           .populate('createdBy', 'name code email mobile role')
+          .populate('completion.usedParts.part', 'name sku sellingPrice')
+          .populate('completionHistory.usedParts.part', 'name sku sellingPrice')
           .sort({ createdAt: -1 });
 
         const totalCount = await Ticket.countDocuments({
@@ -503,6 +536,8 @@ const getTickets = async (req, res) => {
         .populate('dealer', 'name code email mobile')
         .populate('assignedTechnician', 'name code mobile')
         .populate('createdBy', 'name code email mobile role')
+        .populate('completion.usedParts.part', 'name sku sellingPrice')
+        .populate('completionHistory.usedParts.part', 'name sku sellingPrice')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(l);
@@ -521,6 +556,8 @@ const getTickets = async (req, res) => {
       .populate('dealer', 'name code email mobile')
       .populate('assignedTechnician', 'name code mobile')
       .populate('createdBy', 'name code email mobile role')
+      .populate('completion.usedParts.part', 'name sku sellingPrice')
+      .populate('completionHistory.usedParts.part', 'name sku sellingPrice')
       .sort({ createdAt: -1 });
 
     const ticketsWithFees = await attachFeesToTickets(tickets);
