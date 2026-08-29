@@ -33,6 +33,7 @@ const API_BASE = '/api';
 
 // Donut Chart Component
 const DonutChart = ({ data = [] }) => {
+  const [hoveredIdx, setHoveredIdx] = useState(null);
   const safeData = Array.isArray(data) ? data : [];
   const total = safeData.reduce((acc, item) => acc + (item.count || 0), 0);
   if (total === 0) {
@@ -43,41 +44,83 @@ const DonutChart = ({ data = [] }) => {
     );
   }
 
-  let accumulatedAngle = 0;
-  const colors = ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#6B7280'];
+  // Circle properties
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius; // ~238.761
+
+  // 10 distinct, vibrant modern colors
+  const colors = [
+    '#8B5CF6', // Purple / Violet
+    '#3B82F6', // Blue
+    '#10B981', // Emerald / Green
+    '#F59E0B', // Amber / Orange
+    '#EF4444', // Red
+    '#EC4899', // Pink
+    '#06B6D4', // Cyan
+    '#F97316', // Bright Orange
+    '#A855F7', // Bright Violet
+    '#64748B'  // Slate / Gray for Others
+  ];
+
+  let accumulatedPercentage = 0;
+
+  const activeItem = hoveredIdx !== null ? safeData[hoveredIdx] : null;
 
   return (
     <div className="flex flex-col sm:flex-row items-center gap-6">
-      <div className="relative w-36 h-36 flex-shrink-0">
+      <div className="relative w-40 h-40 flex-shrink-0">
         <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
           {safeData.map((item, idx) => {
             const count = item.count || 0;
-            const percentage = (count / total) * 100;
-            const strokeDasharray = `${percentage} ${100 - percentage}`;
-            const strokeDashoffset = -accumulatedAngle;
-            accumulatedAngle += percentage;
-            const color = colors[idx % colors.length];
+            const percentage = count / total;
+            const strokeDasharray = `${percentage * circumference} ${circumference * (1 - percentage)}`;
+            const strokeDashoffset = -(accumulatedPercentage * circumference);
+            accumulatedPercentage += percentage;
+            
+            // Assign specific color or slate for "Others"
+            const color = item.name === 'Others' ? '#64748B' : colors[idx % colors.length];
+            const isHovered = hoveredIdx === idx;
 
             return (
               <circle
                 key={idx}
                 cx="50"
                 cy="50"
-                r="40"
+                r={radius}
                 fill="transparent"
                 stroke={color}
-                strokeWidth="12"
+                strokeWidth={isHovered ? 15 : 12}
                 strokeDasharray={strokeDasharray}
                 strokeDashoffset={strokeDashoffset}
-                className="transition-all duration-300 hover:stroke-[14px]"
-              />
+                className="transition-all duration-200 cursor-pointer"
+                onMouseEnter={() => setHoveredIdx(idx)}
+                onMouseLeave={() => setHoveredIdx(null)}
+              >
+                <title>{`${item.name}: ${count} (${(percentage * 100).toFixed(1)}%)`}</title>
+              </circle>
             );
           })}
-          <circle cx="50" cy="50" r="28" fill="#0f172a" />
+          <circle cx="50" cy="50" r="26" fill="#0f172a" />
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total</span>
-          <span className="text-xl font-black text-white">{total}</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-2">
+          {activeItem ? (
+            <>
+              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider truncate max-w-[85px]" title={activeItem.name}>
+                {activeItem.name}
+              </span>
+              <span className="text-lg font-black text-white leading-tight">
+                {activeItem.count}
+              </span>
+              <span className="text-[9px] font-bold text-violet-400 font-mono">
+                {((activeItem.count / total) * 100).toFixed(1)}%
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total</span>
+              <span className="text-xl font-black text-white">{total}</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -85,12 +128,21 @@ const DonutChart = ({ data = [] }) => {
         {safeData.map((item, idx) => {
           const count = item.count || 0;
           const percentage = ((count / total) * 100).toFixed(1);
-          const color = colors[idx % colors.length];
+          const color = item.name === 'Others' ? '#64748B' : colors[idx % colors.length];
+          const isHovered = hoveredIdx === idx;
           return (
-            <div key={idx} className="flex items-center justify-between text-xs py-0.5">
+            <div 
+              key={idx} 
+              onMouseEnter={() => setHoveredIdx(idx)}
+              onMouseLeave={() => setHoveredIdx(null)}
+              className={`flex items-center justify-between text-xs py-1 px-2 rounded-lg transition cursor-pointer ${isHovered ? 'bg-slate-800/80 shadow-sm' : 'hover:bg-slate-800/40'}`}
+              title={`${item.name}: ${count} (${percentage}%)`}
+            >
               <div className="flex items-center gap-2 truncate pr-2">
                 <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                <span className="font-semibold text-slate-300 truncate" title={item.name}>{item.name || 'Unknown'}</span>
+                <span className={`font-semibold truncate transition ${isHovered ? 'text-white font-bold' : 'text-slate-300'}`}>
+                  {item.name || 'Unknown'}
+                </span>
               </div>
               <div className="flex-shrink-0 space-x-1.5 font-mono">
                 <span className="font-bold text-white">{count}</span>
