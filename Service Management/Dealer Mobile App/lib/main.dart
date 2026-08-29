@@ -2019,6 +2019,28 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
     );
   }
 
+  Widget _buildDetailBlock(String title, List<String> details) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1B24),
+        border: Border.all(color: Colors.blueGrey.withOpacity(0.15)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purpleAccent)),
+          const SizedBox(height: 12),
+          ...details.map((d) => Padding(
+            padding: const EdgeInsets.only(bottom: 6.0),
+            child: Text(d, style: const TextStyle(fontSize: 13, color: Colors.white70)),
+          )),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTimelineBlock(List timeline) {
     return Container(
       padding: const EdgeInsets.all(16),
