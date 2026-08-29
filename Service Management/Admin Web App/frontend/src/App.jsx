@@ -536,6 +536,8 @@ export default function App() {
   });
 
   // Pagination states
+  const [dealerPage, setDealerPage] = useState(1);
+  const [techPage, setTechPage] = useState(1);
   const [customerPage, setCustomerPage] = useState(1);
   const [followUpPage, setFollowUpPage] = useState(1);
   const [ticketPage, setTicketPage] = useState(1);
@@ -2670,68 +2672,119 @@ export default function App() {
                   placeholder="Search dealers by name, code, city, email..."
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                   value={dealerSearch}
-                  onChange={(e) => setDealerSearch(e.target.value)}
+                  onChange={(e) => {
+                    setDealerSearch(e.target.value);
+                    setDealerPage(1);
+                  }}
                 />
               </div>
 
               {/* Dealers List */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {dealers.map(dealer => (
-                  <div key={dealer._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative hover:shadow-2xl transition duration-200">
-                    <span className="absolute top-6 right-6 bg-slate-800 text-slate-300 font-bold text-xs px-2.5 py-1 rounded-lg">
-                      {dealer.code}
-                    </span>
-                    <h3 className="text-lg font-bold text-white pr-20">{dealer.name}</h3>
-                    <p className="text-sm text-slate-400 mt-1">{dealer.contactPerson} (Contact)</p>
-                    
-                    <div className="mt-4 space-y-2 text-sm text-slate-300">
-                      <p className="flex items-center gap-2">
-                        <span className="text-slate-500">Mob:</span> {dealer.mobile}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <span className="text-slate-500">Email:</span> {dealer.email}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <span className="text-slate-500">City:</span> {dealer.city}
-                      </p>
-                    </div>
+              {dealers.length === 0 ? (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500">
+                  No dealers found matching your search.
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {dealers.slice((dealerPage - 1) * 9, dealerPage * 9).map(dealer => (
+                      <div key={dealer._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative hover:shadow-2xl transition duration-200 flex flex-col justify-between">
+                        <div>
+                          <span className="absolute top-6 right-6 bg-slate-800 text-slate-300 font-bold text-xs px-2.5 py-1 rounded-lg font-mono">
+                            {dealer.code}
+                          </span>
+                          <h3 className="text-lg font-bold text-white pr-20">{dealer.name}</h3>
+                          <p className="text-sm text-slate-400 mt-1">{dealer.contactPerson} (Contact)</p>
+                          
+                          <div className="mt-4 space-y-2 text-sm text-slate-300">
+                            <p className="flex items-center gap-2">
+                              <span className="text-slate-500">Mob:</span> {dealer.mobile}
+                            </p>
+                            <p className="flex items-center gap-2">
+                              <span className="text-slate-500">Email:</span> {dealer.email}
+                            </p>
+                            <p className="flex items-center gap-2">
+                              <span className="text-slate-500">City:</span> {dealer.city}
+                            </p>
+                          </div>
+                        </div>
 
-                    <div className="mt-6 flex items-center justify-between border-t border-slate-800 pt-4">
-                      <button
-                        onClick={() => setDealerForm({ 
-                          id: dealer._id, 
-                          name: dealer.name, 
-                          contactPerson: dealer.contactPerson, 
-                          mobile: dealer.mobile, 
-                          email: dealer.email, 
-                          address: dealer.address, 
-                          city: dealer.city, 
-                          password: '' 
-                        })}
-                        className="text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer"
-                      >
-                        Edit Details
-                      </button>
-                      <button
-                        onClick={() => viewHistory('dealer', dealer, 'dealers')}
-                        className="text-xs text-amber-450 hover:text-amber-350 font-bold cursor-pointer"
-                      >
-                        History
-                      </button>
-                      <button
-                        onClick={() => toggleDealer(dealer._id)}
-                        className={`text-xs px-3.5 py-1.5 rounded-lg font-bold transition cursor-pointer ${
-                          dealer.status === 'active' 
-                          ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-700/35 hover:bg-emerald-900/20' 
-                          : 'bg-red-950/40 text-red-400 border border-red-700/35 hover:bg-red-900/20'
-                        }`}
-                      >
-                        {dealer.status === 'active' ? 'Active' : 'Disabled'}
-                      </button>
-                    </div>
+                        <div className="mt-6 flex items-center justify-between border-t border-slate-800 pt-4">
+                          <button
+                            onClick={() => setDealerForm({ 
+                              id: dealer._id, 
+                              name: dealer.name, 
+                              contactPerson: dealer.contactPerson, 
+                              mobile: dealer.mobile, 
+                              email: dealer.email, 
+                              address: dealer.address, 
+                              city: dealer.city, 
+                              password: '' 
+                            })}
+                            className="text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer"
+                          >
+                            Edit Details
+                          </button>
+                          <button
+                            onClick={() => viewHistory('dealer', dealer, 'dealers')}
+                            className="text-xs text-amber-450 hover:text-amber-350 font-bold cursor-pointer"
+                          >
+                            History
+                          </button>
+                          <button
+                            onClick={() => toggleDealer(dealer._id)}
+                            className={`text-xs px-3.5 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                              dealer.status === 'active' 
+                              ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-700/35 hover:bg-emerald-900/20' 
+                              : 'bg-red-950/40 text-red-400 border border-red-700/35 hover:bg-red-900/20'
+                            }`}
+                          >
+                            {dealer.status === 'active' ? 'Active' : 'Disabled'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+
+                  {/* Pagination Controls */}
+                  <div className="px-6 py-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-xs text-slate-400">
+                      Showing <span className="font-semibold text-slate-200">{dealers.length === 0 ? 0 : (dealerPage - 1) * 9 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(dealerPage * 9, dealers.length)}</span> of <span className="font-semibold text-slate-200">{dealers.length}</span> dealers
+                    </div>
+                    {Math.ceil(dealers.length / 9) > 1 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          onClick={() => setDealerPage(prev => Math.max(prev - 1, 1))}
+                          disabled={dealerPage === 1}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition text-xs font-bold"
+                        >
+                          Previous
+                        </button>
+                        {Array.from({ length: Math.ceil(dealers.length / 9) }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setDealerPage(page)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                              page === dealerPage
+                                ? 'bg-violet-600 text-white shadow-md'
+                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setDealerPage(prev => Math.min(prev + 1, Math.ceil(dealers.length / 9)))}
+                          disabled={dealerPage === Math.ceil(dealers.length / 9)}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition text-xs font-bold"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -2773,109 +2826,160 @@ export default function App() {
                   placeholder="Search technicians by name, code, email..."
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                   value={techSearch}
-                  onChange={(e) => setTechSearch(e.target.value)}
+                  onChange={(e) => {
+                    setTechSearch(e.target.value);
+                    setTechPage(1);
+                  }}
                 />
               </div>
 
               {/* Technicians List */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {technicians.map(tech => (
-                  <div key={tech._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative hover:shadow-2xl transition duration-200">
-                    <span className="absolute top-6 right-6 bg-slate-800 text-slate-300 font-bold text-xs px-2.5 py-1 rounded-lg">
-                      {tech.code}
-                    </span>
-                    <h3 className="text-lg font-bold text-white pr-20">{tech.name}</h3>
-                    
-                    <div className="mt-4 space-y-2 text-sm text-slate-300">
-                      <p className="flex items-center gap-2">
-                        <span className="text-slate-500">Mob:</span> {tech.mobile}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <span className="text-slate-500">Email:</span> {tech.email}
-                      </p>
-                      {tech.appliances && tech.appliances.length > 0 && (
-                        <div className="pt-1 flex flex-wrap gap-1">
-                          {tech.appliances.map(a => (
-                            <span key={a._id} className="text-[10px] font-bold bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">
-                              {a.name}
-                            </span>
-                          ))}
+              {technicians.length === 0 ? (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500">
+                  No technicians found matching your search.
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {technicians.slice((techPage - 1) * 9, techPage * 9).map(tech => (
+                      <div key={tech._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative hover:shadow-2xl transition duration-200 flex flex-col justify-between">
+                        <div>
+                          <span className="absolute top-6 right-6 bg-slate-800 text-slate-300 font-bold text-xs px-2.5 py-1 rounded-lg font-mono">
+                            {tech.code}
+                          </span>
+                          <h3 className="text-lg font-bold text-white pr-20">{tech.name}</h3>
+                          
+                          <div className="mt-4 space-y-2 text-sm text-slate-300">
+                            <p className="flex items-center gap-2">
+                              <span className="text-slate-500">Mob:</span> {tech.mobile}
+                            </p>
+                            <p className="flex items-center gap-2">
+                              <span className="text-slate-500">Email:</span> {tech.email}
+                            </p>
+                            {tech.appliances && tech.appliances.length > 0 && (
+                              <div className="pt-1 flex flex-wrap gap-1">
+                                {tech.appliances.map(a => (
+                                  <span key={a._id} className="text-[10px] font-bold bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">
+                                    {a.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {tech.pincodes && tech.pincodes.length > 0 && (
+                              <p className="text-xs text-slate-400 mt-2">
+                                <span className="text-slate-500 font-semibold">Pincodes served:</span> {tech.pincodes.join(', ')}
+                              </p>
+                            )}
+                            <div className="mt-3 pt-2 border-t border-slate-800/60 space-y-1.5">
+                              <p className="text-xs text-slate-500 font-semibold">Documents:</p>
+                              <div className="flex flex-wrap gap-2 text-xs">
+                                {tech.drivingLicense ? (
+                                  <a href={`${API_BASE}/${tech.drivingLicense}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
+                                    DL ✓
+                                  </a>
+                                ) : (
+                                  <span className="text-slate-600">DL ✗</span>
+                                )}
+                                {tech.aadhar ? (
+                                  <a href={`${API_BASE}/${tech.aadhar}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
+                                    Aadhar ✓
+                                  </a>
+                                ) : (
+                                  <span className="text-slate-600">Aadhar ✗</span>
+                                )}
+                                {tech.insurance ? (
+                                  <a href={`${API_BASE}/${tech.insurance}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
+                                    Insurance ✓
+                                  </a>
+                                ) : (
+                                  <span className="text-slate-600">Insurance ✗</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      )}
-                      {tech.pincodes && tech.pincodes.length > 0 && (
-                        <p className="text-xs text-slate-400 mt-2">
-                          <span className="text-slate-500 font-semibold">Pincodes served:</span> {tech.pincodes.join(', ')}
-                        </p>
-                      )}
-                      <div className="mt-3 pt-2 border-t border-slate-800/60 space-y-1.5">
-                        <p className="text-xs text-slate-500 font-semibold">Documents:</p>
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          {tech.drivingLicense ? (
-                            <a href={`${API_BASE}/${tech.drivingLicense}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
-                              DL ✓
-                            </a>
-                          ) : (
-                            <span className="text-slate-600">DL ✗</span>
-                          )}
-                          {tech.aadhar ? (
-                            <a href={`${API_BASE}/${tech.aadhar}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
-                              Aadhar ✓
-                            </a>
-                          ) : (
-                            <span className="text-slate-600">Aadhar ✗</span>
-                          )}
-                          {tech.insurance ? (
-                            <a href={`${API_BASE}/${tech.insurance}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
-                              Insurance ✓
-                            </a>
-                          ) : (
-                            <span className="text-slate-600">Insurance ✗</span>
-                          )}
+
+                        <div className="mt-6 flex items-center justify-between border-t border-slate-800 pt-4">
+                          <button
+                            onClick={() => {
+                              setTechForm({ 
+                                id: tech._id, 
+                                name: tech.name, 
+                                mobile: tech.mobile, 
+                                email: tech.email, 
+                                password: '',
+                                appliances: tech.appliances ? tech.appliances.map(a => typeof a === 'object' ? a._id : a) : [],
+                                drivingLicense: tech.drivingLicense || '',
+                                aadhar: tech.aadhar || '',
+                                insurance: tech.insurance || '',
+                                pincodes: tech.pincodes || []
+                              });
+                              setActiveTab('edit-technician');
+                            }}
+                            className="text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer"
+                          >
+                            Edit Details
+                          </button>
+                          <button
+                            onClick={() => viewHistory('technician', tech, 'technicians')}
+                            className="text-xs text-amber-450 hover:text-amber-350 font-bold cursor-pointer"
+                          >
+                            History
+                          </button>
+                          <button
+                            onClick={() => toggleTech(tech._id)}
+                            className={`text-xs px-3.5 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                              tech.status === 'active' 
+                              ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-700/35 hover:bg-emerald-900/20' 
+                              : 'bg-red-950/40 text-red-400 border border-red-700/35 hover:bg-red-900/20'
+                            }`}
+                          >
+                            {tech.status === 'active' ? 'Active' : 'Disabled'}
+                          </button>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="mt-6 flex items-center justify-between border-t border-slate-800 pt-4">
-                      <button
-                        onClick={() => {
-                          setTechForm({ 
-                            id: tech._id, 
-                            name: tech.name, 
-                            mobile: tech.mobile, 
-                            email: tech.email, 
-                            password: '',
-                            appliances: tech.appliances ? tech.appliances.map(a => typeof a === 'object' ? a._id : a) : [],
-                            drivingLicense: tech.drivingLicense || '',
-                            aadhar: tech.aadhar || '',
-                            insurance: tech.insurance || '',
-                            pincodes: tech.pincodes || []
-                          });
-                          setActiveTab('edit-technician');
-                        }}
-                        className="text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer"
-                      >
-                        Edit Details
-                      </button>
-                      <button
-                        onClick={() => viewHistory('technician', tech, 'technicians')}
-                        className="text-xs text-amber-450 hover:text-amber-350 font-bold cursor-pointer"
-                      >
-                        History
-                      </button>
-                      <button
-                        onClick={() => toggleTech(tech._id)}
-                        className={`text-xs px-3.5 py-1.5 rounded-lg font-bold transition cursor-pointer ${
-                          tech.status === 'active' 
-                          ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-700/35 hover:bg-emerald-900/20' 
-                          : 'bg-red-950/40 text-red-400 border border-red-700/35 hover:bg-red-900/20'
-                        }`}
-                      >
-                        {tech.status === 'active' ? 'Active' : 'Disabled'}
-                      </button>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+
+                  {/* Pagination Controls */}
+                  <div className="px-6 py-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-xs text-slate-400">
+                      Showing <span className="font-semibold text-slate-200">{technicians.length === 0 ? 0 : (techPage - 1) * 9 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(techPage * 9, technicians.length)}</span> of <span className="font-semibold text-slate-200">{technicians.length}</span> technicians
+                    </div>
+                    {Math.ceil(technicians.length / 9) > 1 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          onClick={() => setTechPage(prev => Math.max(prev - 1, 1))}
+                          disabled={techPage === 1}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition text-xs font-bold"
+                        >
+                          Previous
+                        </button>
+                        {Array.from({ length: Math.ceil(technicians.length / 9) }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setTechPage(page)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                              page === techPage
+                                ? 'bg-violet-600 text-white shadow-md'
+                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setTechPage(prev => Math.min(prev + 1, Math.ceil(technicians.length / 9)))}
+                          disabled={techPage === Math.ceil(technicians.length / 9)}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition text-xs font-bold"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
