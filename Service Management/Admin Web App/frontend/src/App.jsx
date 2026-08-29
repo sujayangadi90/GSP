@@ -6844,7 +6844,45 @@ export default function App() {
             <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
               <div>
                 <h3 className="font-extrabold text-white text-lg">{selectedTicket.ticketNumber} Details</h3>
-                <p className="text-xs text-slate-400 mt-0.5 capitalize">Type: {selectedTicket.type} • Status: {selectedTicket.status.replace('_', ' ')}</p>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <p className="text-xs text-slate-400 capitalize">Type: {selectedTicket.type} • Status: {selectedTicket.status.replace('_', ' ')}</p>
+                  <span className="text-slate-600 text-xs">•</span>
+                  {(() => {
+                    const creator = selectedTicket.createdBy;
+                    const dealer = selectedTicket.dealer;
+                    const source = selectedTicket.source;
+
+                    let creatorType = 'Dealer';
+                    let creatorName = dealer?.name || 'Dealer';
+                    let creatorCode = dealer?.code ? ` (${dealer.code})` : '';
+                    let badgeColor = 'bg-purple-950/70 text-purple-300 border-purple-800/50';
+
+                    if (source === 'admin' || creator?.role === 'admin') {
+                      creatorType = 'Admin';
+                      creatorName = creator?.name || 'Admin User';
+                      creatorCode = '';
+                      badgeColor = 'bg-blue-950/70 text-blue-300 border-blue-800/50';
+                    } else if (source === 'technician' || creator?.role === 'technician') {
+                      creatorType = 'Technician';
+                      creatorName = creator?.name || 'Technician';
+                      creatorCode = creator?.code ? ` (${creator.code})` : '';
+                      badgeColor = 'bg-teal-950/70 text-teal-300 border-teal-800/50';
+                    } else if (creator?.role === 'dealer') {
+                      creatorType = 'Dealer';
+                      creatorName = creator?.name || dealer?.name || 'Dealer';
+                      creatorCode = creator?.code ? ` (${creator.code})` : (dealer?.code ? ` (${dealer.code})` : '');
+                      badgeColor = 'bg-purple-950/70 text-purple-300 border-purple-800/50';
+                    }
+
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-md border ${badgeColor}`}>
+                        <span className="text-slate-400 font-normal">Created by:</span>
+                        <span className="font-bold">{creatorName}{creatorCode}</span>
+                        <span className="text-[10px] uppercase tracking-wider opacity-75 font-mono">[{creatorType}]</span>
+                      </span>
+                    );
+                  })()}
+                </div>
               </div>
               <button onClick={() => { setSelectedTicket(null); setShowCancelForm(false); setCancelReason(''); fetchData(); fetchDashboardData(); }} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-6 h-6" /></button>
             </div>

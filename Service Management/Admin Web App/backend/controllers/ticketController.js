@@ -248,6 +248,7 @@ const getTickets = async (req, res) => {
         let tickets = await Ticket.find(query)
           .populate('dealer', 'name code email mobile')
           .populate('assignedTechnician', 'name code mobile')
+          .populate('createdBy', 'name code email mobile role')
           .sort({ createdAt: -1 });
 
         // filter in memory
@@ -319,6 +320,7 @@ const getTickets = async (req, res) => {
         const tickets = await Ticket.find(dealerTicketsQuery)
           .populate('dealer', 'name code email mobile')
           .populate('assignedTechnician', 'name code mobile')
+          .populate('createdBy', 'name code email mobile role')
           .sort({ createdAt: -1 });
 
         const ticketsWithFees = await attachFeesToTickets(tickets);
@@ -392,6 +394,7 @@ const getTickets = async (req, res) => {
         const tickets = await Ticket.find(query)
           .populate('dealer', 'name code email mobile')
           .populate('assignedTechnician', 'name code mobile')
+          .populate('createdBy', 'name code email mobile role')
           .sort({ createdAt: -1 });
 
         const totalCount = await Ticket.countDocuments({
@@ -499,6 +502,7 @@ const getTickets = async (req, res) => {
       const tickets = await Ticket.find(query)
         .populate('dealer', 'name code email mobile')
         .populate('assignedTechnician', 'name code mobile')
+        .populate('createdBy', 'name code email mobile role')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(l);
@@ -516,6 +520,7 @@ const getTickets = async (req, res) => {
     const tickets = await Ticket.find(query)
       .populate('dealer', 'name code email mobile')
       .populate('assignedTechnician', 'name code mobile')
+      .populate('createdBy', 'name code email mobile role')
       .sort({ createdAt: -1 });
 
     const ticketsWithFees = await attachFeesToTickets(tickets);
@@ -534,6 +539,7 @@ const getTicketById = async (req, res) => {
     const ticket = await Ticket.findById(req.params.id)
       .populate('dealer', 'name code email mobile contactPerson address city')
       .populate('assignedTechnician', 'name code mobile email')
+      .populate('createdBy', 'name code email mobile role')
       .populate('completion.usedParts.part', 'name sku sellingPrice')
       .populate('completionHistory.usedParts.part', 'name sku sellingPrice');
 
