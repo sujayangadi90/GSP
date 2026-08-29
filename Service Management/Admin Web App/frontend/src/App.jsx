@@ -25,7 +25,8 @@ import {
   Trash2,
   Edit,
   Power,
-  Menu
+  Menu,
+  Package
 } from 'lucide-react';
 
 const API_BASE = '/api';
@@ -96,6 +97,15 @@ export default function App() {
     noteText: ''
   });
   const [followUpCustSuggestions, setFollowUpCustSuggestions] = useState([]);
+  
+  // Inventory states
+  const [inventory, setInventory] = useState([]);
+  const [inventoryFilters, setInventoryFilters] = useState({ search: '', lowStock: false });
+  const [inventoryForm, setInventoryForm] = useState(null); // null or { name, sku, quantity, minStockLevel, sellingPrice }
+  const [showStockAdjustment, setShowStockAdjustment] = useState(null); // null or { id, name, sku, mode, quantity }
+  const [selectedItemTransactions, setSelectedItemTransactions] = useState(null); // null or item object
+  const [inventoryPage, setInventoryPage] = useState(1);
+  
   const [newRequestForm, setNewRequestForm] = useState({
     dealer: '',
     type: 'installation',
@@ -488,6 +498,15 @@ export default function App() {
     }
   };
 
+  const fetchInventory = async () => {
+    try {
+      const data = await apiFetch(`/inventory?search=${inventoryFilters.search}&lowStock=${inventoryFilters.lowStock}`);
+      setInventory(data);
+    } catch (err) {
+      console.error('Error fetching inventory:', err);
+    }
+  };
+
   const fetchDealerHistory = async () => {
     if (!dealerFromDate || !dealerToDate) {
       alert('Both dates are mandatory.');
@@ -811,6 +830,8 @@ export default function App() {
         fetchAppliances();
       } else if (activeTab === 'followups') {
         fetchFollowUps();
+      } else if (activeTab === 'inventory') {
+        fetchInventory();
       } else if (activeTab === 'dashboard') {
         fetchDashboardData();
       } else {
@@ -819,9 +840,10 @@ export default function App() {
         fetchAppliances();
         fetchBrands();
         fetchCustomers();
+        fetchInventory();
       }
     }
-  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters]);
+  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters, inventoryFilters]);
 
   useEffect(() => {
     setCustomerPage(1);
@@ -830,6 +852,10 @@ export default function App() {
   useEffect(() => {
     setFollowUpPage(1);
   }, [followUpFilters]);
+
+  useEffect(() => {
+    setInventoryPage(1);
+  }, [inventoryFilters]);
 
   useEffect(() => {
     if (user && user.role === 'admin') {
@@ -1239,6 +1265,44 @@ export default function App() {
       setSelectedFollowUpNotes(updated);
       setNewNoteText('');
       fetchFollowUps();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const saveInventoryItem = async (e) => {
+    e.preventDefault();
+    try {
+      if (inventoryForm.id) {
+        await apiFetch(`/inventory/${inventoryForm.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(inventoryForm)
+        });
+      } else {
+        await apiFetch('/inventory', {
+          method: 'POST',
+          body: JSON.stringify(inventoryForm)
+        });
+      }
+      setInventoryForm(null);
+      fetchInventory();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const submitStockAdjustment = async (e) => {
+    e.preventDefault();
+    const qty = Number(showStockAdjustment.quantity);
+    if (!qty || qty <= 0) return alert('Please enter a valid positive quantity');
+    try {
+      const endpoint = `/inventory/${showStockAdjustment.id}/${showStockAdjustment.mode === 'in' ? 'stock-in' : 'stock-out'}`;
+      await apiFetch(endpoint, {
+        method: 'POST',
+        body: JSON.stringify({ quantity: qty })
+      });
+      setShowStockAdjustment(null);
+      fetchInventory();
     } catch (err) {
       alert(err.message);
     }
@@ -1663,6 +1727,15 @@ export default function App() {
             >
               <ClipboardList className="w-5 h-5" />
               AMC Contracts
+            </button>
+          )}
+          {(!user || user.permissions?.customers !== false) && (
+            <button
+              onClick={() => { setActiveTab('inventory'); setMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'inventory' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <Package className="w-5 h-5" />
+              Inventory
             </button>
           )}
           {(!user || user.permissions?.manageDealers !== false) && (
@@ -4554,8 +4627,214 @@ export default function App() {
                   </div>
                 </div>
               </div>
+          {/* Inventory Tab */}
+          {activeTab === 'inventory' && (
+            <div className="space-y-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight">Inventory Management</h1>
+                  <p className="text-slate-400 mt-1">Manage, edit, and track parts stock</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setInventoryForm({
+                      name: '',
+                      sku: '',
+                      quantity: 0,
+                      minStockLevel: 5,
+                      sellingPrice: 0
+                    });
+                  }}
+                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150 shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Inventory Item
+                </button>
+              </div>
+
+              {/* Filters */}
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-wrap gap-4 items-end shadow-xl">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Search Items</label>
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Search SKU or item name..."
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                      value={inventoryFilters.search}
+                      onChange={e => setInventoryFilters({ ...inventoryFilters, search: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5 mb-3.5">
+                  <input
+                    type="checkbox"
+                    id="lowStockFilter"
+                    className="w-4 h-4 rounded-sm border-slate-700 bg-slate-800 text-violet-600 focus:ring-violet-500 cursor-pointer"
+                    checked={inventoryFilters.lowStock}
+                    onChange={e => setInventoryFilters({ ...inventoryFilters, lowStock: e.target.checked })}
+                  />
+                  <label htmlFor="lowStockFilter" className="text-sm font-semibold text-slate-350 cursor-pointer select-none">
+                    Show Low Stock Only
+                  </label>
+                </div>
+              </div>
+
+              {/* Listing Table */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800/50 border-b border-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <th className="p-4">SKU</th>
+                        <th className="p-4">Item Name</th>
+                        <th className="p-4">Available Stock</th>
+                        <th className="p-4">Min stock level</th>
+                        <th className="p-4">Selling Price</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {inventory.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="p-8 text-center text-slate-500 text-sm">No inventory items found.</td>
+                        </tr>
+                      ) : (
+                        inventory.slice((inventoryPage - 1) * 15, inventoryPage * 15).map(item => {
+                          let statusLabel = 'Active';
+                          let statusClass = 'bg-emerald-950 text-emerald-400';
+                          if (item.quantity === 0) {
+                            statusLabel = 'Out of Stock';
+                            statusClass = 'bg-rose-950 text-rose-400 border border-rose-900/50';
+                          } else if (item.quantity <= item.minStockLevel) {
+                            statusLabel = 'Low Stock';
+                            statusClass = 'bg-amber-950 text-amber-400 border border-amber-905/50';
+                          }
+
+                          return (
+                            <tr key={item._id} className="hover:bg-slate-800/20 transition text-sm">
+                              <td className="p-4 font-mono font-bold text-slate-200">
+                                {item.sku}
+                              </td>
+                              <td className="p-4 font-medium text-slate-200">
+                                {item.name}
+                              </td>
+                              <td className="p-4 font-semibold text-slate-300">
+                                {item.quantity}
+                              </td>
+                              <td className="p-4 text-slate-400">
+                                {item.minStockLevel}
+                              </td>
+                              <td className="p-4 text-slate-300">
+                                ₹{item.sellingPrice}
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase ${statusClass}`}>
+                                  {statusLabel}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setShowStockAdjustment({
+                                        id: item._id,
+                                        name: item.name,
+                                        sku: item.sku,
+                                        mode: 'in',
+                                        quantity: ''
+                                      });
+                                    }}
+                                    className="bg-emerald-700/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-900/40 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-xs"
+                                  >
+                                    Stock In
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setShowStockAdjustment({
+                                        id: item._id,
+                                        name: item.name,
+                                        sku: item.sku,
+                                        mode: 'out',
+                                        quantity: ''
+                                      });
+                                    }}
+                                    className="bg-rose-700/20 hover:bg-rose-600/30 text-rose-400 border border-rose-900/40 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-xs"
+                                    disabled={item.quantity === 0}
+                                  >
+                                    Stock Out
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setInventoryForm({
+                                        id: item._id,
+                                        name: item.name,
+                                        sku: item.sku,
+                                        minStockLevel: item.minStockLevel,
+                                        sellingPrice: item.sellingPrice
+                                      });
+                                    }}
+                                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => setSelectedItemTransactions(item)}
+                                    className="bg-violet-955/40 hover:bg-violet-900/50 text-violet-400 border border-violet-900/30 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-xs"
+                                  >
+                                    History ({item.transactions?.length || 0})
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-6 py-4 bg-slate-955/30 border-t border-slate-800/80 flex items-center justify-between">
+                  <div className="text-xs text-slate-400">
+                    Showing <span className="font-semibold text-slate-200">{inventory.length === 0 ? 0 : (inventoryPage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(inventoryPage * 15, inventory.length)}</span> of <span className="font-semibold text-slate-200">{inventory.length}</span> entries
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setInventoryPage(prev => Math.max(prev - 1, 1))}
+                      disabled={inventoryPage === 1}
+                      className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: Math.ceil(inventory.length / 15) }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setInventoryPage(page)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                          page === inventoryPage
+                            ? 'bg-violet-600 text-white shadow-md'
+                            : 'bg-slate-850 text-slate-355 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setInventoryPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(inventory.length / 15))))}
+                      disabled={inventoryPage === Math.max(1, Math.ceil(inventory.length / 15))}
+                      className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-355 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
+          
+        </div>
+      )}
 
           {/* Reports Tab */}
           {activeTab === 'reports' && (
@@ -5098,6 +5377,227 @@ export default function App() {
                 className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm cursor-pointer transition shadow-md"
               >
                 Close Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Inventory Item Modal */}
+      {inventoryForm && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <h3 className="font-extrabold text-white text-lg">{inventoryForm.id ? 'Edit Inventory Item' : 'Add Inventory Item'}</h3>
+              <button 
+                onClick={() => setInventoryForm(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form onSubmit={saveInventoryItem}>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Item Name *</label>
+                  <input 
+                    required 
+                    type="text" 
+                    placeholder="e.g. Copper Pipe 1/4 inch"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500" 
+                    value={inventoryForm.name} 
+                    onChange={e => setInventoryForm({ ...inventoryForm, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">SKU *</label>
+                  <input 
+                    required 
+                    type="text" 
+                    placeholder="e.g. COP-PIPE-01"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500" 
+                    value={inventoryForm.sku} 
+                    onChange={e => setInventoryForm({ ...inventoryForm, sku: e.target.value })}
+                  />
+                </div>
+                {!inventoryForm.id && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Initial Quantity *</label>
+                    <input 
+                      required 
+                      type="number" 
+                      min="0"
+                      placeholder="e.g. 50"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500" 
+                      value={inventoryForm.quantity} 
+                      onChange={e => setInventoryForm({ ...inventoryForm, quantity: e.target.value })}
+                    />
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Min Stock Level *</label>
+                    <input 
+                      required 
+                      type="number" 
+                      min="0"
+                      placeholder="e.g. 5"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500" 
+                      value={inventoryForm.minStockLevel} 
+                      onChange={e => setInventoryForm({ ...inventoryForm, minStockLevel: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Selling Price *</label>
+                    <input 
+                      required 
+                      type="number" 
+                      min="0"
+                      placeholder="e.g. 150"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500" 
+                      value={inventoryForm.sellingPrice} 
+                      onChange={e => setInventoryForm({ ...inventoryForm, sellingPrice: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-850 px-6 py-4 flex items-center justify-end gap-3 border-t border-slate-800">
+                <button 
+                  type="button" 
+                  onClick={() => setInventoryForm(null)} 
+                  className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer shadow-md transition"
+                >
+                  Save Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Adjustment Modal (In / Out) */}
+      {showStockAdjustment && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <h3 className="font-extrabold text-white text-lg">Stock Adjustment ({showStockAdjustment.mode === 'in' ? 'Stock In' : 'Stock Out'})</h3>
+              <button 
+                onClick={() => setShowStockAdjustment(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form onSubmit={submitStockAdjustment}>
+              <div className="p-6 space-y-4">
+                <div className="bg-slate-850 p-4 rounded-xl space-y-1 text-sm border border-slate-800">
+                  <p className="text-slate-400">Item: <span className="font-bold text-white">{showStockAdjustment.name}</span></p>
+                  <p className="text-slate-400">SKU: <span className="font-mono text-white text-xs">{showStockAdjustment.sku}</span></p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Adjustment Quantity *</label>
+                  <input 
+                    required 
+                    type="number" 
+                    min="1"
+                    placeholder="Enter quantity to adjust..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500" 
+                    value={showStockAdjustment.quantity} 
+                    onChange={e => setShowStockAdjustment({ ...showStockAdjustment, quantity: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="bg-slate-850 px-6 py-4 flex items-center justify-end gap-3 border-t border-slate-800">
+                <button 
+                  type="button" 
+                  onClick={() => setShowStockAdjustment(null)} 
+                  className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className={`font-bold py-2 px-5 rounded-lg text-sm cursor-pointer shadow-md transition text-white ${showStockAdjustment.mode === 'in' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'}`}
+                >
+                  Confirm {showStockAdjustment.mode === 'in' ? 'Stock In' : 'Stock Out'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction History Modal */}
+      {selectedItemTransactions && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <div>
+                <h3 className="font-extrabold text-white text-lg">Stock Transaction History</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{selectedItemTransactions.name} ({selectedItemTransactions.sku})</p>
+              </div>
+              <button 
+                onClick={() => setSelectedItemTransactions(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {(!selectedItemTransactions.transactions || selectedItemTransactions.transactions.length === 0) ? (
+                <p className="text-center text-slate-500 py-8 text-sm italic">No transaction history recorded yet.</p>
+              ) : (
+                <div className="bg-slate-950/20 border border-slate-800 rounded-xl overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-800/40 border-b border-slate-800 text-slate-450 font-bold uppercase tracking-wider">
+                        <th className="p-3">Date</th>
+                        <th className="p-3">Type</th>
+                        <th className="p-3 text-right">Qty</th>
+                        <th className="p-3">User</th>
+                        <th className="p-3">Ref Ticket</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {[...selectedItemTransactions.transactions].reverse().map((t, idx) => (
+                        <tr key={t._id || idx} className="hover:bg-slate-800/10">
+                          <td className="p-3">
+                            {new Date(t.date).toLocaleString('en-GB')}
+                          </td>
+                          <td className="p-3 font-semibold uppercase">
+                            {t.type === 'stock_in' && <span className="text-emerald-400">Stock In</span>}
+                            {t.type === 'stock_out' && <span className="text-rose-400">Stock Out</span>}
+                            {t.type === 'ticket_use' && <span className="text-cyan-400">Ticket Use</span>}
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-slate-200">
+                            {t.type === 'stock_in' ? `+${t.quantity}` : `-${t.quantity}`}
+                          </td>
+                          <td className="p-3 text-slate-400">
+                            {t.user}
+                          </td>
+                          <td className="p-3 font-mono text-[11px] text-slate-450">
+                            {t.ticketNumber || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-end border-t border-slate-800">
+              <button 
+                onClick={() => setSelectedItemTransactions(null)} 
+                className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer shadow-md transition"
+              >
+                Close History
               </button>
             </div>
           </div>

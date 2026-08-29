@@ -61,6 +61,7 @@ app.use('/api/followups', require('./routes/followUpRoutes'));
 app.use('/api/cities', require('./routes/cityRoutes'));
 app.use('/api/admins', require('./routes/adminRoutes'));
 app.use('/api/amcs', require('./routes/amcRoutes'));
+app.use('/api/inventory', require('./routes/inventoryRoutes'));
 
 // Fallback base route
 app.get('/', (req, res) => {

@@ -4,6 +4,7 @@ const Appliance = require('../models/Appliance');
 const Brand = require('../models/Brand');
 const FollowUp = require('../models/FollowUp');
 const Customer = require('../models/Customer');
+const InventoryItem = require('../models/InventoryItem');
 const { sendPushNotification } = require('../utils/notification');
 
 // @desc    Create a new request (Installation or Service)
@@ -685,7 +686,7 @@ const updateTicketStatus = async (req, res) => {
 // @route   PATCH /api/tickets/:id/complete
 // @access  Private/Technician
 const submitWorkCompletion = async (req, res) => {
-  const { workDone, remarks } = req.body;
+  const { workDone, remarks, usedParts } = req.body;
 
   try {
     const ticket = await Ticket.findById(req.params.id);
@@ -710,11 +711,45 @@ const submitWorkCompletion = async (req, res) => {
       return res.status(400).json({ message: 'Please upload at least one completion photo' });
     }
 
+    let parsedUsedParts = [];
+    if (usedParts) {
+      try {
+        parsedUsedParts = typeof usedParts === 'string' ? JSON.parse(usedParts) : usedParts;
+      } catch (err) {
+        console.error('Failed to parse usedParts:', err);
+      }
+    }
+
+    // Validate inventory stock
+    for (const up of parsedUsedParts) {
+      const item = await InventoryItem.findById(up.part);
+      if (!item) {
+        return res.status(404).json({ message: 'Inventory item not found' });
+      }
+      if (item.quantity < Number(up.quantity)) {
+        return res.status(400).json({ message: `Insufficient stock for item "${item.name}". Available: ${item.quantity}` });
+      }
+    }
+
+    // Deduct inventory stock and record transactions
+    for (const up of parsedUsedParts) {
+      const item = await InventoryItem.findById(up.part);
+      item.quantity -= Number(up.quantity);
+      item.transactions.push({
+        type: 'ticket_use',
+        quantity: Number(up.quantity),
+        user: req.user.name,
+        ticketNumber: ticket.ticketNumber
+      });
+      await item.save();
+    }
+
     const newCompletion = {
       photos: completionPhotos,
       workDone,
       remarks,
-      submittedAt: Date.now()
+      submittedAt: Date.now(),
+      usedParts: parsedUsedParts
     };
 
     ticket.status = 'verification_pending';

@@ -930,6 +930,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   final _remarksController = TextEditingController();
   final List<File> _completionPhotos = [];
   final _picker = ImagePicker();
+  List<dynamic> _inventory = [];
+  final List<Map<String, dynamic>> _selectedParts = [];
 
   String _formatDateTime(String? dtStr) {
     if (dtStr == null || dtStr.isEmpty) return 'Flexible';
@@ -950,6 +952,107 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   void initState() {
     super.initState();
     _loadJob();
+    _fetchInventory();
+  }
+
+  Future<void> _fetchInventory() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/inventory'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}'
+        },
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _inventory = jsonDecode(res.body);
+        });
+      }
+    } catch (e) {
+      print('Error fetching inventory: $e');
+    }
+  }
+
+  void _showAddPartDialog() {
+    if (_inventory.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No inventory items loaded')),
+      );
+      return;
+    }
+
+    dynamic selectedItem = _inventory[0];
+    final qtyController = TextEditingController(text: '1');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Add Part Used'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<dynamic>(
+                    value: selectedItem,
+                    isExpanded: true,
+                    items: _inventory.map((item) {
+                      return DropdownMenuItem<dynamic>(
+                        value: item,
+                        child: Text('${item['name']} - Avail: ${item['quantity']}'),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      setDialogState(() {
+                        selectedItem = val;
+                      });
+                    },
+                    decoration: const InputDecoration(labelText: 'Select Part'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: qtyController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Quantity'),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final qty = int.tryParse(qtyController.text);
+                    if (qty == null || qty <= 0) return;
+                    if (qty > (selectedItem['quantity'] ?? 0)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Insufficient stock. Available: ${selectedItem['quantity']}')),
+                      );
+                      return;
+                    }
+                    
+                    setState(() {
+                      _selectedParts.add({
+                        'part': selectedItem['_id'],
+                        'quantity': qty,
+                        'name': selectedItem['name'],
+                        'sku': selectedItem['sku']
+                      });
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Add'),
+                )
+              ],
+            );
+          }
+        );
+      }
+    );
   }
 
   Future<void> _loadJob() async {
@@ -1040,6 +1143,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       
       request.fields['workDone'] = _workDoneController.text.trim();
       request.fields['remarks'] = _remarksController.text.trim();
+      request.fields['usedParts'] = jsonEncode(_selectedParts.map((p) => {
+        'part': p['part'],
+        'quantity': p['quantity']
+      }).toList());
 
       for (var file in _completionPhotos) {
         request.files.add(await http.MultipartFile.fromPath('photos', file.path));
@@ -1332,6 +1439,41 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   ],
                 )).toList(),
               ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Parts Used', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[300])),
+                TextButton.icon(
+                  onPressed: _showAddPartDialog,
+                  icon: const Icon(Icons.add, size: 16, color: Colors.orangeAccent),
+                  label: const Text('Add Part', style: TextStyle(fontSize: 12, color: Colors.orangeAccent)),
+                )
+              ],
+            ),
+            if (_selectedParts.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _selectedParts.length,
+                itemBuilder: (context, idx) {
+                  final p = _selectedParts[idx];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(p['name'] ?? '', style: const TextStyle(fontSize: 13, color: Colors.white)),
+                    subtitle: Text('SKU: ${p['sku']} • Quantity: ${p['quantity']}', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, size: 16, color: Colors.red),
+                      onPressed: () => setState(() => _selectedParts.removeAt(idx)),
+                    ),
+                  );
+                },
+              )
+            ] else ...[
+              Text('No parts added.', style: TextStyle(color: Colors.grey[500], fontSize: 12, fontStyle: FontStyle.italic)),
             ],
             const SizedBox(height: 24),
             ElevatedButton(

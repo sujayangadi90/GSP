@@ -65,13 +65,21 @@ const TicketSchema = new mongoose.Schema({
     photos: [String],
     workDone: String,
     remarks: String,
-    submittedAt: Date
+    submittedAt: Date,
+    usedParts: [{
+      part: { type: mongoose.Schema.Types.ObjectId, ref: 'InventoryItem' },
+      quantity: { type: Number, required: true }
+    }]
   },
   completionHistory: [{
     photos: [String],
     workDone: String,
     remarks: String,
-    submittedAt: Date
+    submittedAt: Date,
+    usedParts: [{
+      part: { type: mongoose.Schema.Types.ObjectId, ref: 'InventoryItem' },
+      quantity: { type: Number, required: true }
+    }]
   }],
   adminVerification: {
     status: { type: String, enum: ['approved', 'rejected'] },
