@@ -58,6 +58,7 @@ export default function App() {
   const [techForm, setTechForm] = useState(null); // null or { id?, name, mobile, email, password }
   const [customerForm, setCustomerForm] = useState(null); // null or { name, mobile, alternateMobile, address, city, pincode, appliances }
   const [selectedTicket, setSelectedTicket] = useState(null); // null or ticket details object
+  const [selectedCustomerDetails, setSelectedCustomerDetails] = useState(null); // null or customer object
   const [assignTechId, setAssignTechId] = useState('');
   const [assignNotes, setAssignNotes] = useState('');
   const [verificationForm, setVerificationForm] = useState({ status: 'approved', reason: '' });
@@ -2909,7 +2910,12 @@ export default function App() {
                         filteredCustomers.slice((customerPage - 1) * 15, customerPage * 15).map((cust, idx) => (
                           <tr key={cust.mobile || idx} className="hover:bg-slate-800/25 transition duration-150">
                             <td className="py-4 px-6 font-bold text-white">
-                              <div>{cust.name}</div>
+                              <button 
+                                onClick={() => setSelectedCustomerDetails(cust)}
+                                className="text-left font-bold hover:text-violet-400 cursor-pointer transition duration-150 block"
+                              >
+                                {cust.name}
+                              </button>
                               {cust.appliances && cust.appliances.length > 0 && (
                                 <div className="mt-1 flex flex-wrap gap-1">
                                   {cust.appliances.map(a => (
@@ -4136,6 +4142,72 @@ export default function App() {
                 <button type="submit" className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer">Save Dealer</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Details Modal */}
+      {selectedCustomerDetails && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <h3 className="font-extrabold text-white text-lg">Customer Profile</h3>
+              <button 
+                onClick={() => setSelectedCustomerDetails(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4 text-sm text-slate-350">
+                <div>
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Customer Name</p>
+                  <p className="font-bold text-slate-200 text-base mt-0.5">{selectedCustomerDetails.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Mobile Number</p>
+                  <p className="font-bold text-slate-200 text-base mt-0.5">{selectedCustomerDetails.mobile}</p>
+                </div>
+                {selectedCustomerDetails.alternateMobile && (
+                  <div>
+                    <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Alternate Mobile</p>
+                    <p className="font-bold text-slate-200 mt-0.5">{selectedCustomerDetails.alternateMobile}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">City</p>
+                  <p className="font-bold text-slate-200 mt-0.5">{selectedCustomerDetails.city}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Address</p>
+                  <p className="font-bold text-slate-200 mt-0.5">{selectedCustomerDetails.address} (PIN: {selectedCustomerDetails.pincode})</p>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-800 pt-5">
+                <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-2">Owned Appliances</p>
+                {selectedCustomerDetails.appliances && selectedCustomerDetails.appliances.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCustomerDetails.appliances.map(app => (
+                      <span key={app._id || app} className="text-xs font-bold bg-violet-950/40 text-violet-400 border border-violet-850 px-3 py-1 rounded-lg">
+                        {typeof app === 'object' ? app.name : app}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">No appliances registered for this customer.</p>
+                )}
+              </div>
+            </div>
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-end border-t border-slate-800">
+              <button 
+                onClick={() => setSelectedCustomerDetails(null)} 
+                className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm cursor-pointer transition shadow-md"
+              >
+                Close Details
+              </button>
+            </div>
           </div>
         </div>
       )}
