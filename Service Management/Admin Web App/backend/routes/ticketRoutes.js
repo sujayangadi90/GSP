@@ -11,6 +11,7 @@ const {
   cancelTicket,
   getCustomers,
   addCustomer,
+  updateCustomer,
   getDashboardStats,
   sendCustomAdminMessage,
   getReports
@@ -32,6 +33,9 @@ router.route('/')
 router.route('/customers')
   .get(authorize('admin'), getCustomers)
   .post(authorize('admin'), addCustomer);
+
+router.route('/customers/:id')
+  .put(authorize('admin'), updateCustomer);
 
 router.route('/dashboard')
   .get(authorize('admin'), getDashboardStats);

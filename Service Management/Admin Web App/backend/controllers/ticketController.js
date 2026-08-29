@@ -995,6 +995,39 @@ const addCustomer = async (req, res) => {
   }
 };
 
+// @desc    Update customer details
+// @route   PUT /api/tickets/customers/:id
+// @access  Private/Admin
+const updateCustomer = async (req, res) => {
+  const { name, mobile, alternateMobile, address, city, pincode, appliances } = req.body;
+  try {
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+
+    if (mobile && mobile !== customer.mobile) {
+      const exists = await Customer.findOne({ mobile });
+      if (exists) {
+        return res.status(400).json({ message: 'Mobile number already registered to another customer' });
+      }
+    }
+
+    customer.name = name || customer.name;
+    customer.mobile = mobile || customer.mobile;
+    customer.alternateMobile = alternateMobile !== undefined ? alternateMobile : customer.alternateMobile;
+    customer.address = address || customer.address;
+    customer.city = city || customer.city;
+    customer.pincode = pincode || customer.pincode;
+    customer.appliances = appliances !== undefined ? appliances : customer.appliances;
+
+    const updated = await customer.save();
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get dashboard statistics with date filters
 // @route   GET /api/tickets/dashboard
 // @access  Private/Admin
@@ -1251,6 +1284,7 @@ module.exports = {
   cancelTicket,
   getCustomers,
   addCustomer,
+  updateCustomer,
   getDashboardStats,
   sendCustomAdminMessage,
   getReports

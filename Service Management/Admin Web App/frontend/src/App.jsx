@@ -833,7 +833,7 @@ export default function App() {
       const isAllowed = (tab) => {
         if (tab === 'dashboard' && !perms.dashboard) return false;
         if (tab === 'tickets' && !perms.tickets) return false;
-        if ((tab === 'customers' || tab === 'add-customer') && !perms.customers) return false;
+        if ((tab === 'customers' || tab === 'add-customer' || tab === 'edit-customer') && !perms.customers) return false;
         if ((tab === 'amcs' || tab === 'add-amc' || tab === 'edit-amc' || tab === 'renew-amc') && !perms.customers) return false;
         if (tab === 'dealers' && !perms.manageDealers) return false;
         if ((tab === 'technicians' || tab === 'add-technician' || tab === 'edit-technician') && !perms.manageTechnicians) return false;
@@ -1106,10 +1106,17 @@ export default function App() {
   const saveCustomer = async (e) => {
     e.preventDefault();
     try {
-      await apiFetch('/tickets/customers', {
-        method: 'POST',
-        body: JSON.stringify(customerForm)
-      });
+      if (customerForm.id) {
+        await apiFetch(`/tickets/customers/${customerForm.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(customerForm)
+        });
+      } else {
+        await apiFetch('/tickets/customers', {
+          method: 'POST',
+          body: JSON.stringify(customerForm)
+        });
+      }
       setCustomerForm(null);
       setActiveTab('customers');
       fetchCustomers();
@@ -1558,7 +1565,7 @@ export default function App() {
           {(!user || user.permissions?.customers !== false) && (
             <button
               onClick={() => { setActiveTab('customers'); setMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${(activeTab === 'customers' || activeTab === 'add-customer') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${(activeTab === 'customers' || activeTab === 'add-customer' || activeTab === 'edit-customer') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <UserCheck className="w-5 h-5" />
               Customers
@@ -3069,13 +3076,17 @@ export default function App() {
             </div>
           )}
 
-          {/* Add Customer Standalone Page */}
-          {activeTab === 'add-customer' && customerForm && (
+          {/* Add/Edit Customer Standalone Page */}
+          {(activeTab === 'add-customer' || activeTab === 'edit-customer') && customerForm && (
             <div className="max-w-3xl mx-auto space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-extrabold text-white tracking-tight">Add New Customer</h1>
-                  <p className="text-slate-400 mt-1">Create a new customer profile and assign owned appliances</p>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight">
+                    {customerForm.id ? 'Edit Customer Details' : 'Add New Customer'}
+                  </h1>
+                  <p className="text-slate-400 mt-1">
+                    {customerForm.id ? 'Update customer profile and assign owned appliances' : 'Create a new customer profile and assign owned appliances'}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -4921,7 +4932,26 @@ export default function App() {
                 )}
               </div>
             </div>
-            <div className="bg-slate-850 px-6 py-4 flex items-center justify-end border-t border-slate-800">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-end gap-3 border-t border-slate-800">
+              <button 
+                onClick={() => {
+                  setCustomerForm({
+                    id: selectedCustomerDetails._id,
+                    name: selectedCustomerDetails.name,
+                    mobile: selectedCustomerDetails.mobile,
+                    alternateMobile: selectedCustomerDetails.alternateMobile || '',
+                    address: selectedCustomerDetails.address,
+                    city: selectedCustomerDetails.city,
+                    pincode: selectedCustomerDetails.pincode,
+                    appliances: (selectedCustomerDetails.appliances || []).map(a => typeof a === 'object' ? a._id : a)
+                  });
+                  setSelectedCustomerDetails(null);
+                  setActiveTab('edit-customer');
+                }}
+                className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 px-5 rounded-xl text-sm cursor-pointer border border-slate-700 transition"
+              >
+                Edit Profile & Appliances
+              </button>
               <button 
                 onClick={() => setSelectedCustomerDetails(null)} 
                 className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm cursor-pointer transition shadow-md"
