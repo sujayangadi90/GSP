@@ -1346,49 +1346,93 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                       _job!['adminVerification']['reason'] ?? 'No reason provided',
                       style: const TextStyle(fontSize: 13, color: Colors.white, fontStyle: FontStyle.italic),
                     ),
-                    if (_job!['completion'] != null &&
-                        _job!['completion']['photos'] != null &&
-                        (_job!['completion']['photos'] as List).isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'Previous Completion Photos:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red[200]),
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 80,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: (_job!['completion']['photos'] as List).length,
-                          itemBuilder: (context, idx) {
-                            final base = widget.apiUrl.replaceAll('/api', '');
-                            final path = _job!['completion']['photos'][idx];
-                            final url = '$base/$path';
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: GestureDetector(
-                                onTap: () => _viewPhotos(context, _job!['completion']['photos']),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    url,
-                                    fit: BoxFit.cover,
-                                    width: 80,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        width: 80,
-                                        color: Colors.grey[850],
-                                        child: const Icon(Icons.broken_image, color: Colors.grey, size: 20),
-                                      );
-                                    },
-                                  ),
-                                ),
+                    ...(() {
+                      final history = (_job!['completionHistory'] as List?) ?? [];
+                      final completionsList = history.isNotEmpty
+                          ? history
+                          : (_job!['completion'] != null ? [_job!['completion']] : []);
+
+                      if (completionsList.isEmpty) return <Widget>[];
+
+                      return [
+                        const SizedBox(height: 12),
+                        Text(
+                          'Previous Completion Submission Photos:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red[200]),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: List.generate(completionsList.length, (attemptIndex) {
+                            final comp = completionsList[attemptIndex];
+                            final beforePhotos = comp['beforePhotos'] as List?;
+                            final afterPhotos = comp['afterPhotos'] as List?;
+                            final compPhotos = comp['photos'] as List?;
+
+                            if ((beforePhotos != null && beforePhotos.isNotEmpty) || (afterPhotos != null && afterPhotos.isNotEmpty)) {
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (beforePhotos != null && beforePhotos.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 6.0),
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => _viewPhotos(
+                                          context,
+                                          beforePhotos,
+                                          title: 'Before Photos (Attempt ${attemptIndex + 1})',
+                                        ),
+                                        icon: const Icon(Icons.camera_alt, size: 13, color: Colors.amberAccent),
+                                        label: Text('Before (${beforePhotos.length})', style: const TextStyle(fontSize: 11)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.amber[900]!.withOpacity(0.4),
+                                          foregroundColor: Colors.amber[200],
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                      ),
+                                    ),
+                                  if (afterPhotos != null && afterPhotos.isNotEmpty)
+                                    ElevatedButton.icon(
+                                      onPressed: () => _viewPhotos(
+                                        context,
+                                        afterPhotos,
+                                        title: 'After Photos (Attempt ${attemptIndex + 1})',
+                                      ),
+                                      icon: const Icon(Icons.check_circle, size: 13, color: Colors.greenAccent),
+                                      label: Text('After (${afterPhotos.length})', style: const TextStyle(fontSize: 11)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.teal[900],
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            }
+
+                            if (compPhotos == null || compPhotos.isEmpty) return const SizedBox.shrink();
+                            return ElevatedButton.icon(
+                              onPressed: () => _viewPhotos(
+                                context,
+                                compPhotos,
+                                title: 'Photos (Attempt ${attemptIndex + 1})',
+                              ),
+                              icon: const Icon(Icons.photo_library, size: 14),
+                              label: Text('Photos (Attempt ${attemptIndex + 1})'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal[900],
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                             );
-                          },
+                          }),
                         ),
-                      ),
-                    ],
+                      ];
+                    })(),
                   ],
                 ),
               ),

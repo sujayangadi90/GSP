@@ -1824,15 +1824,43 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
               'Preferred Visit Date & Time: ${_ticket!['preferredVisitDate'] != null ? _formatDateTime(_ticket!['preferredVisitDate'].toString()) : (_ticket!['installationDetails']?['preferredDate'] != null ? _formatDateTime(_ticket!['installationDetails']['preferredDate'].toString()) : 'Flexible')}',
             ]),
             const SizedBox(height: 16),
-            if (_ticket!['completion'] != null) ...[
-              _buildDetailBlock('Completion Info', [
-                'Work Done: ${_ticket!['completion']['workDone'] ?? 'N/A'}',
-                'Remarks: ${_ticket!['completion']['remarks'] ?? 'None'}',
-              ]),
-              const SizedBox(height: 16),
-              _buildCompletionPhotosBlock(_ticket!['completion']),
-              const SizedBox(height: 16),
-            ],
+            // Completion Info & Attempts
+            ...(() {
+              final history = (_ticket!['completionHistory'] as List?) ?? [];
+              final completionsList = history.isNotEmpty
+                  ? history
+                  : (_ticket!['completion'] != null ? [_ticket!['completion']] : []);
+
+              if (completionsList.isEmpty) return <Widget>[];
+
+              return completionsList.asMap().entries.map<Widget>((entry) {
+                final idx = entry.key;
+                final comp = entry.value;
+                final attemptTitle = completionsList.length > 1
+                    ? 'Completion Attempt ${idx + 1}'
+                    : 'Completion Info';
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildDetailBlock(attemptTitle, [
+                      'Work Done: ${comp['workDone'] ?? 'N/A'}',
+                      'Remarks: ${comp['remarks'] ?? 'None'}',
+                      if (comp['submittedAt'] != null)
+                        'Submitted: ${_formatDateTime(comp['submittedAt'].toString())}',
+                    ]),
+                    const SizedBox(height: 12),
+                    _buildCompletionPhotosBlock(
+                      comp,
+                      title: completionsList.length > 1
+                          ? 'Photos (Attempt ${idx + 1})'
+                          : 'WORK COMPLETION PHOTOS',
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                );
+              }).toList();
+            })(),
             _buildExpenseBlock(_ticket!),
             const SizedBox(height: 16),
             _buildTimelineBlock(_ticket!['timeline'] ?? []),
@@ -1895,7 +1923,7 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
     );
   }
 
-  Widget _buildCompletionPhotosBlock(Map<String, dynamic> comp) {
+  Widget _buildCompletionPhotosBlock(Map<String, dynamic> comp, {String title = 'WORK COMPLETION PHOTOS'}) {
     final beforeList = (comp['beforePhotos'] as List?) ?? [];
     final afterList = (comp['afterPhotos'] as List?) ?? [];
     final legacyList = (comp['photos'] as List?) ?? [];
@@ -1915,7 +1943,7 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('WORK COMPLETION PHOTOS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purpleAccent)),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purpleAccent)),
           const SizedBox(height: 12),
           if (hasStructured) ...[
             if (beforeList.isNotEmpty) ...[
