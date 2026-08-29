@@ -10,6 +10,7 @@ const {
   closeTicket,
   cancelTicket,
   getCustomers,
+  addCustomer,
   getDashboardStats,
   sendCustomAdminMessage,
   getReports
@@ -29,7 +30,8 @@ router.route('/')
   .post(authorize('dealer', 'admin'), upload.single('invoiceImage'), createTicket);
 
 router.route('/customers')
-  .get(authorize('admin'), getCustomers);
+  .get(authorize('admin'), getCustomers)
+  .post(authorize('admin'), addCustomer);
 
 router.route('/dashboard')
   .get(authorize('admin'), getDashboardStats);

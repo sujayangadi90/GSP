@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Appliance = require('../models/Appliance');
 const Brand = require('../models/Brand');
 const FollowUp = require('../models/FollowUp');
+const Customer = require('../models/Customer');
 const { sendPushNotification } = require('../utils/notification');
 
 // @desc    Create a new request (Installation or Service)
@@ -54,6 +55,25 @@ const createTicket = async (req, res) => {
     }
 
     const createdTicket = await ticket.save();
+    
+    // Sync to Customer collection
+    try {
+      await Customer.findOneAndUpdate(
+        { mobile: customer.mobile },
+        {
+          name: customer.name,
+          mobile: customer.mobile,
+          alternateMobile: customer.alternateMobile || '',
+          address: customer.address,
+          city: customer.city,
+          pincode: customer.pincode
+        },
+        { upsert: true, new: true }
+      );
+    } catch (err) {
+      console.error('Failed to sync customer details:', err);
+    }
+
     res.status(201).json(createdTicket);
 
     // Trigger Notification
@@ -917,23 +937,59 @@ const cancelTicket = async (req, res) => {
 // @access  Private/Admin
 const getCustomers = async (req, res) => {
   try {
-    const customers = await Ticket.aggregate([
+    const customers = await Customer.find().populate('appliances', 'name').sort({ name: 1 }).lean();
+    
+    // Supplement with lastTicketDate and ticketCount
+    const ticketsGrouped = await Ticket.aggregate([
       {
         $group: {
           _id: "$customer.mobile",
-          name: { $first: "$customer.name" },
-          mobile: { $first: "$customer.mobile" },
-          alternateMobile: { $first: "$customer.alternateMobile" },
-          address: { $first: "$customer.address" },
-          city: { $first: "$customer.city" },
-          pincode: { $first: "$customer.pincode" },
           lastTicketDate: { $max: "$createdAt" },
           ticketCount: { $sum: 1 }
         }
-      },
-      { $sort: { name: 1 } }
+      }
     ]);
-    res.json(customers);
+    
+    const ticketStatsMap = {};
+    ticketsGrouped.forEach(item => {
+      ticketStatsMap[item._id] = item;
+    });
+    
+    const result = customers.map(cust => ({
+      ...cust,
+      lastTicketDate: ticketStatsMap[cust.mobile]?.lastTicketDate || null,
+      ticketCount: ticketStatsMap[cust.mobile]?.ticketCount || 0
+    }));
+    
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Add a new customer
+// @route   POST /api/tickets/customers
+// @access  Private/Admin
+const addCustomer = async (req, res) => {
+  const { name, mobile, alternateMobile, address, city, pincode, appliances } = req.body;
+
+  try {
+    const customerExists = await Customer.findOne({ mobile });
+    if (customerExists) {
+      return res.status(400).json({ message: 'Customer with this mobile number already registered' });
+    }
+
+    const customer = await Customer.create({
+      name,
+      mobile,
+      alternateMobile: alternateMobile || '',
+      address,
+      city,
+      pincode,
+      appliances: appliances || []
+    });
+
+    res.status(201).json(customer);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1194,6 +1250,7 @@ module.exports = {
   closeTicket,
   cancelTicket,
   getCustomers,
+  addCustomer,
   getDashboardStats,
   sendCustomAdminMessage,
   getReports

@@ -56,6 +56,7 @@ export default function App() {
   // Modals & Forms
   const [dealerForm, setDealerForm] = useState(null); // null or { id?, name, contactPerson, mobile, email, address, city, password }
   const [techForm, setTechForm] = useState(null); // null or { id?, name, mobile, email, password }
+  const [customerForm, setCustomerForm] = useState(null); // null or { name, mobile, alternateMobile, address, city, pincode, appliances }
   const [selectedTicket, setSelectedTicket] = useState(null); // null or ticket details object
   const [assignTechId, setAssignTechId] = useState('');
   const [assignNotes, setAssignNotes] = useState('');
@@ -806,7 +807,7 @@ export default function App() {
       const isAllowed = (tab) => {
         if (tab === 'dashboard' && !perms.dashboard) return false;
         if (tab === 'tickets' && !perms.tickets) return false;
-        if (tab === 'customers' && !perms.customers) return false;
+        if ((tab === 'customers' || tab === 'add-customer') && !perms.customers) return false;
         if (tab === 'dealers' && !perms.manageDealers) return false;
         if ((tab === 'technicians' || tab === 'add-technician' || tab === 'edit-technician') && !perms.manageTechnicians) return false;
         if (tab === 'followups' && !perms.followups) return false;
@@ -1070,6 +1071,21 @@ export default function App() {
       setTechForm(null);
       setActiveTab('technicians');
       fetchData();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const saveCustomer = async (e) => {
+    e.preventDefault();
+    try {
+      await apiFetch('/tickets/customers', {
+        method: 'POST',
+        body: JSON.stringify(customerForm)
+      });
+      setCustomerForm(null);
+      setActiveTab('customers');
+      fetchCustomers();
     } catch (err) {
       alert(err.message);
     }
@@ -1481,7 +1497,7 @@ export default function App() {
           {(!user || user.permissions?.customers !== false) && (
             <button
               onClick={() => { setActiveTab('customers'); setMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'customers' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${(activeTab === 'customers' || activeTab === 'add-customer') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <UserCheck className="w-5 h-5" />
               Customers
@@ -2832,18 +2848,39 @@ export default function App() {
                   <p className="text-slate-400 mt-1">View unique customer details compiled across all service and installation requests</p>
                 </div>
                 
-                {/* Search Bar */}
-                <div className="relative w-full md:w-80">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <Search className="w-5 h-5 text-slate-400" />
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Search by name, mobile, city..."
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-violet-600 focus:border-transparent transition"
-                    value={customerSearch}
-                    onChange={e => setCustomerSearch(e.target.value)}
-                  />
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                  <button
+                    onClick={() => {
+                      setCustomerForm({
+                        name: '',
+                        mobile: '',
+                        alternateMobile: '',
+                        address: '',
+                        city: cities[0]?.name || '',
+                        pincode: '',
+                        appliances: []
+                      });
+                      setActiveTab('add-customer');
+                    }}
+                    className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150 whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add New Customer
+                  </button>
+
+                  {/* Search Bar */}
+                  <div className="relative w-full md:w-80">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <Search className="w-5 h-5 text-slate-400" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Search by name, mobile, city..."
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-violet-600 focus:border-transparent transition"
+                      value={customerSearch}
+                      onChange={e => setCustomerSearch(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -2872,7 +2909,16 @@ export default function App() {
                         filteredCustomers.slice((customerPage - 1) * 15, customerPage * 15).map((cust, idx) => (
                           <tr key={cust.mobile || idx} className="hover:bg-slate-800/25 transition duration-150">
                             <td className="py-4 px-6 font-bold text-white">
-                              {cust.name}
+                              <div>{cust.name}</div>
+                              {cust.appliances && cust.appliances.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {cust.appliances.map(a => (
+                                    <span key={a._id || a} className="text-[10px] font-bold bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
+                                      {typeof a === 'object' ? a.name : a}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </td>
                             <td className="py-4 px-6 font-mono text-sm">
                               {cust.mobile}
@@ -2944,6 +2990,156 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add Customer Standalone Page */}
+          {activeTab === 'add-customer' && customerForm && (
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight">Add New Customer</h1>
+                  <p className="text-slate-400 mt-1">Create a new customer profile and assign owned appliances</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setCustomerForm(null); setActiveTab('customers'); }}
+                  className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 px-5 rounded-xl border border-slate-700 text-sm cursor-pointer transition duration-150"
+                >
+                  Back to List
+                </button>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-2xl">
+                <form onSubmit={saveCustomer} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Customer Name *</label>
+                      <input 
+                        required 
+                        type="text" 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                        value={customerForm.name} 
+                        onChange={e => setCustomerForm({...customerForm, name: e.target.value})} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Mobile Number *</label>
+                      <input 
+                        required 
+                        type="text" 
+                        maxLength={10}
+                        placeholder="10-digit mobile number"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                        value={customerForm.mobile} 
+                        onChange={e => setCustomerForm({
+                          ...customerForm, 
+                          mobile: e.target.value.replace(/\D/g, '').slice(0, 10)
+                        })} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Alternate Mobile Number</label>
+                      <input 
+                        type="text" 
+                        maxLength={10}
+                        placeholder="10-digit alternate mobile number"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                        value={customerForm.alternateMobile || ''} 
+                        onChange={e => setCustomerForm({
+                          ...customerForm, 
+                          alternateMobile: e.target.value.replace(/\D/g, '').slice(0, 10)
+                        })} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Pincode *</label>
+                      <input 
+                        required 
+                        type="text" 
+                        maxLength={6}
+                        placeholder="6-digit postal pincode"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                        value={customerForm.pincode} 
+                        onChange={e => setCustomerForm({
+                          ...customerForm, 
+                          pincode: e.target.value.replace(/\D/g, '').slice(0, 6)
+                        })} 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Address *</label>
+                    <textarea 
+                      required 
+                      rows={3}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
+                      value={customerForm.address} 
+                      onChange={e => setCustomerForm({...customerForm, address: e.target.value})} 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">City *</label>
+                    <select
+                      required
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500"
+                      value={customerForm.city}
+                      onChange={e => setCustomerForm({...customerForm, city: e.target.value})}
+                    >
+                      <option value="" disabled>Select City</option>
+                      {cities.map(c => (
+                        <option key={c._id || c.name} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Appliances Owned</label>
+                    <div className="bg-slate-850 border border-slate-800 rounded-xl p-4 max-h-40 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {appliances.map(app => {
+                        const isChecked = customerForm.appliances ? customerForm.appliances.includes(app._id) : false;
+                        return (
+                          <label key={app._id} className="flex items-center gap-2.5 text-sm text-slate-200 cursor-pointer p-1.5 hover:bg-slate-800/40 rounded-lg">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                let list = [...(customerForm.appliances || [])];
+                                if (e.target.checked) {
+                                  list.push(app._id);
+                                } else {
+                                  list = list.filter(id => id !== app._id);
+                                }
+                                setCustomerForm({ ...customerForm, appliances: list });
+                              }}
+                              className="rounded border-slate-600 bg-slate-700 text-violet-600 focus:ring-violet-500 w-4 h-4"
+                            />
+                            <span>{app.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-5 border-t border-slate-800">
+                    <button 
+                      type="button" 
+                      onClick={() => { setCustomerForm(null); setActiveTab('customers'); }} 
+                      className="px-5 py-2.5 text-sm text-slate-400 hover:text-slate-200 cursor-pointer font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-6 rounded-xl text-sm cursor-pointer shadow-lg hover:shadow-violet-600/20 transition duration-150"
+                    >
+                      Save Customer
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}

@@ -8,7 +8,34 @@ const connectDB = require('./config/db');
 dotenv.config();
 
 // Connect to Database
-connectDB();
+connectDB().then(async () => {
+  try {
+    const Ticket = require('./models/Ticket');
+    const Customer = require('./models/Customer');
+    const uniqueMobiles = await Ticket.distinct('customer.mobile');
+    for (const mobile of uniqueMobiles) {
+      if (!mobile) continue;
+      const exists = await Customer.findOne({ mobile });
+      if (!exists) {
+        const ticket = await Ticket.findOne({ 'customer.mobile': mobile });
+        if (ticket && ticket.customer) {
+          await Customer.create({
+            name: ticket.customer.name,
+            mobile: ticket.customer.mobile,
+            alternateMobile: ticket.customer.alternateMobile || '',
+            address: ticket.customer.address,
+            city: ticket.customer.city,
+            pincode: ticket.customer.pincode,
+            appliances: []
+          });
+        }
+      }
+    }
+    console.log('Customer database migration checks completed.');
+  } catch (err) {
+    console.error('Customer migration failed:', err);
+  }
+});
 
 const app = express();
 
