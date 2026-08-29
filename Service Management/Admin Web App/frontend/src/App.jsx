@@ -4627,6 +4627,8 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
           {/* Inventory Tab */}
           {activeTab === 'inventory' && (
             <div className="space-y-8">
@@ -4832,9 +4834,6 @@ export default function App() {
               </div>
             </div>
           )}
-          
-        </div>
-      )}
 
           {/* Reports Tab */}
           {activeTab === 'reports' && (
