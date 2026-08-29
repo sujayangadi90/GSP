@@ -31,6 +31,212 @@ import {
 
 const API_BASE = '/api';
 
+// Donut Chart Component
+const DonutChart = ({ data = [] }) => {
+  const safeData = Array.isArray(data) ? data : [];
+  const total = safeData.reduce((acc, item) => acc + (item.count || 0), 0);
+  if (total === 0) {
+    return (
+      <div className="flex items-center justify-center py-10 text-slate-500 text-sm font-medium">
+        No records in selected period
+      </div>
+    );
+  }
+
+  let accumulatedAngle = 0;
+  const colors = ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#6B7280'];
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center gap-6">
+      <div className="relative w-36 h-36 flex-shrink-0">
+        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+          {safeData.map((item, idx) => {
+            const count = item.count || 0;
+            const percentage = (count / total) * 100;
+            const strokeDasharray = `${percentage} ${100 - percentage}`;
+            const strokeDashoffset = -accumulatedAngle;
+            accumulatedAngle += percentage;
+            const color = colors[idx % colors.length];
+
+            return (
+              <circle
+                key={idx}
+                cx="50"
+                cy="50"
+                r="40"
+                fill="transparent"
+                stroke={color}
+                strokeWidth="12"
+                strokeDasharray={strokeDasharray}
+                strokeDashoffset={strokeDashoffset}
+                className="transition-all duration-300 hover:stroke-[14px]"
+              />
+            );
+          })}
+          <circle cx="50" cy="50" r="28" fill="#0f172a" />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total</span>
+          <span className="text-xl font-black text-white">{total}</span>
+        </div>
+      </div>
+
+      <div className="flex-1 w-full space-y-2 max-h-48 overflow-y-auto pr-1">
+        {safeData.map((item, idx) => {
+          const count = item.count || 0;
+          const percentage = ((count / total) * 100).toFixed(1);
+          const color = colors[idx % colors.length];
+          return (
+            <div key={idx} className="flex items-center justify-between text-xs py-0.5">
+              <div className="flex items-center gap-2 truncate pr-2">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                <span className="font-semibold text-slate-300 truncate" title={item.name}>{item.name || 'Unknown'}</span>
+              </div>
+              <div className="flex-shrink-0 space-x-1.5 font-mono">
+                <span className="font-bold text-white">{count}</span>
+                <span className="text-slate-500 text-[10px]">({percentage}%)</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// Line Graph Component
+const LineGraph = ({ data = [], fromDate, toDate }) => {
+  const dateList = [];
+  const startStr = fromDate || new Date().toISOString().split('T')[0];
+  const endStr = toDate || startStr;
+
+  const start = new Date(startStr + 'T00:00:00');
+  const end = new Date(endStr + 'T23:59:59');
+
+  const curr = new Date(start);
+  if (!isNaN(curr.getTime()) && !isNaN(end.getTime())) {
+    let safetyCounter = 0;
+    while (curr <= end && safetyCounter < 400) {
+      dateList.push(curr.toISOString().split('T')[0]);
+      curr.setDate(curr.getDate() + 1);
+      safetyCounter++;
+    }
+  }
+
+  if (dateList.length === 0) {
+    dateList.push(startStr);
+  }
+
+  const safeData = Array.isArray(data) ? data : [];
+  const series = dateList.map(date => {
+    const match = safeData.find(d => d._id === date);
+    return { date, count: match ? match.count : 0 };
+  });
+
+  const maxVal = Math.max(...series.map(s => s.count), 0);
+  const maxCount = maxVal === 0 ? 4 : Math.ceil(maxVal * 1.25);
+  const width = 600;
+  const height = 180;
+  const paddingLeft = 40;
+  const paddingRight = 20;
+  const paddingTop = 20;
+  const paddingBottom = 30;
+
+  const graphWidth = width - paddingLeft - paddingRight;
+  const graphHeight = height - paddingTop - paddingBottom;
+
+  const points = series.map((s, idx) => {
+    const x = paddingLeft + (idx / Math.max(series.length - 1, 1)) * graphWidth;
+    const y = paddingTop + graphHeight - (s.count / maxCount) * graphHeight;
+    return { x, y, date: s.date, count: s.count };
+  });
+
+  const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+
+  const formatDateLabel = (dateStr) => {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+    return dateStr;
+  };
+
+  let xLabelInterval = 1;
+  if (series.length > 20) xLabelInterval = 3;
+  if (series.length > 40) xLabelInterval = 5;
+  if (series.length > 90) xLabelInterval = 10;
+  if (series.length > 180) xLabelInterval = 30;
+
+  return (
+    <div className="w-full bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Tickets Over Time</h3>
+        <span className="text-xs text-slate-500 font-mono">Range: {series.length} {series.length === 1 ? 'day' : 'days'}</span>
+      </div>
+      <div className="w-full overflow-x-auto">
+        <div className="min-w-[500px] h-48 relative">
+          <svg className="w-full h-full" viewBox={`0 0 ${width} ${height}`}>
+            {Array.from({ length: 5 }).map((_, idx) => {
+              const val = Math.round((maxCount * idx) / 4);
+              const y = paddingTop + graphHeight - (idx / 4) * graphHeight;
+              return (
+                <g key={idx}>
+                  <line x1={paddingLeft} y1={y} x2={width - paddingRight} y2={y} stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
+                  <text x={paddingLeft - 10} y={y + 3} fill="#64748b" fontSize="8" textAnchor="end" className="font-mono">{val}</text>
+                </g>
+              );
+            })}
+
+            {points.length > 1 && (
+              <polyline
+                fill="transparent"
+                stroke="#8B5CF6"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={polylinePoints}
+              />
+            )}
+
+            {points.map((p, idx) => (
+              <circle
+                key={idx}
+                cx={p.x}
+                cy={p.y}
+                r="3.5"
+                fill="#8B5CF6"
+                stroke="#0f172a"
+                strokeWidth="1"
+                className="hover:r-5 cursor-pointer transition-all duration-150"
+              >
+                <title>{`${p.date}: ${p.count} tickets`}</title>
+              </circle>
+            ))}
+
+            {points.map((p, idx) => {
+              if (idx % xLabelInterval !== 0 && idx !== points.length - 1) return null;
+              return (
+                <g key={idx}>
+                  <line x1={p.x} y1={paddingTop + graphHeight} x2={p.x} y2={paddingTop + graphHeight + 4} stroke="#334155" strokeWidth="1" />
+                  <text
+                    x={p.x}
+                    y={paddingTop + graphHeight + 14}
+                    fill="#64748b"
+                    fontSize="8"
+                    textAnchor="middle"
+                    transform={`rotate(-20, ${p.x}, ${paddingTop + graphHeight + 14})`}
+                    className="font-mono"
+                  >
+                    {formatDateLabel(p.date)}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('gsp_user');
@@ -51,7 +257,8 @@ export default function App() {
   const [activeTechniciansForAssign, setActiveTechniciansForAssign] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [stats, setStats] = useState({
-    total: 0, new: 0, assigned: 0, pending: 0, closed: 0
+    total: 0, new: 0, assigned: 0, pending: 0, closed: 0,
+    totalCustomers: 0, totalActiveAmcs: 0
   });
 
   // Modals & Forms
@@ -240,6 +447,10 @@ export default function App() {
   const [dashboardPendingVerifications, setDashboardPendingVerifications] = useState([]);
   const [dashboardNewUnassigned, setDashboardNewUnassigned] = useState([]);
   const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [dashboardTopTechs, setDashboardTopTechs] = useState([]);
+  const [dashboardDealerPerformance, setDashboardDealerPerformance] = useState([]);
+  const [dashboardAppliancePerformance, setDashboardAppliancePerformance] = useState([]);
+  const [dashboardTicketsByDate, setDashboardTicketsByDate] = useState([]);
 
   // Technician History Filter states
   const [techFromDate, setTechFromDate] = useState(todayStr);
@@ -360,9 +571,15 @@ export default function App() {
     try {
       setDashboardLoading(true);
       const data = await apiFetch(`/tickets/dashboard?fromDate=${appliedDashboardRange.fromDate}&toDate=${appliedDashboardRange.toDate}`);
-      setStats(data.stats);
-      setDashboardPendingVerifications(data.pendingVerifications);
-      setDashboardNewUnassigned(data.newUnassignedTickets);
+      if (data && data.stats) {
+        setStats(data.stats);
+      }
+      setDashboardPendingVerifications(data?.pendingVerifications || []);
+      setDashboardNewUnassigned(data?.newUnassignedTickets || []);
+      setDashboardTopTechs(data?.topTechnicians || []);
+      setDashboardDealerPerformance(data?.dealerPerformance || []);
+      setDashboardAppliancePerformance(data?.appliancePerformance || []);
+      setDashboardTicketsByDate(data?.ticketsByDate || []);
     } catch (err) {
       console.error('Error fetching dashboard stats:', err);
     } finally {
@@ -1905,41 +2122,55 @@ export default function App() {
               ) : (
                 <>
                   {/* Stat Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                     <div 
                       onClick={() => handleStatClick('')}
-                      className="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                      className="bg-slate-900 border border-slate-800/80 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
                     >
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Requests</span>
-                      <span className="text-3xl font-black text-white mt-2">{stats.total}</span>
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Requests</span>
+                      <span className="text-2xl font-black text-white mt-2">{stats.total || 0}</span>
                     </div>
                     <div 
                       onClick={() => handleStatClick('new')}
-                      className="bg-blue-950/20 border border-blue-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                      className="bg-blue-950/20 border border-blue-900/40 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
                     >
-                      <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">New Requests</span>
-                      <span className="text-3xl font-black text-blue-400 mt-2">{stats.new}</span>
+                      <span className="text-[11px] font-semibold text-blue-400 uppercase tracking-wider">New Requests</span>
+                      <span className="text-2xl font-black text-blue-400 mt-2">{stats.new || 0}</span>
                     </div>
                     <div 
                       onClick={() => handleStatClick('assigned')}
-                      className="bg-amber-950/20 border border-amber-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                      className="bg-amber-950/20 border border-amber-900/40 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
                     >
-                      <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Assigned</span>
-                      <span className="text-3xl font-black text-amber-400 mt-2">{stats.assigned}</span>
+                      <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">Assigned</span>
+                      <span className="text-2xl font-black text-amber-400 mt-2">{stats.assigned || 0}</span>
                     </div>
                     <div 
                       onClick={() => handleStatClick('pending')}
-                      className="bg-purple-950/20 border border-purple-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                      className="bg-purple-950/20 border border-purple-900/40 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
                     >
-                      <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Pending/Action</span>
-                      <span className="text-3xl font-black text-purple-400 mt-2">{stats.pending}</span>
+                      <span className="text-[11px] font-semibold text-purple-400 uppercase tracking-wider">Pending/Action</span>
+                      <span className="text-2xl font-black text-purple-400 mt-2">{stats.pending || 0}</span>
                     </div>
                     <div 
                       onClick={() => handleStatClick('closed')}
-                      className="bg-emerald-950/20 border border-emerald-900/40 p-5 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                      className="bg-emerald-950/20 border border-emerald-900/40 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
                     >
-                      <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Closed</span>
-                      <span className="text-3xl font-black text-emerald-400 mt-2">{stats.closed}</span>
+                      <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Closed</span>
+                      <span className="text-2xl font-black text-emerald-400 mt-2">{stats.closed || 0}</span>
+                    </div>
+                    <div 
+                      onClick={() => { setActiveTab('customers'); }}
+                      className="bg-violet-950/20 border border-violet-900/40 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                    >
+                      <span className="text-[11px] font-semibold text-violet-400 uppercase tracking-wider">Total Customers</span>
+                      <span className="text-2xl font-black text-violet-400 mt-2">{stats.totalCustomers || 0}</span>
+                    </div>
+                    <div 
+                      onClick={() => { setActiveTab('amcs'); }}
+                      className="bg-teal-950/20 border border-teal-900/40 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                    >
+                      <span className="text-[11px] font-semibold text-teal-400 uppercase tracking-wider">Active AMCs</span>
+                      <span className="text-2xl font-black text-teal-400 mt-2">{stats.totalActiveAmcs || 0}</span>
                     </div>
                   </div>
 
@@ -2010,6 +2241,96 @@ export default function App() {
                         )}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Analytics Section 1: Tickets Over Time Line Graph */}
+                  <LineGraph
+                    data={dashboardTicketsByDate}
+                    fromDate={appliedDashboardRange.fromDate}
+                    toDate={appliedDashboardRange.toDate}
+                  />
+
+                  {/* Analytics Section 2: Dealer & Appliance Performance Donut Charts */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Dealer Performance */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Dealer Performance</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">Tickets created in selected period</p>
+                        </div>
+                        <span className="text-[10px] text-slate-400 bg-slate-800 px-2.5 py-1 rounded font-mono">Top 6 + Others</span>
+                      </div>
+                      <DonutChart data={dashboardDealerPerformance} />
+                    </div>
+
+                    {/* Appliance Performance */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Appliance Performance</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">Tickets by appliance category in selected period</p>
+                        </div>
+                        <span className="text-[10px] text-slate-400 bg-slate-800 px-2.5 py-1 rounded font-mono">Top 6 + Others</span>
+                      </div>
+                      <DonutChart data={dashboardAppliancePerformance} />
+                    </div>
+                  </div>
+
+                  {/* Analytics Section 3: Top 10 Technicians */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+                    <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Top 10 Technicians</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Ranked by tickets closed within selected period</p>
+                      </div>
+                      <span className="text-[10px] text-slate-400 bg-slate-800 px-2.5 py-1 rounded font-mono">By Tickets Closed</span>
+                    </div>
+                    {dashboardTopTechs.length === 0 ? (
+                      <div className="py-10 text-center text-slate-500 text-sm font-medium">
+                        No closed tickets in selected period
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-800">
+                        {dashboardTopTechs.map((tech, idx) => {
+                          const max = dashboardTopTechs[0]?.closedCount || 1;
+                          const pct = Math.round((tech.closedCount / max) * 100);
+                          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
+                          return (
+                            <div key={tech._id || idx} className="flex items-center gap-4 px-6 py-3.5 hover:bg-slate-800/30 transition">
+                              <div className="w-8 text-center flex-shrink-0">
+                                {medal ? (
+                                  <span className="text-lg">{medal}</span>
+                                ) : (
+                                  <span className="text-xs font-black text-slate-500">#{idx + 1}</span>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <div className="flex items-center gap-2 truncate">
+                                    <span className="text-sm font-bold text-white truncate">{tech.name}</span>
+                                    {tech.code && (
+                                      <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                                        {tech.code}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-black text-violet-400 font-mono flex-shrink-0 ml-2">
+                                    {tech.closedCount} {tech.closedCount === 1 ? 'ticket' : 'tickets'} closed
+                                  </span>
+                                </div>
+                                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-gradient-to-r from-violet-600 to-violet-400 transition-all duration-500"
+                                    style={{ width: `${Math.max(pct, 4)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </>
               )}

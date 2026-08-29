@@ -5,6 +5,7 @@ const Brand = require('../models/Brand');
 const FollowUp = require('../models/FollowUp');
 const Customer = require('../models/Customer');
 const InventoryItem = require('../models/InventoryItem');
+const Amc = require('../models/Amc');
 const { sendPushNotification } = require('../utils/notification');
 
 // @desc    Create a new request (Installation or Service)
@@ -1159,14 +1160,169 @@ const getDashboardStats = async (req, res) => {
     .populate('dealer', 'name code email mobile')
     .sort({ createdAt: -1 });
 
+    // --- Analytics Aggregations (with individual try/catches for robustness) ---
+
+    // 1. Top 10 Technicians based on tickets closed within [start, end]
+    let topTechnicians = [];
+    try {
+      const topTechniciansRaw = await Ticket.aggregate([
+        {
+          $match: {
+            status: 'closed',
+            closedAt: { $gte: start, $lte: end },
+            assignedTechnician: { $exists: true, $ne: null }
+          }
+        },
+        {
+          $group: {
+            _id: '$assignedTechnician',
+            closedCount: { $sum: 1 }
+          }
+        },
+        { $sort: { closedCount: -1 } },
+        { $limit: 10 }
+      ]);
+
+      for (const t of topTechniciansRaw) {
+        const userObj = await User.findById(t._id).select('name code mobile');
+        topTechnicians.push({
+          _id: t._id,
+          name: userObj ? userObj.name : 'Unknown Technician',
+          code: userObj ? userObj.code : '',
+          closedCount: t.closedCount
+        });
+      }
+    } catch (e) {
+      console.error('Error calculating topTechnicians:', e.message);
+    }
+
+    // 2. Dealer Performance (Top 6 + Others) based on tickets created within [start, end]
+    let topDealers = [];
+    try {
+      const dealerPerfRaw = await Ticket.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: start, $lte: end },
+            dealer: { $exists: true, $ne: null }
+          }
+        },
+        {
+          $group: {
+            _id: '$dealer',
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { count: -1 } }
+      ]);
+
+      const populatedDealers = [];
+      for (const d of dealerPerfRaw) {
+        const userObj = await User.findById(d._id).select('name code');
+        populatedDealers.push({
+          name: userObj ? (userObj.name || userObj.code) : 'Unknown Dealer',
+          count: d.count
+        });
+      }
+
+      if (populatedDealers.length > 6) {
+        topDealers = populatedDealers.slice(0, 6);
+        const othersCount = populatedDealers.slice(6).reduce((acc, d) => acc + d.count, 0);
+        topDealers.push({ name: 'Others', count: othersCount });
+      } else {
+        topDealers = populatedDealers;
+      }
+    } catch (e) {
+      console.error('Error calculating dealerPerformance:', e.message);
+    }
+
+    // 3. Appliance Performance (Top 6 + Others) based on tickets created within [start, end]
+    let topAppliances = [];
+    try {
+      const appliancePerfRaw = await Ticket.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: start, $lte: end },
+            'product.category': { $exists: true, $ne: null }
+          }
+        },
+        {
+          $group: {
+            _id: '$product.category',
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { count: -1 } }
+      ]);
+
+      const formattedAppliances = appliancePerfRaw
+        .filter(a => a._id && a._id.trim() !== '')
+        .map(a => ({
+          name: a._id.trim(),
+          count: a.count
+        }));
+
+      if (formattedAppliances.length > 6) {
+        topAppliances = formattedAppliances.slice(0, 6);
+        const othersCount = formattedAppliances.slice(6).reduce((acc, a) => acc + a.count, 0);
+        topAppliances.push({ name: 'Others', count: othersCount });
+      } else {
+        topAppliances = formattedAppliances;
+      }
+    } catch (e) {
+      console.error('Error calculating appliancePerformance:', e.message);
+    }
+
+    // 4. Total Customers in the system (Independent of date range)
+    let totalCustomers = 0;
+    try {
+      totalCustomers = await Customer.countDocuments({});
+    } catch (e) {
+      console.error('Error counting totalCustomers:', e.message);
+    }
+
+    // 5. Total Active AMCs in the system (Independent of date range)
+    let totalActiveAmcs = 0;
+    try {
+      totalActiveAmcs = await Amc.countDocuments({ status: 'active' });
+    } catch (e) {
+      console.error('Error counting totalActiveAmcs:', e.message);
+    }
+
+    // 6. Tickets Graph series (number of tickets over time)
+    let ticketsByDate = [];
+    try {
+      ticketsByDate = await Ticket.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: start, $lte: end }
+          }
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'Asia/Kolkata' } },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]);
+    } catch (e) {
+      console.error('Error calculating ticketsByDate:', e.message);
+    }
+
     res.json({
       stats: {
         total: totalCount,
         new: newCount,
         assigned: assignedCount,
         pending: pendingCount,
-        closed: closedCount
+        closed: closedCount,
+        totalCustomers,
+        totalActiveAmcs
       },
+      topTechnicians,
+      dealerPerformance: topDealers,
+      appliancePerformance: topAppliances,
+      ticketsByDate,
       pendingVerifications,
       newUnassignedTickets
     });
