@@ -54,8 +54,16 @@ const TicketSchema = new mongoose.Schema({
   invoiceImage: String,
   dealer: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: 'User'
+  },
+  source: {
+    type: String,
+    enum: ['admin', 'dealer', 'technician'],
+    default: 'dealer'
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   assignedTechnician: {
     type: mongoose.Schema.Types.ObjectId,
@@ -64,6 +72,8 @@ const TicketSchema = new mongoose.Schema({
   assignmentNotes: String,
   completion: {
     photos: [String],
+    beforePhotos: [String],
+    afterPhotos: [String],
     workDone: String,
     remarks: String,
     submittedAt: Date,
@@ -74,6 +84,8 @@ const TicketSchema = new mongoose.Schema({
   },
   completionHistory: [{
     photos: [String],
+    beforePhotos: [String],
+    afterPhotos: [String],
     workDone: String,
     remarks: String,
     submittedAt: Date,

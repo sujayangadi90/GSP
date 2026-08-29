@@ -1826,9 +1826,11 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
             const SizedBox(height: 16),
             if (_ticket!['completion'] != null) ...[
               _buildDetailBlock('Completion Info', [
-                'Work Done: ${_ticket!['completion']['workDone']}',
+                'Work Done: ${_ticket!['completion']['workDone'] ?? 'N/A'}',
                 'Remarks: ${_ticket!['completion']['remarks'] ?? 'None'}',
               ]),
+              const SizedBox(height: 16),
+              _buildCompletionPhotosBlock(_ticket!['completion']),
               const SizedBox(height: 16),
             ],
             _buildExpenseBlock(_ticket!),
@@ -1893,7 +1895,16 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
     );
   }
 
-  Widget _buildDetailBlock(String title, List<String> details) {
+  Widget _buildCompletionPhotosBlock(Map<String, dynamic> comp) {
+    final beforeList = (comp['beforePhotos'] as List?) ?? [];
+    final afterList = (comp['afterPhotos'] as List?) ?? [];
+    final legacyList = (comp['photos'] as List?) ?? [];
+
+    final hasStructured = beforeList.isNotEmpty || afterList.isNotEmpty;
+    if (!hasStructured && legacyList.isEmpty) return const SizedBox.shrink();
+
+    final base = widget.apiUrl.replaceAll('/api', '');
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1904,13 +1915,106 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purpleAccent)),
+          const Text('WORK COMPLETION PHOTOS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purpleAccent)),
           const SizedBox(height: 12),
-          ...details.map((d) => Padding(
-            padding: const EdgeInsets.only(bottom: 6.0),
-            child: Text(d, style: const TextStyle(fontSize: 13, color: Colors.white70)),
-          )),
+          if (hasStructured) ...[
+            if (beforeList.isNotEmpty) ...[
+              Row(
+                children: [
+                  const Icon(Icons.camera_alt, size: 14, color: Colors.amberAccent),
+                  const SizedBox(width: 6),
+                  Text('Before Photos (${beforeList.length}/2):', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amberAccent)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _buildPhotosRow(beforeList, base, Colors.amberAccent),
+              const SizedBox(height: 12),
+            ],
+            if (afterList.isNotEmpty) ...[
+              Row(
+                children: [
+                  const Icon(Icons.check_circle, size: 14, color: Colors.greenAccent),
+                  const SizedBox(width: 6),
+                  Text('After Photos (${afterList.length}/4):', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.greenAccent)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _buildPhotosRow(afterList, base, Colors.greenAccent),
+            ],
+          ] else ...[
+            Text('Photos (${legacyList.length}):', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white70)),
+            const SizedBox(height: 8),
+            _buildPhotosRow(legacyList, base, Colors.blueGrey),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildPhotosRow(List photos, String base, Color borderColor) {
+    return SizedBox(
+      height: 90,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: photos.length,
+        itemBuilder: (context, idx) {
+          final path = photos[idx].toString();
+          final url = path.startsWith('http') ? path : '$base/$path';
+          return Padding(
+            padding: const EdgeInsets.only(right: 10.0),
+            child: GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => Dialog(
+                    backgroundColor: Colors.black,
+                    insetPadding: const EdgeInsets.all(10),
+                    child: Stack(
+                      children: [
+                        InteractiveViewer(
+                          child: Center(
+                            child: Image.network(url, fit: BoxFit.contain),
+                          ),
+                        ),
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: borderColor.withOpacity(0.5)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.cover,
+                    width: 90,
+                    height: 90,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 90,
+                        height: 90,
+                        color: Colors.grey[900],
+                        child: const Icon(Icons.broken_image, color: Colors.grey, size: 24),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

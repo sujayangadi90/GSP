@@ -37,7 +37,19 @@ const createTicket = async (req, res) => {
     invoiceImage
   } = req.body;
 
-  try {
+    let ticketDealer = null;
+    let ticketSource = 'dealer';
+    if (req.user.role === 'admin') {
+      ticketDealer = dealer;
+      ticketSource = 'admin';
+    } else if (req.user.role === 'technician') {
+      ticketDealer = dealer || null;
+      ticketSource = 'technician';
+    } else {
+      ticketDealer = req.user._id;
+      ticketSource = 'dealer';
+    }
+
     const ticket = new Ticket({
       type,
       customer,
@@ -46,7 +58,9 @@ const createTicket = async (req, res) => {
       installationDetails,
       preferredVisitDate,
       remarks,
-      dealer: req.user.role === 'admin' ? dealer : req.user._id,
+      dealer: ticketDealer,
+      source: ticketSource,
+      createdBy: req.user._id,
       status: 'new'
     });
 
@@ -518,18 +532,24 @@ const getTicketById = async (req, res) => {
   try {
     const ticket = await Ticket.findById(req.params.id)
       .populate('dealer', 'name code email mobile contactPerson address city')
-      .populate('assignedTechnician', 'name code mobile email');
+      .populate('assignedTechnician', 'name code mobile email')
+      .populate('completion.usedParts.part', 'name sku sellingPrice')
+      .populate('completionHistory.usedParts.part', 'name sku sellingPrice');
 
     if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
     // Authorization checks
-    if (req.user.role === 'dealer' && ticket.dealer._id.toString() !== req.user._id.toString()) {
+    if (req.user.role === 'dealer' && (!ticket.dealer || ticket.dealer._id.toString() !== req.user._id.toString())) {
       return res.status(403).json({ message: 'Not authorized to view this ticket' });
     }
-    if (req.user.role === 'technician' && (!ticket.assignedTechnician || ticket.assignedTechnician._id.toString() !== req.user._id.toString())) {
-      return res.status(403).json({ message: 'Not authorized to view this ticket' });
+    if (req.user.role === 'technician') {
+      const isAssigned = ticket.assignedTechnician && ticket.assignedTechnician._id.toString() === req.user._id.toString();
+      const isCreator = ticket.createdBy && ticket.createdBy.toString() === req.user._id.toString();
+      if (!isAssigned && !isCreator) {
+        return res.status(403).json({ message: 'Not authorized to view this ticket' });
+      }
     }
 
     const ticketObj = ticket.toObject();
@@ -699,16 +719,44 @@ const submitWorkCompletion = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to complete this ticket' });
     }
 
+    let beforePhotos = [];
+    let afterPhotos = [];
     let completionPhotos = [];
-    if (req.files && req.files.length > 0) {
-      req.files.forEach(file => {
-        completionPhotos.push('uploads/' + file.filename);
-      });
-    } else if (ticket.completion && ticket.completion.photos) {
-      completionPhotos = ticket.completion.photos;
+
+    if (req.files) {
+      if (Array.isArray(req.files)) {
+        req.files.forEach(file => {
+          completionPhotos.push('uploads/' + file.filename);
+        });
+      } else {
+        if (req.files.beforePhotos) {
+          req.files.beforePhotos.forEach(file => {
+            beforePhotos.push('uploads/' + file.filename);
+          });
+        }
+        if (req.files.afterPhotos) {
+          req.files.afterPhotos.forEach(file => {
+            afterPhotos.push('uploads/' + file.filename);
+          });
+        }
+        if (req.files.photos) {
+          req.files.photos.forEach(file => {
+            completionPhotos.push('uploads/' + file.filename);
+          });
+        }
+      }
     }
 
-    if (completionPhotos.length === 0) {
+    // Fallback/Legacy preservation
+    if (completionPhotos.length === 0 && (beforePhotos.length > 0 || afterPhotos.length > 0)) {
+      completionPhotos = [...beforePhotos, ...afterPhotos];
+    } else if (completionPhotos.length === 0 && ticket.completion && ticket.completion.photos) {
+      completionPhotos = ticket.completion.photos;
+      beforePhotos = ticket.completion.beforePhotos || [];
+      afterPhotos = ticket.completion.afterPhotos || [];
+    }
+
+    if (completionPhotos.length === 0 && beforePhotos.length === 0 && afterPhotos.length === 0) {
       return res.status(400).json({ message: 'Please upload at least one completion photo' });
     }
 
@@ -747,6 +795,8 @@ const submitWorkCompletion = async (req, res) => {
 
     const newCompletion = {
       photos: completionPhotos,
+      beforePhotos: beforePhotos,
+      afterPhotos: afterPhotos,
       workDone,
       remarks,
       submittedAt: Date.now(),

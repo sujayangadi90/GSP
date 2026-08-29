@@ -6957,15 +6957,75 @@ export default function App() {
                           <p><span className="text-slate-500 font-semibold">Work Done:</span> {comp.workDone}</p>
                           <p><span className="text-slate-500 font-semibold">Remarks:</span> {comp.remarks || 'None'}</p>
                         </div>
-                        {comp.photos && comp.photos.length > 0 && (
-                          <div>
-                            <p className="text-xs text-slate-500 font-semibold mb-2">Completion Photos</p>
-                            <div className="grid grid-cols-3 gap-2">
-                              {comp.photos.map((photo, i) => (
-                                <a key={i} href={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} target="_blank" rel="noreferrer">
-                                  <img src={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} alt="Completion" className="rounded-lg object-cover w-full h-24 border border-slate-700" />
-                                </a>
-                              ))}
+                        {/* Before & After Photos */}
+                        {(comp.beforePhotos && comp.beforePhotos.length > 0) || (comp.afterPhotos && comp.afterPhotos.length > 0) ? (
+                          <div className="space-y-3">
+                            {comp.beforePhotos && comp.beforePhotos.length > 0 && (
+                              <div>
+                                <p className="text-xs font-bold text-amber-400 mb-1.5 flex items-center gap-1.5">
+                                  <span>📷</span> Before Photos ({comp.beforePhotos.length}/2):
+                                </p>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {comp.beforePhotos.map((photo, i) => (
+                                    <a key={i} href={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} target="_blank" rel="noreferrer">
+                                      <img src={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} alt={`Before ${i+1}`} className="rounded-xl object-cover w-full h-24 border border-amber-800/40 hover:opacity-90 transition" />
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {comp.afterPhotos && comp.afterPhotos.length > 0 && (
+                              <div>
+                                <p className="text-xs font-bold text-emerald-400 mb-1.5 flex items-center gap-1.5">
+                                  <span>✅</span> After Photos ({comp.afterPhotos.length}/4):
+                                </p>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {comp.afterPhotos.map((photo, i) => (
+                                    <a key={i} href={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} target="_blank" rel="noreferrer">
+                                      <img src={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} alt={`After ${i+1}`} className="rounded-xl object-cover w-full h-24 border border-emerald-800/40 hover:opacity-90 transition" />
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          comp.photos && comp.photos.length > 0 && (
+                            <div>
+                              <p className="text-xs text-slate-500 font-semibold mb-2">Completion Photos</p>
+                              <div className="grid grid-cols-3 gap-2">
+                                {comp.photos.map((photo, i) => (
+                                  <a key={i} href={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} target="_blank" rel="noreferrer">
+                                    <img src={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} alt="Completion" className="rounded-lg object-cover w-full h-24 border border-slate-700" />
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        )}
+
+                        {/* Parts Used */}
+                        {comp.usedParts && comp.usedParts.length > 0 && (
+                          <div className="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800 space-y-2">
+                            <p className="text-xs font-bold text-violet-400 uppercase tracking-wider">
+                              📦 Spare Parts / Inventory Used
+                            </p>
+                            <div className="divide-y divide-slate-800 text-xs">
+                              {comp.usedParts.map((item, pIdx) => {
+                                const partName = item.part?.name || item.name || (typeof item.part === 'string' ? item.part : 'Part');
+                                const partSku = item.part?.sku || item.sku || '';
+                                return (
+                                  <div key={pIdx} className="py-1.5 flex items-center justify-between text-slate-300">
+                                    <div>
+                                      <span className="font-semibold text-white">{partName}</span>
+                                      {partSku && <span className="text-slate-500 font-mono ml-2">({partSku})</span>}
+                                    </div>
+                                    <span className="font-bold text-violet-300 bg-violet-950/60 px-2 py-0.5 rounded border border-violet-850">
+                                      Qty: {item.quantity}
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}

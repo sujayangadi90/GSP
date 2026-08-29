@@ -28,7 +28,7 @@ router.route('/reports')
 // Unified routes for query & create
 router.route('/')
   .get(getTickets)
-  .post(authorize('dealer', 'admin'), upload.single('invoiceImage'), createTicket);
+  .post(authorize('dealer', 'admin', 'technician'), upload.single('invoiceImage'), createTicket);
 
 router.route('/customers')
   .get(authorize('admin'), getCustomers)
@@ -61,6 +61,14 @@ router.route('/:id/message').post(authorize('admin'), sendCustomAdminMessage);
 
 // Technician-only updates
 router.route('/:id/status').patch(authorize('technician'), updateTicketStatus);
-router.route('/:id/complete').patch(authorize('technician'), upload.array('photos', 5), submitWorkCompletion);
+router.route('/:id/complete').patch(
+  authorize('technician'),
+  upload.fields([
+    { name: 'photos', maxCount: 10 },
+    { name: 'beforePhotos', maxCount: 2 },
+    { name: 'afterPhotos', maxCount: 4 }
+  ]),
+  submitWorkCompletion
+);
 
 module.exports = router;

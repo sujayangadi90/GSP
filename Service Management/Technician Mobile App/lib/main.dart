@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -920,26 +921,87 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildHistoryButton() {
-    return ElevatedButton.icon(
-      onPressed: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => JobHistoryScreen(
-            token: widget.token,
-            apiUrl: widget.apiUrl,
-            initialMonth: _selectedMonth,
-            initialYear: _selectedYear,
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TicketFormScreen(
+                      type: 'installation',
+                      token: widget.token,
+                      apiUrl: widget.apiUrl,
+                    ),
+                  ),
+                ).then((_) => _loadJobs()),
+                icon: const Icon(Icons.build_circle, color: Colors.tealAccent),
+                label: const Text('Raise Installation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E2422),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.teal.withOpacity(0.3)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TicketFormScreen(
+                      type: 'service',
+                      token: widget.token,
+                      apiUrl: widget.apiUrl,
+                    ),
+                  ),
+                ).then((_) => _loadJobs()),
+                icon: const Icon(Icons.home_repair_service, color: Colors.orangeAccent),
+                label: const Text('Raise Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E2422),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => JobHistoryScreen(
+                token: widget.token,
+                apiUrl: widget.apiUrl,
+                initialMonth: _selectedMonth,
+                initialYear: _selectedYear,
+              ),
+            ),
+          ),
+          icon: const Icon(Icons.history),
+          label: const Text('View Job History'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blueGrey[850],
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(48),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
-      ),
-      icon: const Icon(Icons.history),
-      label: const Text('View Job History'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blueGrey[850],
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+      ],
     );
   }
 }
@@ -960,7 +1022,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   bool _isLoading = false;
   final _workDoneController = TextEditingController();
   final _remarksController = TextEditingController();
-  final List<File> _completionPhotos = [];
+  final List<File> _beforePhotos = [];
+  final List<File> _afterPhotos = [];
   final _picker = ImagePicker();
   List<dynamic> _inventory = [];
   final List<Map<String, dynamic>> _selectedParts = [];
@@ -1135,20 +1198,38 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     }
   }
 
-  Future<void> _pickImage() async {
-    if (_completionPhotos.length >= 5) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 5 images allowed')));
+  Future<void> _pickBeforeImage() async {
+    if (_beforePhotos.length >= 2) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 2 Before photos allowed')));
       return;
     }
     final pickedFile = await _picker.pickImage(
       source: ImageSource.camera,
       maxWidth: 1920,
       maxHeight: 1080,
-      imageQuality: 80, // Compresses image to 80% quality
+      imageQuality: 80,
     );
     if (pickedFile != null) {
       setState(() {
-        _completionPhotos.add(File(pickedFile.path));
+        _beforePhotos.add(File(pickedFile.path));
+      });
+    }
+  }
+
+  Future<void> _pickAfterImage() async {
+    if (_afterPhotos.length >= 4) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 4 After photos allowed')));
+      return;
+    }
+    final pickedFile = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1920,
+      maxHeight: 1080,
+      imageQuality: 80,
+    );
+    if (pickedFile != null) {
+      setState(() {
+        _afterPhotos.add(File(pickedFile.path));
       });
     }
   }
@@ -1159,9 +1240,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       return;
     }
 
-    if (_completionPhotos.isEmpty) {
+    if (_beforePhotos.isEmpty && _afterPhotos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please upload at least one completion photo'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('Please upload at least one Before or After photo'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -1180,8 +1261,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         'quantity': p['quantity']
       }).toList());
 
-      for (var file in _completionPhotos) {
-        request.files.add(await http.MultipartFile.fromPath('photos', file.path));
+      for (var file in _beforePhotos) {
+        request.files.add(await http.MultipartFile.fromPath('beforePhotos', file.path));
+      }
+
+      for (var file in _afterPhotos) {
+        request.files.add(await http.MultipartFile.fromPath('afterPhotos', file.path));
       }
 
       final streamedResponse = await request.send();
@@ -1440,28 +1525,95 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _pickImage,
-              icon: const Icon(Icons.camera_alt),
-              label: const Text('Take Completion Photo'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey[800], foregroundColor: Colors.white),
+            // BEFORE PHOTOS SECTION (MAX 2)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.camera_alt, size: 14, color: Colors.amberAccent),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Before Photos (${_beforePhotos.length}/2)',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amberAccent),
+                    ),
+                  ],
+                ),
+                if (_beforePhotos.length < 2)
+                  TextButton.icon(
+                    onPressed: _pickBeforeImage,
+                    icon: const Icon(Icons.add_a_photo, size: 14, color: Colors.amberAccent),
+                    label: const Text('Add (Max 2)', style: TextStyle(fontSize: 12, color: Colors.amberAccent)),
+                  ),
+              ],
             ),
-            if (_completionPhotos.isNotEmpty) ...[
+            if (_beforePhotos.isNotEmpty) ...[
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _completionPhotos.map((f) => Stack(
+                children: _beforePhotos.map((f) => Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(8),
                       child: Image.file(f, height: 70, width: 70, fit: BoxFit.cover),
                     ),
                     Positioned(
                       right: 0,
                       top: 0,
                       child: GestureDetector(
-                        onTap: () => setState(() => _completionPhotos.remove(f)),
+                        onTap: () => setState(() => _beforePhotos.remove(f)),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+                          child: const Icon(Icons.close, size: 12, color: Colors.red),
+                        ),
+                      ),
+                    )
+                  ],
+                )).toList(),
+              ),
+            ],
+            const SizedBox(height: 16),
+
+            // AFTER PHOTOS SECTION (MAX 4)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.check_circle, size: 14, color: Colors.greenAccent),
+                    const SizedBox(width: 6),
+                    Text(
+                      'After Photos (${_afterPhotos.length}/4)',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.greenAccent),
+                    ),
+                  ],
+                ),
+                if (_afterPhotos.length < 4)
+                  TextButton.icon(
+                    onPressed: _pickAfterImage,
+                    icon: const Icon(Icons.add_a_photo, size: 14, color: Colors.greenAccent),
+                    label: const Text('Add (Max 4)', style: TextStyle(fontSize: 12, color: Colors.greenAccent)),
+                  ),
+              ],
+            ),
+            if (_afterPhotos.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _afterPhotos.map((f) => Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(f, height: 70, width: 70, fit: BoxFit.cover),
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _afterPhotos.remove(f)),
                         child: Container(
                           padding: const EdgeInsets.all(2),
                           decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
@@ -1540,14 +1692,14 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     );
   }
 
-  void _viewPhotos(BuildContext context, List photos) {
+  void _viewPhotos(BuildContext context, List photos, {String title = 'Completion Photos'}) {
     showDialog(
       context: context,
       builder: (context) {
         final base = widget.apiUrl.replaceAll('/api', '');
         return AlertDialog(
           backgroundColor: const Color(0xFF1E293B),
-          title: const Text('Completion Photos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           content: photos.isEmpty
               ? const Text('No photos uploaded.', style: TextStyle(color: Colors.grey))
               : SizedBox(
@@ -2030,7 +2182,53 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                                   runSpacing: 8,
                                   children: List.generate(completionHistory.length, (attemptIndex) {
                                     final comp = completionHistory[attemptIndex];
+                                    final beforePhotos = comp['beforePhotos'] as List?;
+                                    final afterPhotos = comp['afterPhotos'] as List?;
                                     final compPhotos = comp['photos'] as List?;
+
+                                    if ((beforePhotos != null && beforePhotos.isNotEmpty) || (afterPhotos != null && afterPhotos.isNotEmpty)) {
+                                      return Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (beforePhotos != null && beforePhotos.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(right: 6.0),
+                                              child: ElevatedButton.icon(
+                                                onPressed: () => _viewPhotos(
+                                                  context,
+                                                  beforePhotos,
+                                                  title: 'Before Photos (Attempt ${attemptIndex + 1})',
+                                                ),
+                                                icon: const Icon(Icons.camera_alt, size: 13, color: Colors.amberAccent),
+                                                label: Text('Before (${beforePhotos.length})', style: const TextStyle(fontSize: 11)),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.amber[900]!.withOpacity(0.4),
+                                                  foregroundColor: Colors.amber[200],
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                ),
+                                              ),
+                                            ),
+                                          if (afterPhotos != null && afterPhotos.isNotEmpty)
+                                            ElevatedButton.icon(
+                                              onPressed: () => _viewPhotos(
+                                                context,
+                                                afterPhotos,
+                                                title: 'After Photos (Attempt ${attemptIndex + 1})',
+                                              ),
+                                              icon: const Icon(Icons.check_circle, size: 13, color: Colors.greenAccent),
+                                              label: Text('After (${afterPhotos.length})', style: const TextStyle(fontSize: 11)),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.teal[900],
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              ),
+                                            ),
+                                        ],
+                                      );
+                                    }
+
                                     if (compPhotos == null || compPhotos.isEmpty) return const SizedBox.shrink();
                                     return ElevatedButton.icon(
                                       onPressed: () => _viewPhotos(
@@ -2187,7 +2385,7 @@ class ProfileScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.purpleAccent, size: 20),
+          Icon(icon, color: Colors.tealAccent, size: 20),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -2207,6 +2405,492 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class BoxCover {
+  static get cover => BoxFit.cover;
+}
+
+class TicketFormScreen extends StatefulWidget {
+  final String type;
+  final String token;
+  final String apiUrl;
+
+  const TicketFormScreen({super.key, required this.type, required this.token, required this.apiUrl});
+
+  @override
+  State<TicketFormScreen> createState() => _TicketFormScreenState();
+}
+
+class _TicketFormScreenState extends State<TicketFormScreen> {
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+
+  // Controllers
+  final _custName = TextEditingController();
+  final _custMobile = TextEditingController();
+  final _custAlt = TextEditingController();
+  final _custAddress = TextEditingController();
+  final _custPincode = TextEditingController();
+
+  final _prodModel = TextEditingController();
+  final _prodSerial = TextEditingController();
+  final _prodInvoice = TextEditingController();
+  final _prodDate = TextEditingController();
+
+  final _serviceDesc = TextEditingController();
+  final _visitDateController = TextEditingController();
+  
+  String _priority = 'medium';
+  File? _selectedInvoice;
+  final _picker = ImagePicker();
+
+  // Dynamic lists and selection states
+  List<dynamic> _appliances = [];
+  List<dynamic> _brands = [];
+  List<dynamic> _cities = [];
+  String? _selectedApplianceId;
+  String? _selectedApplianceName;
+  String? _selectedBrandName;
+  String? _selectedCity;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAppliances();
+    _fetchCities();
+  }
+
+  Future<void> _fetchCities() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/cities?active=true'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _cities = jsonDecode(res.body);
+        });
+      }
+    } catch (e) {
+      print('Error fetching cities: $e');
+    }
+  }
+
+  Future<void> _fetchAppliances() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/appliances?active=true'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _appliances = jsonDecode(res.body);
+        });
+      }
+    } catch (e) {
+      print('Error fetching appliances: $e');
+    }
+  }
+
+  Future<void> _fetchBrands(String applianceId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/brands?appliance=$applianceId&active=true'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _brands = jsonDecode(res.body);
+        });
+      }
+    } catch (e) {
+      print('Error fetching brands: $e');
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _selectedInvoice = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final url = Uri.parse('${widget.apiUrl}/tickets');
+      final request = http.MultipartRequest('POST', url);
+      request.headers['Authorization'] = 'Bearer ${widget.token}';
+
+      // Meta parameters
+      request.fields['type'] = widget.type;
+      request.fields['customer[name]'] = _custName.text.trim();
+      request.fields['customer[mobile]'] = _custMobile.text.trim();
+      request.fields['customer[alternateMobile]'] = _custAlt.text.trim();
+      request.fields['customer[address]'] = _custAddress.text.trim();
+      request.fields['customer[city]'] = _selectedCity ?? '';
+      request.fields['customer[pincode]'] = _custPincode.text.trim();
+
+      request.fields['product[category]'] = _selectedApplianceName ?? '';
+      request.fields['product[name]'] = _selectedBrandName ?? '';
+      request.fields['product[modelNumber]'] = _prodModel.text.trim();
+      request.fields['product[serialNumber]'] = _prodSerial.text.trim();
+      request.fields['product[invoiceNumber]'] = _prodInvoice.text.trim();
+      
+      if (_prodDate.text.isNotEmpty) {
+        request.fields['product[purchaseDate]'] = _prodDate.text;
+      }
+      
+      if (widget.type == 'service') {
+        request.fields['serviceDetails[description]'] = _serviceDesc.text.trim();
+        request.fields['serviceDetails[priority]'] = _priority;
+      } else {
+        request.fields['installationDetails[priority]'] = _priority;
+      }
+
+      if (_visitDateController.text.isNotEmpty) {
+        request.fields['preferredVisitDate'] = _visitDateController.text;
+        request.fields['installationDetails[preferredDate]'] = _visitDateController.text;
+      }
+
+      if (_selectedInvoice != null) {
+        request.files.add(await http.MultipartFile.fromPath('invoiceImage', _selectedInvoice!.path));
+      }
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Request raised successfully!'), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context);
+      } else {
+        String errorMessage = 'Failed to raise request';
+        try {
+          final errorData = jsonDecode(response.body);
+          if (errorData != null && errorData['message'] != null) {
+            errorMessage = errorData['message'];
+          }
+        } catch (_) {}
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.type == 'installation' ? 'Raise Installation Request' : 'Raise Service Request'),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildSectionHeader('Customer Details'),
+                  _buildTextField(_custName, 'Customer Name'),
+                  _buildTextField(
+                    _custMobile, 
+                    'Mobile Number', 
+                    keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Mobile number is required';
+                      if (val.trim().length != 10) return 'Enter a valid 10-digit mobile number';
+                      return null;
+                    },
+                  ),
+                  _buildTextField(
+                    _custAlt, 
+                    'Alternate Mobile', 
+                    required: false, 
+                    keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    validator: (val) {
+                      if (val != null && val.trim().isNotEmpty && val.trim().length != 10) {
+                        return 'Enter a valid 10-digit mobile number';
+                      }
+                      return null;
+                    },
+                  ),
+                  _buildTextField(_custAddress, 'Address'),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedCity,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'City *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                      ),
+                      items: _cities.map<DropdownMenuItem<String>>((city) {
+                        return DropdownMenuItem<String>(
+                          value: city['name'] as String,
+                          child: Text(city['name'] as String),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedCity = val;
+                        });
+                      },
+                      validator: (val) => val == null ? 'Please select a city' : null,
+                    ),
+                  ),
+                  _buildTextField(
+                    _custPincode, 
+                    'Pincode', 
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Pincode is required';
+                      if (val.trim().length != 6) return 'Enter a valid 6-digit pincode';
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 24),
+                  _buildSectionHeader('Product Details'),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedApplianceId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Appliance *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                      ),
+                      items: _appliances.map<DropdownMenuItem<String>>((appliance) {
+                        return DropdownMenuItem<String>(
+                          value: appliance['_id'] as String,
+                          child: Text(appliance['name'] as String),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedApplianceId = val;
+                          _selectedApplianceName = _appliances.firstWhere((a) => a['_id'] == val)['name'];
+                          _selectedBrandName = null;
+                          _brands = [];
+                        });
+                        if (val != null) {
+                          _fetchBrands(val);
+                        }
+                      },
+                      validator: (val) => val == null ? 'Please select an appliance' : null,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedBrandName,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Brand *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                      ),
+                      items: _brands.map<DropdownMenuItem<String>>((brand) {
+                        return DropdownMenuItem<String>(
+                          value: brand['name'] as String,
+                          child: Text(brand['name'] as String),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedBrandName = val;
+                        });
+                      },
+                      validator: (val) => val == null ? 'Please select a brand' : null,
+                    ),
+                  ),
+                  _buildTextField(_prodModel, 'Model Number', required: false),
+                  _buildTextField(_prodSerial, 'Serial Number', required: false),
+                  _buildTextField(_prodInvoice, 'Invoice Number', required: false),
+                  _buildDateField(_prodDate, 'Purchase Date', required: false),
+                  
+                  if (widget.type == 'service') ...[
+                    const SizedBox(height: 24),
+                    _buildSectionHeader('Service Details'),
+                    _buildTextField(_serviceDesc, 'Problem Description', maxLines: 3, required: false),
+                    const SizedBox(height: 8),
+                    const Text('Priority *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
+                    Row(
+                      children: [
+                        _buildPriorityRadio('low', 'Low'),
+                        _buildPriorityRadio('medium', 'Mid'),
+                        _buildPriorityRadio('high', 'High'),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 24),
+                    _buildSectionHeader('Installation Details'),
+                    const Text('Priority *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
+                    Row(
+                      children: [
+                        _buildPriorityRadio('low', 'Low'),
+                        _buildPriorityRadio('medium', 'Mid'),
+                        _buildPriorityRadio('high', 'High'),
+                      ],
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
+                  _buildSectionHeader('Scheduling & Attachments'),
+                  _buildDateField(_visitDateController, 'Preferred Visit Date & Time', required: true),
+                  const SizedBox(height: 16),
+                  
+                  ElevatedButton.icon(
+                    onPressed: _pickImage,
+                    icon: const Icon(Icons.receipt_long),
+                    label: Text(_selectedInvoice == null ? 'Upload Invoice Copy' : 'Invoice Attached (Tap to change)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueGrey[800],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                  if (_selectedInvoice != null) ...[
+                    const SizedBox(height: 8),
+                    Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(_selectedInvoice!, height: 120, width: 120, fit: BoxCover.cover),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 32),
+                  ElevatedButton(
+                    onPressed: _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Submit Request', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.tealAccent),
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label, {
+    bool required = true,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
+    int? maxLength,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        maxLength: maxLength,
+        inputFormatters: inputFormatters,
+        decoration: InputDecoration(
+          labelText: label,
+          counterText: '', // Hide default character counter
+          border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+        ),
+        validator: validator ?? (required ? (val) => val == null || val.isEmpty ? 'Field required' : null : null),
+      ),
+    );
+  }
+
+  Widget _buildDateField(TextEditingController controller, String label, {bool required = true}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: TextFormField(
+        controller: controller,
+        readOnly: true,
+        decoration: InputDecoration(
+          labelText: label + (required ? ' *' : ''),
+          suffixIcon: const Icon(Icons.event),
+          border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+        ),
+        onTap: () async {
+          final datePicked = await showDatePicker(
+            context: context,
+            initialDate: DateTime.now(),
+            firstDate: DateTime.now().subtract(const Duration(days: 365)),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+          );
+          if (datePicked != null) {
+            final timePicked = await showTimePicker(
+              context: context,
+              initialTime: TimeOfDay.now(),
+            );
+            if (timePicked != null) {
+              final formattedTime = '${timePicked.hour.toString().padLeft(2, '0')}:${timePicked.minute.toString().padLeft(2, '0')}';
+              setState(() {
+                controller.text = '${datePicked.toIso8601String().split('T')[0]} $formattedTime';
+              });
+            }
+          }
+        },
+        validator: required ? (val) => val == null || val.isEmpty ? 'Please select date and time' : null : null,
+      ),
+    );
+  }
+
+  Widget _buildPriorityRadio(String value, String label) {
+    return Row(
+      children: [
+        Radio(
+          value: value,
+          groupValue: _priority,
+          activeColor: Colors.tealAccent,
+          onChanged: (val) {
+            setState(() {
+              _priority = val.toString();
+            });
+          },
+        ),
+        Text(label),
+        const SizedBox(width: 16),
+      ],
     );
   }
 }
