@@ -524,12 +524,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (s == 'verification_pending') pending++;
           if (s == 'completed' || s == 'closed') {
             completed++;
-            final type = job['type'] ?? '';
-            if (type == 'service') {
-              earnings += (job['serviceFee'] ?? 0).toDouble();
-            } else if (type == 'installation') {
-              earnings += (job['installationFee'] ?? 0).toDouble();
+            // Calculate Technician Earning: sum of Technician Fee for closed/completed tickets
+            double techFee = 0.0;
+            if (job['technicianEarning'] != null && job['technicianEarning'] is num) {
+              techFee = (job['technicianEarning'] as num).toDouble();
+            } else if (job['technicianFee'] != null && job['technicianFee'] is num) {
+              techFee = (job['technicianFee'] as num).toDouble();
+            } else {
+              final type = job['type'] ?? '';
+              if (type == 'service') {
+                techFee = (job['technicianServiceFee'] ?? job['serviceFee'] ?? 0).toDouble();
+              } else if (type == 'installation') {
+                techFee = (job['technicianInstallationFee'] ?? job['installationFee'] ?? 0).toDouble();
+              }
             }
+            earnings += techFee;
           }
         }
         setState(() {

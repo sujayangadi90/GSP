@@ -151,13 +151,20 @@ const attachFeesToTickets = async (tickets) => {
 
       ticketObj.serviceFee = ticketObj.customerServiceFee;
       ticketObj.installationFee = ticketObj.customerInstallationFee;
+
+      ticketObj.technicianFee = ticketObj.type === 'installation' ? ticketObj.technicianInstallationFee : ticketObj.technicianServiceFee;
+      ticketObj.dealerFee = ticketObj.type === 'installation' ? ticketObj.dealerInstallationFee : ticketObj.dealerServiceFee;
+      ticketObj.customerFee = ticketObj.type === 'installation' ? ticketObj.customerInstallationFee : ticketObj.customerServiceFee;
     } else {
       ticketObj.serviceFee = 0;
       ticketObj.installationFee = 0;
+      ticketObj.technicianFee = 0;
+      ticketObj.dealerFee = 0;
+      ticketObj.customerFee = 0;
     }
 
-    if (ticketObj.status === 'completed') {
-      if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null) {
+    if (ticketObj.status === 'completed' || ticketObj.status === 'closed') {
+      if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null && typeof ticketObj.dealerExpense === 'number') {
         // Use historical snapshot
       } else {
         if (brandObj) {
@@ -173,7 +180,7 @@ const attachFeesToTickets = async (tickets) => {
         }
       }
 
-      if (ticketObj.technicianEarning !== undefined && ticketObj.technicianEarning !== null) {
+      if (ticketObj.technicianEarning !== undefined && ticketObj.technicianEarning !== null && typeof ticketObj.technicianEarning === 'number') {
         // Use historical snapshot
       } else {
         if (brandObj) {
@@ -622,13 +629,20 @@ const getTicketById = async (req, res) => {
 
       ticketObj.serviceFee = ticketObj.customerServiceFee;
       ticketObj.installationFee = ticketObj.customerInstallationFee;
+
+      ticketObj.technicianFee = ticketObj.type === 'installation' ? ticketObj.technicianInstallationFee : ticketObj.technicianServiceFee;
+      ticketObj.dealerFee = ticketObj.type === 'installation' ? ticketObj.dealerInstallationFee : ticketObj.dealerServiceFee;
+      ticketObj.customerFee = ticketObj.type === 'installation' ? ticketObj.customerInstallationFee : ticketObj.customerServiceFee;
     } else {
       ticketObj.serviceFee = 0;
       ticketObj.installationFee = 0;
+      ticketObj.technicianFee = 0;
+      ticketObj.dealerFee = 0;
+      ticketObj.customerFee = 0;
     }
 
-    if (ticketObj.status === 'completed') {
-      if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null) {
+    if (ticketObj.status === 'completed' || ticketObj.status === 'closed') {
+      if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null && typeof ticketObj.dealerExpense === 'number') {
         // Use snapshot
       } else {
         if (brandObj && brandObj.appliance) {
@@ -644,7 +658,7 @@ const getTicketById = async (req, res) => {
         }
       }
 
-      if (ticketObj.technicianEarning !== undefined && ticketObj.technicianEarning !== null) {
+      if (ticketObj.technicianEarning !== undefined && ticketObj.technicianEarning !== null && typeof ticketObj.technicianEarning === 'number') {
         // Use snapshot
       } else {
         if (brandObj && brandObj.appliance) {
