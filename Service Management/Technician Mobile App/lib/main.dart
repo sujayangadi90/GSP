@@ -1037,6 +1037,7 @@ class JobDetailsScreen extends StatefulWidget {
 class _JobDetailsScreenState extends State<JobDetailsScreen> {
   Map<String, dynamic>? _job;
   bool _isLoading = false;
+  bool _isFeeLoading = true;
   final _workDoneController = TextEditingController();
   final _remarksController = TextEditingController();
   final List<File> _beforePhotos = [];
@@ -1065,6 +1066,14 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     super.initState();
     if (widget.initialJob != null) {
       _job = widget.initialJob;
+      final hasFees = _job?['customerServiceFee'] != null || 
+                      _job?['customerInstallationFee'] != null || 
+                      _job?['dealerServiceFee'] != null || 
+                      _job?['dealerInstallationFee'] != null ||
+                      _job?['customerFee'] != null;
+      _isFeeLoading = !hasFees;
+    } else {
+      _isFeeLoading = true;
     }
     _loadJob();
     _fetchInventory();
@@ -1192,14 +1201,18 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         if (mounted) {
           setState(() {
             _job = jsonDecode(res.body);
+            _isFeeLoading = false;
           });
         }
       }
     } catch (e) {
       print('Error loading job details: $e');
     } finally {
-      if (mounted && _isLoading) {
-        setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isFeeLoading = false;
+          if (_isLoading) _isLoading = false;
+        });
       }
     }
   }
@@ -1803,7 +1816,39 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   }
 
   Widget _buildPaymentSummaryCard() {
-    if (_job == null) return const SizedBox.shrink();
+    if (_isFeeLoading || _job == null) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141F1D),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: Colors.tealAccent,
+              ),
+            ),
+            SizedBox(width: 14),
+            Text(
+              'Loading billing & fee summary...',
+              style: TextStyle(
+                color: Colors.tealAccent,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     final type = (_job!['type'] ?? '').toString().toLowerCase();
     final sType = (_job!['serviceType'] ?? _job!['serviceDetails']?['serviceType'] ?? 'In Warranty').toString();
