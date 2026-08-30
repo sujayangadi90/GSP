@@ -1,10 +1,11 @@
 const InventoryItem = require('../models/InventoryItem');
+const User = require('../models/User');
 
 // @desc    Create new inventory item
 // @route   POST /api/inventory
 // @access  Private/Admin
 const createItem = async (req, res) => {
-  const { name, sku, quantity, minStockLevel, sellingPrice } = req.body;
+  const { name, sku, image, quantity, minStockLevel, sellingPrice } = req.body;
 
   try {
     const itemExists = await InventoryItem.findOne({ sku: sku.trim() });
@@ -15,6 +16,7 @@ const createItem = async (req, res) => {
     const item = new InventoryItem({
       name: name.trim(),
       sku: sku.trim(),
+      image: image ? image.trim() : '',
       quantity: Number(quantity) || 0,
       minStockLevel: Number(minStockLevel) || 5,
       sellingPrice: Number(sellingPrice) || 0
@@ -74,7 +76,7 @@ const updateItem = async (req, res) => {
       return res.status(404).json({ message: 'Inventory item not found' });
     }
 
-    const { name, sku, minStockLevel, sellingPrice } = req.body;
+    const { name, sku, image, minStockLevel, sellingPrice } = req.body;
 
     if (sku && sku.trim() !== item.sku) {
       const exists = await InventoryItem.findOne({ sku: sku.trim() });
@@ -85,6 +87,9 @@ const updateItem = async (req, res) => {
     }
 
     item.name = name ? name.trim() : item.name;
+    if (image !== undefined) {
+      item.image = image ? image.trim() : '';
+    }
     item.minStockLevel = minStockLevel !== undefined ? Number(minStockLevel) : item.minStockLevel;
     item.sellingPrice = sellingPrice !== undefined ? Number(sellingPrice) : item.sellingPrice;
 
@@ -143,11 +148,20 @@ const stockOut = async (req, res) => {
       return res.status(400).json({ message: `Insufficient stock. Current available: ${item.quantity}` });
     }
 
+    const { technicianId, technicianName } = req.body;
+    let resolvedTechName = technicianName || '';
+    if (technicianId && !resolvedTechName) {
+      const tech = await User.findById(technicianId);
+      if (tech) resolvedTechName = tech.name;
+    }
+
     item.quantity -= qty;
     item.transactions.push({
       type: 'stock_out',
       quantity: qty,
-      user: req.user ? req.user.name : 'Admin'
+      user: req.user ? req.user.name : 'Admin',
+      technician: technicianId || null,
+      technicianName: resolvedTechName
     });
 
     const updated = await item.save();

@@ -20,6 +20,13 @@ const TransactionSchema = new mongoose.Schema({
   },
   ticketNumber: {
     type: String
+  },
+  technician: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  technicianName: {
+    type: String
   }
 });
 
@@ -34,6 +41,10 @@ const InventoryItemSchema = new mongoose.Schema({
     required: true,
     unique: true,
     trim: true
+  },
+  image: {
+    type: String,
+    default: ''
   },
   quantity: {
     type: Number,

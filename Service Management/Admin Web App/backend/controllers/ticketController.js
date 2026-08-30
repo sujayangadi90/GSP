@@ -832,7 +832,9 @@ const submitWorkCompletion = async (req, res) => {
         type: 'ticket_use',
         quantity: Number(up.quantity),
         user: req.user.name,
-        ticketNumber: ticket.ticketNumber
+        ticketNumber: ticket.ticketNumber,
+        technician: req.user.role === 'technician' ? req.user._id : (ticket.technician || null),
+        technicianName: req.user.role === 'technician' ? req.user.name : ''
       });
       await item.save();
     }

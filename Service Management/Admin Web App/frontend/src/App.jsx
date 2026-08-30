@@ -364,8 +364,9 @@ export default function App() {
   // Inventory states
   const [inventory, setInventory] = useState([]);
   const [inventoryFilters, setInventoryFilters] = useState({ search: '', lowStock: false });
-  const [inventoryForm, setInventoryForm] = useState(null); // null or { name, sku, quantity, minStockLevel, sellingPrice }
-  const [showStockAdjustment, setShowStockAdjustment] = useState(null); // null or { id, name, sku, mode, quantity }
+  const [inventoryForm, setInventoryForm] = useState(null); // null or { id, name, sku, image, quantity, minStockLevel, sellingPrice }
+  const [uploadingInventoryImage, setUploadingInventoryImage] = useState(false);
+  const [showStockAdjustment, setShowStockAdjustment] = useState(null); // null or { id, name, sku, mode, quantity, technicianId, technicianName }
   const [selectedItemTransactions, setSelectedItemTransactions] = useState(null); // null or item object
   const [inventoryPage, setInventoryPage] = useState(1);
   
@@ -1733,6 +1734,40 @@ export default function App() {
     }
   };
 
+  const handleInventoryImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingInventoryImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch(`${API_BASE}/inventory/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!res.ok) {
+        let errMsg = 'Failed to upload part image';
+        try {
+          const errData = await res.json();
+          errMsg = errData.message || errMsg;
+        } catch (errJson) {}
+        throw new Error(errMsg);
+      }
+
+      const data = await res.json();
+      setInventoryForm(prev => ({ ...prev, image: data.filePath }));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUploadingInventoryImage(false);
+    }
+  };
+
   const saveInventoryItem = async (e) => {
     e.preventDefault();
     try {
@@ -1760,9 +1795,14 @@ export default function App() {
     if (!qty || qty <= 0) return alert('Please enter a valid positive quantity');
     try {
       const endpoint = `/inventory/${showStockAdjustment.id}/${showStockAdjustment.mode === 'in' ? 'stock-in' : 'stock-out'}`;
+      const payload = {
+        quantity: qty,
+        technicianId: showStockAdjustment.technicianId || '',
+        technicianName: showStockAdjustment.technicianName || ''
+      };
       await apiFetch(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ quantity: qty })
+        body: JSON.stringify(payload)
       });
       setShowStockAdjustment(null);
       fetchInventory();
@@ -5494,6 +5534,7 @@ export default function App() {
                     setInventoryForm({
                       name: '',
                       sku: '',
+                      image: '',
                       quantity: 0,
                       minStockLevel: 5,
                       sellingPrice: 0
@@ -5541,6 +5582,7 @@ export default function App() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-800/50 border-b border-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <th className="p-4 w-16 text-center">Image</th>
                         <th className="p-4">SKU</th>
                         <th className="p-4">Item Name</th>
                         <th className="p-4">Available Stock</th>
@@ -5553,7 +5595,7 @@ export default function App() {
                     <tbody className="divide-y divide-slate-800">
                       {inventory.length === 0 ? (
                         <tr>
-                          <td colSpan="7" className="p-8 text-center text-slate-500 text-sm">No inventory items found.</td>
+                          <td colSpan="8" className="p-8 text-center text-slate-500 text-sm">No inventory items found.</td>
                         </tr>
                       ) : (
                         inventory.slice((inventoryPage - 1) * 15, inventoryPage * 15).map(item => {
@@ -5569,6 +5611,19 @@ export default function App() {
 
                           return (
                             <tr key={item._id} className="hover:bg-slate-800/20 transition text-sm">
+                              <td className="p-4 text-center">
+                                <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center mx-auto shrink-0 shadow-inner">
+                                  {item.image ? (
+                                    <img
+                                      src={item.image.startsWith('http') ? item.image : `/${item.image}`}
+                                      alt={item.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <Package className="w-5 h-5 text-slate-500" />
+                                  )}
+                                </div>
+                              </td>
                               <td className="p-4 font-mono font-bold text-slate-200">
                                 {item.sku}
                               </td>
@@ -5597,8 +5652,11 @@ export default function App() {
                                         id: item._id,
                                         name: item.name,
                                         sku: item.sku,
+                                        image: item.image,
                                         mode: 'in',
-                                        quantity: ''
+                                        quantity: '',
+                                        technicianId: '',
+                                        technicianName: ''
                                       });
                                     }}
                                     className="bg-emerald-700/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-900/40 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-xs"
@@ -5611,8 +5669,11 @@ export default function App() {
                                         id: item._id,
                                         name: item.name,
                                         sku: item.sku,
+                                        image: item.image,
                                         mode: 'out',
-                                        quantity: ''
+                                        quantity: '',
+                                        technicianId: '',
+                                        technicianName: ''
                                       });
                                     }}
                                     className="bg-rose-700/20 hover:bg-rose-600/30 text-rose-400 border border-rose-900/40 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-xs"
@@ -5626,6 +5687,7 @@ export default function App() {
                                         id: item._id,
                                         name: item.name,
                                         sku: item.sku,
+                                        image: item.image || '',
                                         minStockLevel: item.minStockLevel,
                                         sellingPrice: item.sellingPrice
                                       });
@@ -6424,6 +6486,54 @@ export default function App() {
             </div>
             <form onSubmit={saveInventoryItem}>
               <div className="p-6 space-y-4">
+                {/* Part Square Image Upload */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+                    Part Image (Square)
+                  </label>
+                  <div className="flex items-center gap-4 bg-slate-950/40 p-3.5 rounded-2xl border border-slate-800">
+                    <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-700 bg-slate-800/80 overflow-hidden flex items-center justify-center relative shrink-0">
+                      {inventoryForm.image ? (
+                        <img 
+                          src={inventoryForm.image.startsWith('http') ? inventoryForm.image : `/${inventoryForm.image}`} 
+                          alt="Part Preview" 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <Package className="w-7 h-7 text-slate-500" />
+                      )}
+                      {uploadingInventoryImage && (
+                        <div className="absolute inset-0 bg-slate-900/85 flex items-center justify-center text-[10px] font-bold text-violet-400 animate-pulse">
+                          Uploading...
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition flex items-center gap-1.5 w-fit">
+                        <Upload className="w-3.5 h-3.5 text-violet-400" />
+                        {inventoryForm.image ? 'Change Image' : 'Upload Image'}
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={handleInventoryImageUpload}
+                          disabled={uploadingInventoryImage}
+                        />
+                      </label>
+                      {inventoryForm.image && (
+                        <button
+                          type="button"
+                          onClick={() => setInventoryForm({ ...inventoryForm, image: '' })}
+                          className="text-xs text-rose-400 hover:text-rose-300 font-semibold cursor-pointer text-left flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3 h-3" /> Remove Image
+                        </button>
+                      )}
+                      <span className="text-[11px] text-slate-500">Square ratio (1:1) recommended</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Item Name *</label>
                   <input 
@@ -6497,7 +6607,8 @@ export default function App() {
                 </button>
                 <button 
                   type="submit" 
-                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer shadow-md transition"
+                  disabled={uploadingInventoryImage}
+                  className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer shadow-md transition"
                 >
                   Save Item
                 </button>
@@ -6522,10 +6633,24 @@ export default function App() {
             </div>
             <form onSubmit={submitStockAdjustment}>
               <div className="p-6 space-y-4">
-                <div className="bg-slate-850 p-4 rounded-xl space-y-1 text-sm border border-slate-800">
-                  <p className="text-slate-400">Item: <span className="font-bold text-white">{showStockAdjustment.name}</span></p>
-                  <p className="text-slate-400">SKU: <span className="font-mono text-white text-xs">{showStockAdjustment.sku}</span></p>
+                <div className="bg-slate-850 p-4 rounded-xl flex items-center gap-3 border border-slate-800">
+                  <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
+                    {showStockAdjustment.image ? (
+                      <img
+                        src={showStockAdjustment.image.startsWith('http') ? showStockAdjustment.image : `/${showStockAdjustment.image}`}
+                        alt={showStockAdjustment.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Package className="w-5 h-5 text-slate-500" />
+                    )}
+                  </div>
+                  <div className="space-y-0.5 text-sm min-w-0">
+                    <p className="font-bold text-white truncate">{showStockAdjustment.name}</p>
+                    <p className="font-mono text-slate-400 text-xs truncate">SKU: {showStockAdjustment.sku}</p>
+                  </div>
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Adjustment Quantity *</label>
                   <input 
@@ -6538,6 +6663,34 @@ export default function App() {
                     onChange={e => setShowStockAdjustment({ ...showStockAdjustment, quantity: e.target.value })}
                   />
                 </div>
+
+                {showStockAdjustment.mode === 'out' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+                      Select Technician (Stock Out To)
+                    </label>
+                    <select
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      value={showStockAdjustment.technicianId || ''}
+                      onChange={e => {
+                        const techId = e.target.value;
+                        const tech = technicians.find(t => (t._id === techId || t.id === techId));
+                        setShowStockAdjustment({
+                          ...showStockAdjustment,
+                          technicianId: techId,
+                          technicianName: tech ? tech.name : ''
+                        });
+                      }}
+                    >
+                      <option value="">-- Select Technician (Optional) --</option>
+                      {technicians.map(tech => (
+                        <option key={tech._id || tech.id} value={tech._id || tech.id}>
+                          {tech.name} {tech.code ? `(${tech.code})` : ''} {tech.mobile ? `- ${tech.mobile}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="bg-slate-850 px-6 py-4 flex items-center justify-end gap-3 border-t border-slate-800">
                 <button 
@@ -6562,11 +6715,24 @@ export default function App() {
       {/* Transaction History Modal */}
       {selectedItemTransactions && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
-              <div>
-                <h3 className="font-extrabold text-white text-lg">Stock Transaction History</h3>
-                <p className="text-xs text-slate-400 mt-0.5">{selectedItemTransactions.name} ({selectedItemTransactions.sku})</p>
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
+                  {selectedItemTransactions.image ? (
+                    <img 
+                      src={selectedItemTransactions.image.startsWith('http') ? selectedItemTransactions.image : `/${selectedItemTransactions.image}`} 
+                      alt={selectedItemTransactions.name} 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <Package className="w-5 h-5 text-slate-500" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-lg">Stock Transaction History</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{selectedItemTransactions.name} ({selectedItemTransactions.sku})</p>
+                </div>
               </div>
               <button 
                 onClick={() => setSelectedItemTransactions(null)} 
@@ -6588,6 +6754,7 @@ export default function App() {
                         <th className="p-3">Type</th>
                         <th className="p-3 text-right">Qty</th>
                         <th className="p-3">User</th>
+                        <th className="p-3">Technician / Recipient</th>
                         <th className="p-3">Ref Ticket</th>
                       </tr>
                     </thead>
@@ -6607,6 +6774,16 @@ export default function App() {
                           </td>
                           <td className="p-3 text-slate-400">
                             {t.user}
+                          </td>
+                          <td className="p-3">
+                            {t.technicianName ? (
+                              <span className="font-semibold text-violet-400 bg-violet-950/50 border border-violet-800/50 px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1">
+                                <UserCheck className="w-3 h-3 text-violet-400" />
+                                {t.technicianName}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
                           </td>
                           <td className="p-3 font-mono text-[11px] text-slate-450">
                             {t.ticketNumber || '-'}
