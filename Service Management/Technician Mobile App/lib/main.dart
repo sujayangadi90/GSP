@@ -921,6 +921,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 jobId: job['_id'],
                 token: widget.token,
                 apiUrl: widget.apiUrl,
+                initialJob: job,
               ),
             ),
           ).then((_) => _loadJobs());
@@ -1019,8 +1020,15 @@ class JobDetailsScreen extends StatefulWidget {
   final String jobId;
   final String token;
   final String apiUrl;
+  final Map<String, dynamic>? initialJob;
 
-  const JobDetailsScreen({super.key, required this.jobId, required this.token, required this.apiUrl});
+  const JobDetailsScreen({
+    super.key,
+    required this.jobId,
+    required this.token,
+    required this.apiUrl,
+    this.initialJob,
+  });
 
   @override
   State<JobDetailsScreen> createState() => _JobDetailsScreenState();
@@ -1055,6 +1063,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialJob != null) {
+      _job = widget.initialJob;
+    }
     _loadJob();
     _fetchInventory();
   }
@@ -1166,7 +1177,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   }
 
   Future<void> _loadJob() async {
-    setState(() => _isLoading = true);
+    if (_job == null) {
+      setState(() => _isLoading = true);
+    }
     try {
       final res = await http.get(
         Uri.parse('${widget.apiUrl}/tickets/${widget.jobId}'),
@@ -1176,14 +1189,18 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         },
       );
       if (res.statusCode == 200) {
-        setState(() {
-          _job = jsonDecode(res.body);
-        });
+        if (mounted) {
+          setState(() {
+            _job = jsonDecode(res.body);
+          });
+        }
       }
     } catch (e) {
       print('Error loading job details: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted && _isLoading) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
