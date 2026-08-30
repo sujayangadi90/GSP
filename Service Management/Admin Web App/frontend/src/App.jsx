@@ -981,6 +981,18 @@ export default function App() {
     }
   };
 
+  const openTicketDetails = async (ticket) => {
+    setSelectedTicket(ticket);
+    try {
+      const fullTicket = await apiFetch(`/tickets/${ticket._id}`);
+      if (fullTicket) {
+        setSelectedTicket(fullTicket);
+      }
+    } catch (e) {
+      console.error('Error fetching full ticket details:', e);
+    }
+  };
+
   const fetchDealerVideos = async (dealerId) => {
     if (!dealerId) return;
     try {
@@ -5518,14 +5530,25 @@ export default function App() {
                                   {ticket.type}
                                 </span>
                               </div>
-                              <span className={`text-xs px-3 py-1.5 rounded-xl font-bold uppercase ${
-                                ticket.status === 'completed' ? 'bg-emerald-950 text-emerald-400' :
-                                ticket.status === 'pending' ? 'bg-yellow-950 text-yellow-400' :
-                                ticket.status === 'assigned' ? 'bg-blue-950 text-blue-400' :
-                                'bg-slate-800 text-slate-400'
-                              }`}>
-                                {ticket.status}
-                              </span>
+                              <div className="flex items-center gap-2.5">
+                                <button
+                                  onClick={() => openTicketDetails(ticket)}
+                                  className="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3.5 py-1.5 rounded-xl font-bold inline-flex items-center gap-1.5 cursor-pointer border border-slate-700 hover:border-slate-600 transition duration-150 shadow-sm"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-violet-400" />
+                                  View details
+                                </button>
+                                <span className={`text-xs px-3 py-1.5 rounded-xl font-bold uppercase ${
+                                  ticket.status === 'completed' ? 'bg-emerald-950 text-emerald-400 border border-emerald-900/50' :
+                                  ticket.status === 'closed' ? 'bg-slate-800 text-slate-300 border border-slate-700' :
+                                  ticket.status === 'verification_pending' || ticket.status === 'pending' ? 'bg-yellow-950 text-yellow-400 border border-yellow-900/50' :
+                                  ticket.status === 'assigned' ? 'bg-blue-950 text-blue-400 border border-blue-900/50' :
+                                  ticket.status === 'in_progress' ? 'bg-amber-950 text-amber-400 border border-amber-900/50' :
+                                  'bg-slate-800 text-slate-400 border border-slate-700'
+                                }`}>
+                                  {ticket.status.replace('_', ' ')}
+                                </span>
+                              </div>
                             </div>
                             
                              <div className={`grid grid-cols-1 ${ticket.status === 'completed' || ticket.status === 'closed' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-6 text-sm`}>
