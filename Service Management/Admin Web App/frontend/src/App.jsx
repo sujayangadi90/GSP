@@ -2439,9 +2439,9 @@ export default function App() {
       </header>
 
       {/* Main Container */}
-      <div className="flex flex-1 flex-col lg:flex-row">
+      <div className="flex flex-1 flex-col lg:flex-row min-w-0">
         {/* Sidebar Nav */}
-        <aside className={`${menuOpen ? 'block' : 'hidden'} lg:block w-full lg:w-64 bg-slate-900/50 border-r border-slate-800 p-4 space-y-2 lg:min-h-[calc(100vh-73px)]`}>
+        <aside className={`${menuOpen ? 'block' : 'hidden'} lg:block w-full lg:w-64 shrink-0 bg-slate-900/50 border-r border-slate-800 p-4 space-y-2 lg:min-h-[calc(100vh-73px)]`}>
           {(!user || user.permissions?.dashboard !== false) && (
             <button
               onClick={() => { setActiveTab('dashboard'); setMenuOpen(false); }}
@@ -2592,7 +2592,7 @@ export default function App() {
         </aside>
 
         {/* Dashboard / Workspace Area */}
-        <main className="flex-1 p-6 lg:p-8 space-y-8 bg-slate-950">
+        <main className="flex-1 p-6 lg:p-8 space-y-8 bg-slate-950 min-w-0 max-w-full overflow-x-hidden">
           
           {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
@@ -6403,7 +6403,7 @@ export default function App() {
 
           {/* Performance Main Tab */}
           {activeTab === 'performance' && (
-            <div className="space-y-8">
+            <div className="space-y-8 max-w-full min-w-0">
               {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -6455,7 +6455,7 @@ export default function App() {
                 }
 
                 return (
-                  <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 relative overflow-hidden">
+                  <div className="w-full max-w-full min-w-0 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 relative overflow-hidden">
                     {/* Background glow decoration */}
                     <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
                     <div className="absolute bottom-0 left-0 w-96 h-96 bg-violet-500/5 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20" />
@@ -6507,7 +6507,7 @@ export default function App() {
                     {/* Horizontal Slider Track */}
                     <div
                       id="eom-slider-track"
-                      className="flex gap-4 overflow-x-auto pb-2 pt-1 scroll-smooth snap-x snap-mandatory relative z-10 scrollbar-none"
+                      className="w-full max-w-full min-w-0 flex gap-4 overflow-x-auto pb-3 pt-1 scroll-smooth snap-x snap-mandatory relative z-10 scrollbar-none"
                       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     >
                       {last12Months.map((item, idx) => {
