@@ -43,11 +43,29 @@ const TicketSchema = new mongoose.Schema({
   },
   serviceDetails: {
     description: String,
-    priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' }
+    priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+    serviceType: {
+      type: String,
+      enum: ['In Warranty', 'Out Warranty', 'Paid by Dealer'],
+      default: 'In Warranty'
+    }
   },
   installationDetails: {
     preferredDate: String,
-    priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' }
+    priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+    installationType: {
+      type: String,
+      enum: ['Free Installation', 'Paid Installation', 'Paid by Dealer'],
+      default: 'Free Installation'
+    }
+  },
+  serviceType: {
+    type: String,
+    enum: ['In Warranty', 'Out Warranty', 'Paid by Dealer']
+  },
+  installationType: {
+    type: String,
+    enum: ['Free Installation', 'Paid Installation', 'Paid by Dealer']
   },
   preferredVisitDate: String,
   remarks: String,

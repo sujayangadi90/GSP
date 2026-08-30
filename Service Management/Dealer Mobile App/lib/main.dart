@@ -832,6 +832,8 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   final _visitDateController = TextEditingController();
   
   String _priority = 'medium';
+  String _serviceType = 'In Warranty';
+  String _installationType = 'Free Installation';
   File? _selectedInvoice;
   final _picker = ImagePicker();
 
@@ -940,8 +942,12 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
       if (widget.type == 'service') {
         request.fields['serviceDetails[description]'] = _serviceDesc.text.trim();
         request.fields['serviceDetails[priority]'] = _priority;
+        request.fields['serviceDetails[serviceType]'] = _serviceType;
+        request.fields['serviceType'] = _serviceType;
       } else {
         request.fields['installationDetails[priority]'] = _priority;
+        request.fields['installationDetails[installationType]'] = _installationType;
+        request.fields['installationType'] = _installationType;
       }
 
       if (_visitDateController.text.isNotEmpty) {
@@ -1123,6 +1129,24 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                   if (widget.type == 'service') ...[
                     const SizedBox(height: 24),
                     _buildSectionHeader('Service Details'),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: DropdownButtonFormField<String>(
+                        value: _serviceType,
+                        decoration: const InputDecoration(
+                          labelText: 'Service Type *',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'In Warranty', child: Text('In Warranty')),
+                          DropdownMenuItem(value: 'Out Warranty', child: Text('Out Warranty')),
+                          DropdownMenuItem(value: 'Paid by Dealer', child: Text('Paid by Dealer')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setState(() => _serviceType = val);
+                        },
+                      ),
+                    ),
                     _buildTextField(_serviceDesc, 'Problem Description', maxLines: 3, required: false),
                     const SizedBox(height: 8),
                     const Text('Priority *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
@@ -1136,6 +1160,24 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                   ] else ...[
                     const SizedBox(height: 24),
                     _buildSectionHeader('Installation Details'),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: DropdownButtonFormField<String>(
+                        value: _installationType,
+                        decoration: const InputDecoration(
+                          labelText: 'Installation Type *',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'Free Installation', child: Text('Free Installation')),
+                          DropdownMenuItem(value: 'Paid Installation', child: Text('Paid Installation')),
+                          DropdownMenuItem(value: 'Paid by Dealer', child: Text('Paid by Dealer')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setState(() => _installationType = val);
+                        },
+                      ),
+                    ),
                     const Text('Priority *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
                     Row(
                       children: [
@@ -1812,6 +1854,7 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
               'Model: ${_ticket!['product']['modelNumber'] ?? 'N/A'}',
               'Serial: ${_ticket!['product']['serialNumber'] ?? 'N/A'}',
               'Scope: ${_ticket!['type'].toString().toUpperCase()}',
+              'Type: ${_ticket!['type'].toString().toLowerCase() == 'service' ? (_ticket!['serviceType'] ?? _ticket!['serviceDetails']?['serviceType'] ?? 'In Warranty') : (_ticket!['installationType'] ?? _ticket!['installationDetails']?['installationType'] ?? 'Free Installation')}',
               'Priority: ${((_ticket!['installationDetails']?['priority'] ?? _ticket!['serviceDetails']?['priority'] ?? 'medium').toString()).toLowerCase() == 'medium' ? 'MID' : ((_ticket!['installationDetails']?['priority'] ?? _ticket!['serviceDetails']?['priority'] ?? 'medium').toString()).toUpperCase()}',
             ]),
             const SizedBox(height: 16),
@@ -1872,16 +1915,22 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
 
   Widget _buildExpenseBlock(Map<String, dynamic> ticket) {
     final status = ticket['status']?.toString().toLowerCase() ?? '';
+    final type = ticket['type']?.toString().toLowerCase() ?? '';
+    final specificType = type == 'service'
+        ? (ticket['serviceType'] ?? ticket['serviceDetails']?['serviceType'] ?? 'In Warranty').toString()
+        : (ticket['installationType'] ?? ticket['installationDetails']?['installationType'] ?? 'Free Installation').toString();
+    final isPaidByDealer = specificType == 'Paid by Dealer';
+
     String expenseText = '';
 
     if (status == 'completed' || status == 'closed') {
       final exp = ticket['dealerExpense'];
-      if (exp == 'Fee Not Configured') {
-        expenseText = 'Fee Not Configured';
-      } else if (exp is num) {
+      if (exp is num) {
         expenseText = '₹ ${exp.toInt()}';
+      } else if (exp == 'Fee Not Configured') {
+        expenseText = isPaidByDealer ? 'Fee Not Configured' : '₹ 0';
       } else {
-        expenseText = 'Fee Not Configured';
+        expenseText = isPaidByDealer ? 'Fee Not Configured' : '₹ 0';
       }
     } else if (status == 'cancelled') {
       expenseText = '₹ 0 / Not applicable';
@@ -1899,9 +1948,32 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'EXPENSE DETAILS',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purpleAccent),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'EXPENSE DETAILS',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purpleAccent),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isPaidByDealer ? Colors.amber.withOpacity(0.2) : Colors.blueGrey.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isPaidByDealer ? Colors.amber.withOpacity(0.4) : Colors.blueGrey.withOpacity(0.4),
+                  ),
+                ),
+                child: Text(
+                  specificType,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isPaidByDealer ? Colors.amberAccent : Colors.white70,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           const Text(
@@ -1914,9 +1986,11 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'This amount represents the cost incurred by the dealer for the completed service or installation work, and is set automatically based on the GSP Fees Configuration.',
-            style: TextStyle(fontSize: 11, color: Colors.white38),
+          Text(
+            isPaidByDealer
+                ? 'This ticket is marked Paid by Dealer. Dealer Expense is calculated from the Fee Management configuration.'
+                : 'This ticket is $specificType. No dealer expense is incurred (₹0).',
+            style: const TextStyle(fontSize: 11, color: Colors.white38),
           ),
         ],
       ),
@@ -2401,14 +2475,19 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
       completedDate = _formatDate(ticket['updatedAt'].toString());
     }
 
+    final sType = type == 'SERVICE'
+        ? (ticket['serviceType'] ?? ticket['serviceDetails']?['serviceType'] ?? 'In Warranty').toString()
+        : (ticket['installationType'] ?? ticket['installationDetails']?['installationType'] ?? 'Free Installation').toString();
+    final isPaidByDealer = sType == 'Paid by Dealer';
+
     final exp = ticket['dealerExpense'];
     String expenseText = '';
-    if (exp == 'Fee Not Configured') {
-      expenseText = 'Fee Not Configured';
-    } else if (exp is num) {
+    if (exp is num) {
       expenseText = '₹ ${exp.toInt()}';
+    } else if (exp == 'Fee Not Configured') {
+      expenseText = isPaidByDealer ? 'Fee Not Configured' : '₹ 0';
     } else {
-      expenseText = 'Fee Not Configured';
+      expenseText = isPaidByDealer ? 'Fee Not Configured' : '₹ 0';
     }
 
     return InkWell(
@@ -2443,27 +2522,54 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
                   ticketId,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: type == 'INSTALLATION' 
-                        ? const Color(0xFF0E7490).withOpacity(0.2) 
-                        : const Color(0xFFB45309).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: type == 'INSTALLATION' 
-                          ? const Color(0xFF22D3EE).withOpacity(0.4) 
-                          : const Color(0xFFFBBF24).withOpacity(0.4),
+                Row(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isPaidByDealer 
+                            ? Colors.amber.withOpacity(0.2) 
+                            : Colors.blueGrey.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isPaidByDealer 
+                              ? Colors.amber.withOpacity(0.4) 
+                              : Colors.blueGrey.withOpacity(0.4),
+                        ),
+                      ),
+                      child: Text(
+                        sType,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isPaidByDealer ? Colors.amberAccent : Colors.white70,
+                        ),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    type,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: type == 'INSTALLATION' ? const Color(0xFF22D3EE) : const Color(0xFFFBBF24),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: type == 'INSTALLATION' 
+                            ? const Color(0xFF0E7490).withOpacity(0.2) 
+                            : const Color(0xFFB45309).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: type == 'INSTALLATION' 
+                              ? const Color(0xFF22D3EE).withOpacity(0.4) 
+                              : const Color(0xFFFBBF24).withOpacity(0.4),
+                        ),
+                      ),
+                      child: Text(
+                        type,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: type == 'INSTALLATION' ? const Color(0xFF22D3EE) : const Color(0xFFFBBF24),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),

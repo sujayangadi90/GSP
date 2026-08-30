@@ -31,6 +31,8 @@ const createTicket = async (req, res) => {
     product,
     serviceDetails,
     installationDetails,
+    serviceType,
+    installationType,
     preferredVisitDate,
     remarks,
     dealer,
@@ -51,12 +53,27 @@ const createTicket = async (req, res) => {
       ticketSource = 'dealer';
     }
 
+    const finalServiceType = (serviceDetails && serviceDetails.serviceType) || serviceType || 'In Warranty';
+    const finalInstallationType = (installationDetails && installationDetails.installationType) || installationType || 'Free Installation';
+
+    const finalServiceDetails = serviceDetails ? {
+      ...serviceDetails,
+      serviceType: finalServiceType
+    } : undefined;
+
+    const finalInstallationDetails = installationDetails ? {
+      ...installationDetails,
+      installationType: finalInstallationType
+    } : undefined;
+
     const ticket = new Ticket({
       type,
       customer,
       product,
-      serviceDetails,
-      installationDetails,
+      serviceDetails: finalServiceDetails,
+      installationDetails: finalInstallationDetails,
+      serviceType: type === 'service' ? finalServiceType : undefined,
+      installationType: type === 'installation' ? finalInstallationType : undefined,
       preferredVisitDate,
       remarks,
       dealer: ticketDealer,
@@ -163,20 +180,31 @@ const attachFeesToTickets = async (tickets) => {
       ticketObj.customerFee = 0;
     }
 
+    const sType = ticketObj.serviceType || (ticketObj.serviceDetails && ticketObj.serviceDetails.serviceType) || 'In Warranty';
+    const iType = ticketObj.installationType || (ticketObj.installationDetails && ticketObj.installationDetails.installationType) || 'Free Installation';
+    ticketObj.serviceType = sType;
+    ticketObj.installationType = iType;
+
+    const isPaidByDealer = (ticketObj.type === 'service' && sType === 'Paid by Dealer') || (ticketObj.type === 'installation' && iType === 'Paid by Dealer');
+
     if (ticketObj.status === 'completed' || ticketObj.status === 'closed') {
-      if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null && typeof ticketObj.dealerExpense === 'number') {
-        // Use historical snapshot
+      if (!isPaidByDealer) {
+        ticketObj.dealerExpense = 0;
       } else {
-        if (brandObj) {
-          if (ticketObj.type === 'service') {
-            ticketObj.dealerExpense = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
-          } else if (ticketObj.type === 'installation') {
-            ticketObj.dealerExpense = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
+        if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null && typeof ticketObj.dealerExpense === 'number' && ticketObj.dealerExpense > 0) {
+          // Use historical snapshot
+        } else {
+          if (brandObj) {
+            if (ticketObj.type === 'service') {
+              ticketObj.dealerExpense = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
+            } else if (ticketObj.type === 'installation') {
+              ticketObj.dealerExpense = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
+            } else {
+              ticketObj.dealerExpense = 'Fee Not Configured';
+            }
           } else {
             ticketObj.dealerExpense = 'Fee Not Configured';
           }
-        } else {
-          ticketObj.dealerExpense = 'Fee Not Configured';
         }
       }
 
@@ -641,20 +669,31 @@ const getTicketById = async (req, res) => {
       ticketObj.customerFee = 0;
     }
 
+    const sType = ticketObj.serviceType || (ticketObj.serviceDetails && ticketObj.serviceDetails.serviceType) || 'In Warranty';
+    const iType = ticketObj.installationType || (ticketObj.installationDetails && ticketObj.installationDetails.installationType) || 'Free Installation';
+    ticketObj.serviceType = sType;
+    ticketObj.installationType = iType;
+
+    const isPaidByDealer = (ticketObj.type === 'service' && sType === 'Paid by Dealer') || (ticketObj.type === 'installation' && iType === 'Paid by Dealer');
+
     if (ticketObj.status === 'completed' || ticketObj.status === 'closed') {
-      if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null && typeof ticketObj.dealerExpense === 'number') {
-        // Use snapshot
+      if (!isPaidByDealer) {
+        ticketObj.dealerExpense = 0;
       } else {
-        if (brandObj && brandObj.appliance) {
-          if (ticketObj.type === 'service') {
-            ticketObj.dealerExpense = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
-          } else if (ticketObj.type === 'installation') {
-            ticketObj.dealerExpense = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
+        if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null && typeof ticketObj.dealerExpense === 'number' && ticketObj.dealerExpense > 0) {
+          // Use snapshot
+        } else {
+          if (brandObj && brandObj.appliance) {
+            if (ticketObj.type === 'service') {
+              ticketObj.dealerExpense = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
+            } else if (ticketObj.type === 'installation') {
+              ticketObj.dealerExpense = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
+            } else {
+              ticketObj.dealerExpense = 'Fee Not Configured';
+            }
           } else {
             ticketObj.dealerExpense = 'Fee Not Configured';
           }
-        } else {
-          ticketObj.dealerExpense = 'Fee Not Configured';
         }
       }
 
@@ -941,15 +980,23 @@ const verifyWork = async (req, res) => {
           match: { name: { $regex: new RegExp(`^${appName}$`, 'i') } }
         });
         if (brandObj && brandObj.appliance) {
+          const sType = ticket.serviceType || (ticket.serviceDetails && ticket.serviceDetails.serviceType) || 'In Warranty';
+          const iType = ticket.installationType || (ticket.installationDetails && ticket.installationDetails.installationType) || 'Free Installation';
+          const isPaidByDealer = (ticket.type === 'service' && sType === 'Paid by Dealer') || (ticket.type === 'installation' && iType === 'Paid by Dealer');
+
           if (ticket.type === 'service') {
-            ticket.dealerExpense = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null);
+            ticket.dealerExpense = isPaidByDealer 
+              ? (brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null))
+              : 0;
             ticket.technicianEarning = brandObj.technicianServiceFee !== undefined ? brandObj.technicianServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null);
           } else if (ticket.type === 'installation') {
-            ticket.dealerExpense = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null);
+            ticket.dealerExpense = isPaidByDealer
+              ? (brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null))
+              : 0;
             ticket.technicianEarning = brandObj.technicianInstallationFee !== undefined ? brandObj.technicianInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null);
           }
         } else {
-          ticket.dealerExpense = null;
+          ticket.dealerExpense = 0;
           ticket.technicianEarning = null;
         }
       } catch (err) {
@@ -1556,22 +1603,6 @@ const getReports = async (req, res) => {
     let installationAmount = 0;
     let completedCount = 0;
 
-    allTicketsWithFees.forEach(t => {
-      const exp = reportType === 'expense' ? t.dealerExpense : t.technicianEarning;
-      if (typeof exp === 'number') {
-        totalAmount += exp;
-        completedCount++;
-        if (t.type === 'service') {
-          serviceAmount += exp;
-        } else if (t.type === 'installation') {
-          serviceAmount += exp; // wait! If type is installation, add to installationAmount! Oh wait: serviceAmount += exp if type == service, else installationAmount += exp!
-        }
-      }
-    });
-
-    // Let's fix that block:
-    serviceAmount = 0;
-    installationAmount = 0;
     allTicketsWithFees.forEach(t => {
       const exp = reportType === 'expense' ? t.dealerExpense : t.technicianEarning;
       if (typeof exp === 'number') {

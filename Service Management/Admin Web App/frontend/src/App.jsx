@@ -425,12 +425,16 @@ export default function App() {
     },
     serviceDetails: {
       description: '',
-      priority: 'medium'
+      priority: 'medium',
+      serviceType: 'In Warranty'
     },
     installationDetails: {
       preferredDate: '',
-      priority: 'medium'
+      priority: 'medium',
+      installationType: 'Free Installation'
     },
+    serviceType: 'In Warranty',
+    installationType: 'Free Installation',
     preferredVisitDate: '',
     remarks: ''
   });
@@ -2294,15 +2298,21 @@ export default function App() {
       };
 
       if (newRequestForm.type === 'service') {
+        const sType = newRequestForm.serviceType || newRequestForm.serviceDetails?.serviceType || 'In Warranty';
         payload.serviceDetails = {
           description: newRequestForm.serviceDetails.description,
-          priority: newRequestForm.serviceDetails.priority
+          priority: newRequestForm.serviceDetails.priority,
+          serviceType: sType
         };
+        payload.serviceType = sType;
       } else {
+        const iType = newRequestForm.installationType || newRequestForm.installationDetails?.installationType || 'Free Installation';
         payload.installationDetails = {
           preferredDate: newRequestForm.preferredVisitDate,
-          priority: newRequestForm.installationDetails?.priority || 'medium'
+          priority: newRequestForm.installationDetails?.priority || 'medium',
+          installationType: iType
         };
+        payload.installationType = iType;
       }
 
       const res = await fetch(`${API_BASE}/tickets`, {
@@ -2339,10 +2349,12 @@ export default function App() {
       setNewRequestForm({
         dealer: '',
         type: 'installation',
+        serviceType: 'In Warranty',
+        installationType: 'Free Installation',
         customer: { name: '', mobile: '', alternateMobile: '', address: '', city: '', pincode: '' },
         product: { category: '', name: '', modelNumber: '', serialNumber: '', purchaseDate: '', invoiceNumber: '' },
-        serviceDetails: { description: '', priority: 'medium' },
-        installationDetails: { preferredDate: '' },
+        serviceDetails: { description: '', priority: 'medium', serviceType: 'In Warranty' },
+        installationDetails: { preferredDate: '', priority: 'medium', installationType: 'Free Installation' },
         preferredVisitDate: '',
         remarks: ''
       });
@@ -3068,22 +3080,39 @@ export default function App() {
                               <p className="text-xs text-slate-400">{ticket.customer.city}</p>
                             </td>
                             <td className="px-6 py-4 capitalize text-slate-300">
-                              <div>{ticket.type}</div>
-                              {(() => {
-                                const priority = ticket.installationDetails?.priority || ticket.serviceDetails?.priority;
-                                if (!priority) return null;
-                                const isHigh = priority.toLowerCase() === 'high';
-                                const isLow = priority.toLowerCase() === 'low';
-                                return (
-                                  <span className={`inline-block mt-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded ${
-                                    isHigh ? 'bg-red-950/80 text-red-400 border border-red-800/60' :
-                                    isLow ? 'bg-slate-800 text-slate-400 border border-slate-700' :
-                                    'bg-amber-950/80 text-amber-300 border border-amber-800/60'
-                                  }`}>
-                                    {priority.toLowerCase() === 'medium' ? 'Mid' : priority} Priority
-                                  </span>
-                                );
-                              })()}
+                              <div className="font-semibold text-slate-200">{ticket.type}</div>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {(() => {
+                                  const specificType = ticket.type === 'service'
+                                    ? (ticket.serviceType || ticket.serviceDetails?.serviceType || 'In Warranty')
+                                    : (ticket.installationType || ticket.installationDetails?.installationType || 'Free Installation');
+                                  const isPaidByDealer = specificType === 'Paid by Dealer';
+                                  return (
+                                    <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                      isPaidByDealer 
+                                        ? 'bg-amber-950/80 text-amber-300 border-amber-800/60'
+                                        : 'bg-slate-800 text-slate-300 border-slate-700'
+                                    }`}>
+                                      {specificType}
+                                    </span>
+                                  );
+                                })()}
+                                {(() => {
+                                  const priority = ticket.installationDetails?.priority || ticket.serviceDetails?.priority;
+                                  if (!priority) return null;
+                                  const isHigh = priority.toLowerCase() === 'high';
+                                  const isLow = priority.toLowerCase() === 'low';
+                                  return (
+                                    <span className={`inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded ${
+                                      isHigh ? 'bg-red-950/80 text-red-400 border border-red-800/60' :
+                                      isLow ? 'bg-slate-800 text-slate-400 border border-slate-700' :
+                                      'bg-amber-950/80 text-amber-300 border border-amber-800/60'
+                                    }`}>
+                                      {priority.toLowerCase() === 'medium' ? 'Mid' : priority}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
                             </td>
                             <td className="px-6 py-4">
                               <p className="font-medium text-slate-300">{ticket.dealer?.name || 'N/A'}</p>
@@ -5522,13 +5551,28 @@ export default function App() {
                         filtered.slice((historyPage - 1) * 10, historyPage * 10).map(ticket => (
                           <div key={ticket._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 hover:shadow-xl transition duration-150">
                             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
                                 <span className="text-lg font-black text-white">{ticket.ticketNumber}</span>
                                 <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${
                                   ticket.type === 'installation' ? 'bg-cyan-950 text-cyan-400 border border-cyan-900/50' : 'bg-amber-950 text-amber-400 border border-amber-900/50'
                                 }`}>
                                   {ticket.type}
                                 </span>
+                                {(() => {
+                                  const specificType = ticket.type === 'service'
+                                    ? (ticket.serviceType || ticket.serviceDetails?.serviceType || 'In Warranty')
+                                    : (ticket.installationType || ticket.installationDetails?.installationType || 'Free Installation');
+                                  const isPaidByDealer = specificType === 'Paid by Dealer';
+                                  return (
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${
+                                      isPaidByDealer 
+                                        ? 'bg-amber-950/80 text-amber-300 border-amber-800/60' 
+                                        : 'bg-slate-800 text-slate-300 border-slate-700'
+                                    }`}>
+                                      {specificType}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <div className="flex items-center gap-2.5">
                                 <button
@@ -7863,7 +7907,9 @@ export default function App() {
               <div>
                 <h3 className="font-extrabold text-white text-lg">{selectedTicket.ticketNumber} Details</h3>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
-                  <p className="text-xs text-slate-400 capitalize">Type: {selectedTicket.type} • Status: {selectedTicket.status.replace('_', ' ')}</p>
+                  <p className="text-xs text-slate-400 capitalize">
+                    Type: <span className="font-semibold text-white">{selectedTicket.type}</span> ({selectedTicket.type === 'service' ? (selectedTicket.serviceType || selectedTicket.serviceDetails?.serviceType || 'In Warranty') : (selectedTicket.installationType || selectedTicket.installationDetails?.installationType || 'Free Installation')}) • Status: {selectedTicket.status.replace('_', ' ')}
+                  </p>
                   <span className="text-slate-600 text-xs">•</span>
                   {(() => {
                     const creator = selectedTicket.createdBy;
@@ -8028,12 +8074,13 @@ export default function App() {
                       <p className="text-xl font-extrabold text-amber-300">
                         {typeof selectedTicket.dealerExpense === 'number'
                           ? `₹ ${selectedTicket.dealerExpense}`
-                          : typeof selectedTicket.dealerFee === 'number'
-                            ? `₹ ${selectedTicket.dealerFee}`
-                            : selectedTicket.dealerExpense || 'Fee Not Configured'}
+                          : selectedTicket.dealerExpense || '₹ 0'}
                       </p>
                       <p className="text-[10px] text-slate-400 mt-0.5">
-                        Dealer: {selectedTicket.dealer?.name || 'N/A'}
+                        {selectedTicket.type === 'service' 
+                          ? (selectedTicket.serviceType || selectedTicket.serviceDetails?.serviceType || 'In Warranty')
+                          : (selectedTicket.installationType || selectedTicket.installationDetails?.installationType || 'Free Installation')}
+                        {((selectedTicket.type === 'service' ? (selectedTicket.serviceType || selectedTicket.serviceDetails?.serviceType) : (selectedTicket.installationType || selectedTicket.installationDetails?.installationType)) !== 'Paid by Dealer') ? ' (₹0 Expense)' : ' (Paid by Dealer)'}
                       </p>
                     </div>
 
@@ -9037,17 +9084,22 @@ export default function App() {
                 <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
                   <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Service Request Details</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Issue Description</label>
-                      <textarea 
-                        rows="2"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-                        value={newRequestForm.serviceDetails.description}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Service Type *</label>
+                      <select 
+                        required 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer font-medium"
+                        value={newRequestForm.serviceType || newRequestForm.serviceDetails?.serviceType || 'In Warranty'}
                         onChange={e => setNewRequestForm({ 
                           ...newRequestForm, 
-                          serviceDetails: { ...newRequestForm.serviceDetails, description: e.target.value } 
+                          serviceType: e.target.value,
+                          serviceDetails: { ...newRequestForm.serviceDetails, serviceType: e.target.value } 
                         })}
-                      ></textarea>
+                      >
+                        <option value="In Warranty">In Warranty</option>
+                        <option value="Out Warranty">Out Warranty</option>
+                        <option value="Paid by Dealer">Paid by Dealer</option>
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Priority *</label>
@@ -9065,12 +9117,44 @@ export default function App() {
                         <option value="high">High</option>
                       </select>
                     </div>
+                    <div className="md:col-span-3">
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Issue Description</label>
+                      <textarea 
+                        rows="2"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                        value={newRequestForm.serviceDetails.description}
+                        onChange={e => setNewRequestForm({ 
+                          ...newRequestForm, 
+                          serviceDetails: { ...newRequestForm.serviceDetails, description: e.target.value } 
+                        })}
+                      ></textarea>
+                    </div>
                   </div>
                 </div>
               ) : (
                 <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
                   <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Installation Request Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Installation Type *</label>
+                      <select 
+                        required 
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer font-medium"
+                        value={newRequestForm.installationType || newRequestForm.installationDetails?.installationType || 'Free Installation'}
+                        onChange={e => setNewRequestForm({ 
+                          ...newRequestForm, 
+                          installationType: e.target.value,
+                          installationDetails: { 
+                            ...newRequestForm.installationDetails, 
+                            installationType: e.target.value 
+                          } 
+                        })}
+                      >
+                        <option value="Free Installation">Free Installation</option>
+                        <option value="Paid Installation">Paid Installation</option>
+                        <option value="Paid by Dealer">Paid by Dealer</option>
+                      </select>
+                    </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Priority *</label>
                       <select 
