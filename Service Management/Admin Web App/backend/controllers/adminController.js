@@ -1,3 +1,5 @@
+const User = require('../models/User');
+
 const isSuperAdmin = (admin) => {
   if (!admin) return false;
   const email = (admin.email || '').trim().toLowerCase();
