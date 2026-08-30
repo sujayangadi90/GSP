@@ -488,6 +488,17 @@ export default function App() {
     });
   }, [brands, feeApplianceFilter, feeBrandFilter, feeSearchQuery]);
 
+  const [feeCurrentPage, setFeeCurrentPage] = useState(1);
+  const FEE_ITEMS_PER_PAGE = 20;
+
+  const totalFeePages = Math.ceil(filteredFeeBrands.length / FEE_ITEMS_PER_PAGE) || 1;
+
+  const paginatedFeeBrands = useMemo(() => {
+    const validPage = Math.min(Math.max(1, feeCurrentPage), totalFeePages);
+    const start = (validPage - 1) * FEE_ITEMS_PER_PAGE;
+    return filteredFeeBrands.slice(start, start + FEE_ITEMS_PER_PAGE);
+  }, [filteredFeeBrands, feeCurrentPage, totalFeePages]);
+
   const [admins, setAdmins] = useState([]);
   const [adminForm, setAdminForm] = useState(null); // null or { id?, name, email, password, status, permissions }
   const [customers, setCustomers] = useState([]);
@@ -4092,6 +4103,7 @@ export default function App() {
                       onChange={(e) => {
                         setFeeApplianceFilter(e.target.value);
                         setFeeBrandFilter('ALL'); // Reset brand filter when appliance category changes
+                        setFeeCurrentPage(1);
                       }}
                       className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-violet-500 cursor-pointer"
                     >
@@ -4110,7 +4122,10 @@ export default function App() {
                     </label>
                     <select
                       value={feeBrandFilter}
-                      onChange={(e) => setFeeBrandFilter(e.target.value)}
+                      onChange={(e) => {
+                        setFeeBrandFilter(e.target.value);
+                        setFeeCurrentPage(1);
+                      }}
                       className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
                     >
                       <option value="ALL">All Brands ({availableFeeBrands.length})</option>
@@ -4131,13 +4146,19 @@ export default function App() {
                         type="text"
                         placeholder="Search appliance or brand..."
                         value={feeSearchQuery}
-                        onChange={(e) => setFeeSearchQuery(e.target.value)}
+                        onChange={(e) => {
+                          setFeeSearchQuery(e.target.value);
+                          setFeeCurrentPage(1);
+                        }}
                         className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg pl-8 pr-7 py-2 text-xs focus:outline-none focus:border-violet-500"
                       />
                       <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
                       {feeSearchQuery && (
                         <button
-                          onClick={() => setFeeSearchQuery('')}
+                          onClick={() => {
+                            setFeeSearchQuery('');
+                            setFeeCurrentPage(1);
+                          }}
                           className="absolute right-2.5 top-1.5 text-slate-400 hover:text-white text-sm font-bold cursor-pointer"
                         >
                           ×
@@ -4154,6 +4175,7 @@ export default function App() {
                         setFeeApplianceFilter('ALL');
                         setFeeBrandFilter('ALL');
                         setFeeSearchQuery('');
+                        setFeeCurrentPage(1);
                       }}
                       className="w-full h-[34px] bg-slate-700/60 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none text-slate-200 text-xs rounded-lg font-medium transition cursor-pointer flex items-center justify-center gap-1"
                       title="Reset all filters"
@@ -4186,7 +4208,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
-                      {filteredFeeBrands.length === 0 ? (
+                      {paginatedFeeBrands.length === 0 ? (
                         <tr>
                           <td colSpan="6" className="text-slate-500 py-10 text-center">
                             {brands.length === 0 
@@ -4195,7 +4217,7 @@ export default function App() {
                           </td>
                         </tr>
                       ) : (
-                        filteredFeeBrands.map(b => (
+                        paginatedFeeBrands.map(b => (
                           <tr key={b._id} className="hover:bg-slate-800/20 transition duration-150">
                             <td className="px-5 py-4 font-medium text-white">{b.appliance?.name || 'N/A'}</td>
                             <td className="px-5 py-4 text-white font-medium">{b.name}</td>
@@ -4241,6 +4263,67 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination Footer */}
+                {filteredFeeBrands.length > 0 && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-800">
+                    <div className="text-xs text-slate-400">
+                      Showing <strong className="text-white">{(feeCurrentPage - 1) * FEE_ITEMS_PER_PAGE + 1}</strong> to <strong className="text-white">{Math.min(feeCurrentPage * FEE_ITEMS_PER_PAGE, filteredFeeBrands.length)}</strong> of <strong className="text-white">{filteredFeeBrands.length}</strong> configurations (20 per page)
+                    </div>
+
+                    {totalFeePages > 1 && (
+                      <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                        <button
+                          disabled={feeCurrentPage <= 1}
+                          onClick={() => setFeeCurrentPage(prev => Math.max(1, prev - 1))}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1 transition cursor-pointer border border-slate-700/60"
+                          title="Previous Page"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                          <span className="hidden sm:inline">Prev</span>
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: totalFeePages }, (_, i) => i + 1).map(pageNum => {
+                            if (
+                              pageNum === 1 || 
+                              pageNum === totalFeePages || 
+                              (pageNum >= feeCurrentPage - 1 && pageNum <= feeCurrentPage + 1)
+                            ) {
+                              return (
+                                <button
+                                  key={pageNum}
+                                  onClick={() => setFeeCurrentPage(pageNum)}
+                                  className={`w-8 h-8 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center ${
+                                    feeCurrentPage === pageNum 
+                                      ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/30' 
+                                      : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60'
+                                  }`}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            }
+                            if (pageNum === feeCurrentPage - 2 || pageNum === feeCurrentPage + 2) {
+                              return <span key={pageNum} className="text-slate-500 text-xs px-1 select-none">...</span>;
+                            }
+                            return null;
+                          })}
+                        </div>
+
+                        <button
+                          disabled={feeCurrentPage >= totalFeePages}
+                          onClick={() => setFeeCurrentPage(prev => Math.min(totalFeePages, prev + 1))}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1 transition cursor-pointer border border-slate-700/60"
+                          title="Next Page"
+                        >
+                          <span className="hidden sm:inline">Next</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
