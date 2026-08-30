@@ -2158,12 +2158,34 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 8),
-          Text(
-            isPaidByDealer
-                ? 'This ticket is marked Paid by Dealer. Dealer Expense is calculated from the Fee Management configuration.'
-                : 'This ticket is $specificType. No dealer expense is incurred (₹0).',
-            style: const TextStyle(fontSize: 11, color: Colors.white38),
-          ),
+          (() {
+            double partsTotal = 0.0;
+            final usedPartsList = (ticket['completion']?['usedParts'] as List?) ?? 
+                (ticket['completionHistory'] != null && (ticket['completionHistory'] as List).isNotEmpty
+                    ? (ticket['completionHistory'] as List).last['usedParts'] as List?
+                    : null);
+            if (usedPartsList != null) {
+              for (var up in usedPartsList) {
+                double pPrice = 0.0;
+                if (up['part'] is Map && up['part']['sellingPrice'] != null) {
+                  pPrice = (up['part']['sellingPrice'] as num).toDouble();
+                } else if (up['sellingPrice'] != null) {
+                  pPrice = (up['sellingPrice'] as num).toDouble();
+                }
+                final qty = (up['quantity'] is num) ? (up['quantity'] as num).toInt() : 1;
+                partsTotal += pPrice * qty;
+              }
+            }
+
+            return Text(
+              isPaidByDealer
+                  ? (partsTotal > 0 
+                      ? 'Dealer Expense = Applicable Dealer Fee + Total Part Price (₹${partsTotal.toInt()})' 
+                      : 'This ticket is marked Paid by Dealer. Dealer Expense is calculated from the Fee Management configuration.')
+                  : 'This ticket is $specificType. No dealer expense is incurred (₹0).',
+              style: const TextStyle(fontSize: 11, color: Colors.white38),
+            );
+          })(),
         ],
       ),
     );

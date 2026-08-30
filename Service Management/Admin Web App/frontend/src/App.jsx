@@ -8080,7 +8080,11 @@ export default function App() {
                         {selectedTicket.type === 'service' 
                           ? (selectedTicket.serviceType || selectedTicket.serviceDetails?.serviceType || 'In Warranty')
                           : (selectedTicket.installationType || selectedTicket.installationDetails?.installationType || 'Free Installation')}
-                        {((selectedTicket.type === 'service' ? (selectedTicket.serviceType || selectedTicket.serviceDetails?.serviceType) : (selectedTicket.installationType || selectedTicket.installationDetails?.installationType)) !== 'Paid by Dealer') ? ' (₹0 Expense)' : ' (Paid by Dealer)'}
+                        {((selectedTicket.type === 'service' ? (selectedTicket.serviceType || selectedTicket.serviceDetails?.serviceType) : (selectedTicket.installationType || selectedTicket.installationDetails?.installationType)) !== 'Paid by Dealer') 
+                          ? ' (₹0 Expense)' 
+                          : (selectedTicket.totalPartsPrice > 0 
+                              ? ` (Fee + Parts: ₹${selectedTicket.totalPartsPrice})` 
+                              : ' (Paid by Dealer)')}
                       </p>
                     </div>
 

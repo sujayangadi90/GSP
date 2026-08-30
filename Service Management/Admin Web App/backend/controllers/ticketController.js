@@ -194,6 +194,19 @@ const attachFeesToTickets = async (tickets) => {
 
     const isPaidByDealer = (ticketObj.type === 'service' && sType === 'Paid by Dealer') || (ticketObj.type === 'installation' && iType === 'Paid by Dealer');
 
+    let totalPartsPrice = 0;
+    const compObj = ticketObj.completion || (ticketObj.completionHistory && ticketObj.completionHistory.length > 0 ? ticketObj.completionHistory[ticketObj.completionHistory.length - 1] : null);
+    if (compObj && Array.isArray(compObj.usedParts)) {
+      compObj.usedParts.forEach(up => {
+        const pPrice = (up.part && typeof up.part === 'object' && up.part.sellingPrice !== undefined)
+          ? up.part.sellingPrice
+          : (up.sellingPrice !== undefined ? up.sellingPrice : 0);
+        const qty = up.quantity || 1;
+        totalPartsPrice += (Number(pPrice) || 0) * (Number(qty) || 0);
+      });
+    }
+    ticketObj.totalPartsPrice = totalPartsPrice;
+
     if (ticketObj.status === 'completed' || ticketObj.status === 'closed') {
       if (!isPaidByDealer) {
         ticketObj.dealerExpense = 0;
@@ -202,15 +215,20 @@ const attachFeesToTickets = async (tickets) => {
           // Use historical snapshot
         } else {
           if (brandObj) {
+            let baseDealerFee = null;
             if (ticketObj.type === 'service') {
-              ticketObj.dealerExpense = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
+              baseDealerFee = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null);
             } else if (ticketObj.type === 'installation') {
-              ticketObj.dealerExpense = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
+              baseDealerFee = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null);
+            }
+
+            if (baseDealerFee !== null) {
+              ticketObj.dealerExpense = baseDealerFee + totalPartsPrice;
             } else {
-              ticketObj.dealerExpense = 'Fee Not Configured';
+              ticketObj.dealerExpense = totalPartsPrice > 0 ? totalPartsPrice : 'Fee Not Configured';
             }
           } else {
-            ticketObj.dealerExpense = 'Fee Not Configured';
+            ticketObj.dealerExpense = totalPartsPrice > 0 ? totalPartsPrice : 'Fee Not Configured';
           }
         }
       }
@@ -690,6 +708,19 @@ const getTicketById = async (req, res) => {
 
     const isPaidByDealer = (ticketObj.type === 'service' && sType === 'Paid by Dealer') || (ticketObj.type === 'installation' && iType === 'Paid by Dealer');
 
+    let totalPartsPrice = 0;
+    const compObj = ticketObj.completion || (ticketObj.completionHistory && ticketObj.completionHistory.length > 0 ? ticketObj.completionHistory[ticketObj.completionHistory.length - 1] : null);
+    if (compObj && Array.isArray(compObj.usedParts)) {
+      compObj.usedParts.forEach(up => {
+        const pPrice = (up.part && typeof up.part === 'object' && up.part.sellingPrice !== undefined)
+          ? up.part.sellingPrice
+          : (up.sellingPrice !== undefined ? up.sellingPrice : 0);
+        const qty = up.quantity || 1;
+        totalPartsPrice += (Number(pPrice) || 0) * (Number(qty) || 0);
+      });
+    }
+    ticketObj.totalPartsPrice = totalPartsPrice;
+
     if (ticketObj.status === 'completed' || ticketObj.status === 'closed') {
       if (!isPaidByDealer) {
         ticketObj.dealerExpense = 0;
@@ -698,15 +729,20 @@ const getTicketById = async (req, res) => {
           // Use snapshot
         } else {
           if (brandObj && brandObj.appliance) {
+            let baseDealerFee = null;
             if (ticketObj.type === 'service') {
-              ticketObj.dealerExpense = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
+              baseDealerFee = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null);
             } else if (ticketObj.type === 'installation') {
-              ticketObj.dealerExpense = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
+              baseDealerFee = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null);
+            }
+
+            if (baseDealerFee !== null) {
+              ticketObj.dealerExpense = baseDealerFee + totalPartsPrice;
             } else {
-              ticketObj.dealerExpense = 'Fee Not Configured';
+              ticketObj.dealerExpense = totalPartsPrice > 0 ? totalPartsPrice : 'Fee Not Configured';
             }
           } else {
-            ticketObj.dealerExpense = 'Fee Not Configured';
+            ticketObj.dealerExpense = totalPartsPrice > 0 ? totalPartsPrice : 'Fee Not Configured';
           }
         }
       }
@@ -998,15 +1034,33 @@ const verifyWork = async (req, res) => {
           const iType = ticket.installationType || (ticket.installationDetails && ticket.installationDetails.installationType) || 'Free Installation';
           const isPaidByDealer = (ticket.type === 'service' && sType === 'Paid by Dealer') || (ticket.type === 'installation' && iType === 'Paid by Dealer');
 
+          let totalPartsPrice = 0;
+          const comp = ticket.completion || (ticket.completionHistory && ticket.completionHistory.length > 0 ? ticket.completionHistory[ticket.completionHistory.length - 1] : null);
+          if (comp && Array.isArray(comp.usedParts)) {
+            for (const up of comp.usedParts) {
+              let partSellingPrice = 0;
+              if (up.part) {
+                if (typeof up.part === 'object' && up.part.sellingPrice !== undefined) {
+                  partSellingPrice = up.part.sellingPrice;
+                } else {
+                  const partDoc = await InventoryItem.findById(up.part);
+                  if (partDoc) partSellingPrice = partDoc.sellingPrice || 0;
+                }
+              } else if (up.sellingPrice !== undefined) {
+                partSellingPrice = up.sellingPrice;
+              }
+              const qty = up.quantity || 1;
+              totalPartsPrice += (Number(partSellingPrice) || 0) * (Number(qty) || 0);
+            }
+          }
+
           if (ticket.type === 'service') {
-            ticket.dealerExpense = isPaidByDealer 
-              ? (brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null))
-              : 0;
+            const baseFee = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 0);
+            ticket.dealerExpense = isPaidByDealer ? (baseFee + totalPartsPrice) : 0;
             ticket.technicianEarning = brandObj.technicianServiceFee !== undefined ? brandObj.technicianServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null);
           } else if (ticket.type === 'installation') {
-            ticket.dealerExpense = isPaidByDealer
-              ? (brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null))
-              : 0;
+            const baseFee = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 0);
+            ticket.dealerExpense = isPaidByDealer ? (baseFee + totalPartsPrice) : 0;
             ticket.technicianEarning = brandObj.technicianInstallationFee !== undefined ? brandObj.technicianInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null);
           }
         } else {
@@ -1608,7 +1662,9 @@ const getReports = async (req, res) => {
 
     const allMatchingTickets = await Ticket.find(query)
       .populate('dealer', 'name code')
-      .populate('assignedTechnician', 'name');
+      .populate('assignedTechnician', 'name')
+      .populate('completion.usedParts.part', 'name sku sellingPrice')
+      .populate('completionHistory.usedParts.part', 'name sku sellingPrice');
 
     const allTicketsWithFees = await attachFeesToTickets(allMatchingTickets);
 
