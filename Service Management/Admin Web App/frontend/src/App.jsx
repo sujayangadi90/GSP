@@ -7992,6 +7992,67 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Financial & Fee Breakdown Card */}
+                <div className="bg-slate-800/40 border border-slate-850 p-5 rounded-2xl">
+                  <h4 className="font-bold text-white mb-3 text-sm border-b border-slate-700 pb-2 flex items-center justify-between">
+                    <span>Fee & Expense Details</span>
+                    <span className="text-[11px] text-slate-400 font-normal capitalize">
+                      {selectedTicket.type} ({selectedTicket.product?.category} - {selectedTicket.product?.name})
+                    </span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {/* Technician Earning */}
+                    <div className="bg-slate-900/60 border border-emerald-900/40 p-3.5 rounded-xl">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <p className="text-[11px] text-emerald-400 font-bold uppercase tracking-wider">Technician Earning</p>
+                      </div>
+                      <p className="text-xl font-extrabold text-emerald-300">
+                        {typeof selectedTicket.technicianEarning === 'number'
+                          ? `₹ ${selectedTicket.technicianEarning}`
+                          : typeof selectedTicket.technicianFee === 'number'
+                            ? `₹ ${selectedTicket.technicianFee}`
+                            : selectedTicket.technicianEarning || 'Fee Not Configured'}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Tech: {selectedTicket.assignedTechnician?.name || 'Unassigned'}
+                      </p>
+                    </div>
+
+                    {/* Dealer Expense */}
+                    <div className="bg-slate-900/60 border border-amber-900/40 p-3.5 rounded-xl">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                        <p className="text-[11px] text-amber-400 font-bold uppercase tracking-wider">Dealer Expense</p>
+                      </div>
+                      <p className="text-xl font-extrabold text-amber-300">
+                        {typeof selectedTicket.dealerExpense === 'number'
+                          ? `₹ ${selectedTicket.dealerExpense}`
+                          : typeof selectedTicket.dealerFee === 'number'
+                            ? `₹ ${selectedTicket.dealerFee}`
+                            : selectedTicket.dealerExpense || 'Fee Not Configured'}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Dealer: {selectedTicket.dealer?.name || 'N/A'}
+                      </p>
+                    </div>
+
+                    {/* Customer Fee */}
+                    <div className="bg-slate-900/60 border border-violet-900/40 p-3.5 rounded-xl">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="w-2 h-2 rounded-full bg-violet-400"></span>
+                        <p className="text-[11px] text-violet-400 font-bold uppercase tracking-wider">Customer Fee</p>
+                      </div>
+                      <p className="text-xl font-extrabold text-violet-300">
+                        ₹ {selectedTicket.customerFee ?? (selectedTicket.type === 'installation' ? (selectedTicket.customerInstallationFee ?? selectedTicket.installationFee ?? 0) : (selectedTicket.customerServiceFee ?? selectedTicket.serviceFee ?? 0))}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Customer Billing Rate
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Technician Completion Uploads */}
                 {(() => {
                   const completionsList = selectedTicket.completionHistory && selectedTicket.completionHistory.length > 0
