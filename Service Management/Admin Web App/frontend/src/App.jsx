@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -39,7 +39,9 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
-  Sliders
+  Sliders,
+  Filter,
+  RotateCcw
 } from 'lucide-react';
 
 const API_BASE = '/api';
@@ -453,6 +455,39 @@ export default function App() {
   const [cities, setCities] = useState([]);
   const [cityForm, setCityForm] = useState(null); // null or { id?, name }
   const [feeForm, setFeeForm] = useState(null); // null or { id, brandName, applianceName, serviceFee, installationFee }
+  const [feeApplianceFilter, setFeeApplianceFilter] = useState('ALL');
+  const [feeBrandFilter, setFeeBrandFilter] = useState('ALL');
+  const [feeSearchQuery, setFeeSearchQuery] = useState('');
+
+  // Available brands for Fee Configuration dropdown
+  const availableFeeBrands = useMemo(() => {
+    let list = brands;
+    if (feeApplianceFilter !== 'ALL') {
+      list = list.filter(b => {
+        const appName = (b.appliance && typeof b.appliance === 'object') ? b.appliance.name : (b.appliance || '');
+        return (appName || '').toLowerCase() === feeApplianceFilter.toLowerCase();
+      });
+    }
+    const uniqueNames = Array.from(new Set(list.map(b => b.name).filter(Boolean)));
+    return uniqueNames.sort((a, b) => a.localeCompare(b));
+  }, [brands, feeApplianceFilter]);
+
+  // Filtered brands list for Fee Matrix Table
+  const filteredFeeBrands = useMemo(() => {
+    return brands.filter(b => {
+      const appName = (b.appliance && typeof b.appliance === 'object') ? (b.appliance.name || '') : (b.appliance || '');
+      const bName = b.name || '';
+
+      const matchesAppliance = feeApplianceFilter === 'ALL' || appName.toLowerCase() === feeApplianceFilter.toLowerCase();
+      const matchesBrand = feeBrandFilter === 'ALL' || bName.toLowerCase() === feeBrandFilter.toLowerCase();
+      const matchesSearch = !feeSearchQuery.trim() || 
+        appName.toLowerCase().includes(feeSearchQuery.toLowerCase().trim()) || 
+        bName.toLowerCase().includes(feeSearchQuery.toLowerCase().trim());
+
+      return matchesAppliance && matchesBrand && matchesSearch;
+    });
+  }, [brands, feeApplianceFilter, feeBrandFilter, feeSearchQuery]);
+
   const [admins, setAdmins] = useState([]);
   const [adminForm, setAdminForm] = useState(null); // null or { id?, name, email, password, status, permissions }
   const [customers, setCustomers] = useState([]);
@@ -4033,12 +4068,100 @@ export default function App() {
                 <p className="text-slate-400 mt-1">Configure Customer, Dealer, and Technician service & installation fees for each appliance category and brand</p>
               </div>
 
-              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     <ClipboardList className="w-5 h-5 text-violet-400" />
                     Appliance & Brand Fee Matrix
                   </h3>
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <span>Showing <strong className="text-white">{filteredFeeBrands.length}</strong> of {brands.length} fee configurations</span>
+                  </div>
+                </div>
+
+                {/* Filter Controls Bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 bg-slate-800/40 p-4 rounded-xl border border-slate-700/50">
+                  {/* Appliance Category Filter */}
+                  <div className="lg:col-span-4">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1.5">
+                      <Filter className="w-3 h-3 text-violet-400" />
+                      Appliance Category
+                    </label>
+                    <select
+                      value={feeApplianceFilter}
+                      onChange={(e) => {
+                        setFeeApplianceFilter(e.target.value);
+                        setFeeBrandFilter('ALL'); // Reset brand filter when appliance category changes
+                      }}
+                      className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-violet-500 cursor-pointer"
+                    >
+                      <option value="ALL">All Appliances ({appliances.length})</option>
+                      {appliances.map(a => (
+                        <option key={a._id} value={a.name}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Brand Filter */}
+                  <div className="lg:col-span-4">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1.5">
+                      <Filter className="w-3 h-3 text-amber-400" />
+                      Brand
+                    </label>
+                    <select
+                      value={feeBrandFilter}
+                      onChange={(e) => setFeeBrandFilter(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      <option value="ALL">All Brands ({availableFeeBrands.length})</option>
+                      {availableFeeBrands.map(bName => (
+                        <option key={bName} value={bName}>{bName}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="lg:col-span-3">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1.5">
+                      <Search className="w-3 h-3 text-slate-400" />
+                      Search
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search appliance or brand..."
+                        value={feeSearchQuery}
+                        onChange={(e) => setFeeSearchQuery(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg pl-8 pr-7 py-2 text-xs focus:outline-none focus:border-violet-500"
+                      />
+                      <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+                      {feeSearchQuery && (
+                        <button
+                          onClick={() => setFeeSearchQuery('')}
+                          className="absolute right-2.5 top-1.5 text-slate-400 hover:text-white text-sm font-bold cursor-pointer"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Reset Button */}
+                  <div className="lg:col-span-1 flex items-end">
+                    <button
+                      disabled={feeApplianceFilter === 'ALL' && feeBrandFilter === 'ALL' && !feeSearchQuery}
+                      onClick={() => {
+                        setFeeApplianceFilter('ALL');
+                        setFeeBrandFilter('ALL');
+                        setFeeSearchQuery('');
+                      }}
+                      className="w-full h-[34px] bg-slate-700/60 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none text-slate-200 text-xs rounded-lg font-medium transition cursor-pointer flex items-center justify-center gap-1"
+                      title="Reset all filters"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Reset</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -4063,12 +4186,16 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
-                      {brands.length === 0 ? (
+                      {filteredFeeBrands.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="text-slate-500 py-10 text-center">No brands configured yet. Please configure appliances and brands first.</td>
+                          <td colSpan="6" className="text-slate-500 py-10 text-center">
+                            {brands.length === 0 
+                              ? 'No brands configured yet. Please configure appliances and brands first.'
+                              : 'No fee configurations match the selected filters.'}
+                          </td>
                         </tr>
                       ) : (
-                        brands.map(b => (
+                        filteredFeeBrands.map(b => (
                           <tr key={b._id} className="hover:bg-slate-800/20 transition duration-150">
                             <td className="px-5 py-4 font-medium text-white">{b.appliance?.name || 'N/A'}</td>
                             <td className="px-5 py-4 text-white font-medium">{b.name}</td>
