@@ -782,6 +782,13 @@ export default function App() {
     e.preventDefault();
     try {
       if (adminForm.id) {
+        const targetAdmin = admins.find(a => a._id === adminForm.id);
+        if (targetAdmin && ((targetAdmin.email || '').toLowerCase() === 'admin@gsp.com' || (targetAdmin.code || '').toUpperCase() === 'ADMIN-01' || (targetAdmin.name || '').toLowerCase() === 'gsp super admin')) {
+          alert('The GSP Super Admin account is system protected and cannot be edited.');
+          setAdminForm(null);
+          return;
+        }
+
         // Edit admin
         await apiFetch(`/admins/${adminForm.id}`, {
           method: 'PUT',
@@ -794,6 +801,11 @@ export default function App() {
           })
         });
       } else {
+        if ((adminForm.email || '').toLowerCase() === 'admin@gsp.com') {
+          alert('Cannot use the protected Super Admin email address.');
+          return;
+        }
+
         // Add admin
         await apiFetch('/admins', {
           method: 'POST',
@@ -815,6 +827,12 @@ export default function App() {
   };
 
   const toggleAdminStatus = async (id) => {
+    const targetAdmin = admins.find(a => a._id === id);
+    if (targetAdmin && ((targetAdmin.email || '').toLowerCase() === 'admin@gsp.com' || (targetAdmin.code || '').toUpperCase() === 'ADMIN-01' || (targetAdmin.name || '').toLowerCase() === 'gsp super admin')) {
+      alert('The GSP Super Admin account is system protected and cannot be deactivated or modified.');
+      return;
+    }
+
     try {
       await apiFetch(`/admins/${id}/toggle`, {
         method: 'PATCH'
@@ -4139,62 +4157,79 @@ export default function App() {
                   {admins.length === 0 ? (
                     <p className="text-slate-500 py-6 text-center text-sm">No admin users found</p>
                   ) : (
-                    admins.map(admin => (
-                      <div key={admin._id} className="py-4 flex items-center justify-between hover:bg-slate-800/30 px-3 rounded-xl transition duration-150">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-bold text-white">{admin.name}</p>
-                            <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded font-mono">{admin.code}</span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${admin.status === 'active' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
-                              {admin.status}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-400">{admin.email}</p>
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            <span className="text-[10px] text-slate-500 font-bold uppercase">Access:</span>
-                            {Object.entries(admin.permissions || {}).map(([key, val]) => (
-                              val && (
-                                <span key={key} className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded-md font-medium uppercase tracking-wider">
-                                  {key.replace('manage', '').replace('followups', 'follow-ups')}
+                    admins.map(admin => {
+                      const isSuper = (admin.email || '').toLowerCase() === 'admin@gsp.com' || (admin.code || '').toUpperCase() === 'ADMIN-01' || (admin.name || '').toLowerCase() === 'gsp super admin';
+                      return (
+                        <div key={admin._id} className="py-4 flex items-center justify-between hover:bg-slate-800/30 px-3 rounded-xl transition duration-150">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-bold text-white">{admin.name}</p>
+                              <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded font-mono">{admin.code}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${admin.status === 'active' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+                                {admin.status}
+                              </span>
+                              {isSuper && (
+                                <span className="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
+                                  <Lock className="w-2.5 h-2.5" /> Protected Super Admin
                                 </span>
-                              )
-                            ))}
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400">{admin.email}</p>
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              <span className="text-[10px] text-slate-500 font-bold uppercase">Access:</span>
+                              {Object.entries(admin.permissions || {}).map(([key, val]) => (
+                                val && (
+                                  <span key={key} className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded-md font-medium uppercase tracking-wider">
+                                    {key.replace('manage', '').replace('followups', 'follow-ups')}
+                                  </span>
+                                )
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isSuper ? (
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 border border-slate-700/60 rounded-lg text-slate-400 text-xs font-semibold select-none shadow-sm" title="GSP Super Admin account cannot be edited or deactivated">
+                                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                                <span className="text-slate-300">Protected</span>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => setAdminForm({
+                                    id: admin._id,
+                                    name: admin.name,
+                                    email: admin.email,
+                                    password: '', // blank for edits
+                                    status: admin.status,
+                                    permissions: admin.permissions || {
+                                      dashboard: true,
+                                      tickets: true,
+                                      customers: true,
+                                      manageDealers: true,
+                                      manageTechnicians: true,
+                                      followups: true,
+                                      settings: true
+                                    }
+                                  })}
+                                  className="p-1.5 hover:bg-slate-850 rounded-lg text-slate-400 hover:text-slate-200 transition cursor-pointer"
+                                  title="Edit User"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                  disabled={admin._id === user._id}
+                                  onClick={() => toggleAdminStatus(admin._id)}
+                                  className={`p-1.5 hover:bg-slate-850 rounded-lg transition cursor-pointer disabled:opacity-30 ${admin.status === 'active' ? 'text-amber-500 hover:text-amber-400' : 'text-emerald-500 hover:text-emerald-400'}`}
+                                  title={admin.status === 'active' ? 'Deactivate' : 'Activate'}
+                                >
+                                  <Power className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setAdminForm({
-                              id: admin._id,
-                              name: admin.name,
-                              email: admin.email,
-                              password: '', // blank for edits
-                              status: admin.status,
-                              permissions: admin.permissions || {
-                                dashboard: true,
-                                tickets: true,
-                                customers: true,
-                                manageDealers: true,
-                                manageTechnicians: true,
-                                followups: true,
-                                settings: true
-                              }
-                            })}
-                            className="p-1.5 hover:bg-slate-850 rounded-lg text-slate-400 hover:text-slate-200 transition"
-                            title="Edit User"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            disabled={admin._id === user._id}
-                            onClick={() => toggleAdminStatus(admin._id)}
-                            className={`p-1.5 hover:bg-slate-850 rounded-lg transition disabled:opacity-30 ${admin.status === 'active' ? 'text-amber-500 hover:text-amber-400' : 'text-emerald-500 hover:text-emerald-400'}`}
-                            title={admin.status === 'active' ? 'Deactivate' : 'Activate'}
-                          >
-                            <Power className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>

@@ -1,4 +1,10 @@
-const User = require('../models/User');
+const isSuperAdmin = (admin) => {
+  if (!admin) return false;
+  const email = (admin.email || '').trim().toLowerCase();
+  const code = (admin.code || '').trim().toUpperCase();
+  const name = (admin.name || '').trim().toLowerCase();
+  return email === 'admin@gsp.com' || code === 'ADMIN-01' || name === 'gsp super admin';
+};
 
 // @desc    Get all admin users
 // @route   GET /api/admins
@@ -35,7 +41,11 @@ const addAdmin = async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const adminExists = await User.findOne({ email });
+    if (email.trim().toLowerCase() === 'admin@gsp.com') {
+      return res.status(400).json({ message: 'Cannot create an account with the protected Super Admin email address.' });
+    }
+
+    const adminExists = await User.findOne({ email: email.trim().toLowerCase() });
     if (adminExists) {
       return res.status(400).json({ message: 'Email already registered' });
     }
@@ -55,7 +65,7 @@ const addAdmin = async (req, res) => {
 
     const admin = await User.create({
       name: adminName,
-      email,
+      email: email.trim().toLowerCase(),
       password,
       role: 'admin',
       code,
@@ -96,8 +106,11 @@ const updateAdmin = async (req, res) => {
       return res.status(404).json({ message: 'Admin user not found' });
     }
 
-    // Don't allow changing the main super admin (or allow if not self)
-    // For simplicity, allow updating name, email, status, permissions
+    // Protect GSP Super Admin from any modifications
+    if (isSuperAdmin(admin)) {
+      return res.status(403).json({ message: 'The GSP Super Admin account is system protected and cannot be edited or modified.' });
+    }
+
     admin.name = name || admin.name;
     admin.email = email || admin.email;
     admin.status = status || admin.status;
@@ -140,6 +153,11 @@ const toggleAdminStatus = async (req, res) => {
     const admin = await User.findById(req.params.id);
     if (!admin || admin.role !== 'admin') {
       return res.status(404).json({ message: 'Admin user not found' });
+    }
+
+    // Protect GSP Super Admin from status toggle / deactivation
+    if (isSuperAdmin(admin)) {
+      return res.status(403).json({ message: 'The GSP Super Admin account is system protected and cannot be deactivated or status modified.' });
     }
 
     // Prevent deactivating own account
