@@ -1188,6 +1188,8 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                     ),
                   ],
 
+                  _buildFeeBreakdownCard(),
+
                   const SizedBox(height: 24),
                   _buildSectionHeader('Scheduling & Attachments'),
                   _buildDateField(_visitDateController, 'Preferred Visit Date & Time', required: true),
@@ -1229,6 +1231,176 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
               ),
             ),
           ),
+    );
+  }
+
+  Widget _buildFeeBreakdownCard() {
+    dynamic selectedBrandObj;
+    if (_selectedBrandName != null && _brands.isNotEmpty) {
+      try {
+        selectedBrandObj = _brands.firstWhere((b) => b['name'] == _selectedBrandName, orElse: () => null);
+      } catch (_) {}
+    }
+
+    int customerFee = 0;
+    int dealerExpense = 0;
+
+    if (selectedBrandObj != null) {
+      final custServiceFee = (selectedBrandObj['customerServiceFee'] ?? selectedBrandObj['serviceFee'] ?? 0) is num
+          ? (selectedBrandObj['customerServiceFee'] ?? selectedBrandObj['serviceFee'] ?? 0).toInt()
+          : 0;
+      final custInstallFee = (selectedBrandObj['customerInstallationFee'] ?? selectedBrandObj['installationFee'] ?? 0) is num
+          ? (selectedBrandObj['customerInstallationFee'] ?? selectedBrandObj['installationFee'] ?? 0).toInt()
+          : 0;
+      final dlerServiceFee = (selectedBrandObj['dealerServiceFee'] ?? selectedBrandObj['serviceFee'] ?? 0) is num
+          ? (selectedBrandObj['dealerServiceFee'] ?? selectedBrandObj['serviceFee'] ?? 0).toInt()
+          : 0;
+      final dlerInstallFee = (selectedBrandObj['dealerInstallationFee'] ?? selectedBrandObj['installationFee'] ?? 0) is num
+          ? (selectedBrandObj['dealerInstallationFee'] ?? selectedBrandObj['installationFee'] ?? 0).toInt()
+          : 0;
+
+      if (widget.type == 'service') {
+        if (_serviceType == 'Out Warranty') {
+          customerFee = custServiceFee;
+          dealerExpense = 0;
+        } else if (_serviceType == 'Paid by Dealer') {
+          customerFee = 0;
+          dealerExpense = dlerServiceFee;
+        } else {
+          customerFee = 0;
+          dealerExpense = 0;
+        }
+      } else {
+        if (_installationType == 'Paid Installation') {
+          customerFee = custInstallFee;
+          dealerExpense = 0;
+        } else if (_installationType == 'Paid by Dealer') {
+          customerFee = 0;
+          dealerExpense = dlerInstallFee;
+        } else {
+          customerFee = 0;
+          dealerExpense = 0;
+        }
+      }
+    }
+
+    final isService = widget.type == 'service';
+    final selectionLabel = isService ? _serviceType : _installationType;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1B24),
+        border: Border.all(color: Colors.purple.withValues(alpha: 0.25)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Text('💰 ', style: TextStyle(fontSize: 14)),
+                  Text(
+                    'FEE & EXPENSE ESTIMATE',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.purpleAccent, letterSpacing: 0.5),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  selectionLabel,
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              // Customer Fee
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF121018),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'CUSTOMER FEE',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '₹ $customerFee',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: customerFee > 0 ? const Color(0xFFA78BFA) : Colors.white60,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        customerFee > 0
+                            ? 'Charge to customer'
+                            : (isService ? (_serviceType == 'In Warranty' ? 'Free (In Warranty)' : 'Covered by Dealer') : (_installationType == 'Free Installation' ? 'Free Installation' : 'Covered by Dealer')),
+                        style: const TextStyle(fontSize: 9, color: Colors.white38),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Dealer Expense
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF121018),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'DEALER EXPENSE',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '₹ $dealerExpense',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: dealerExpense > 0 ? const Color(0xFFFBBF24) : Colors.white60,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        dealerExpense > 0 ? 'Deducted upon close' : 'No dealer cost',
+                        style: const TextStyle(fontSize: 9, color: Colors.white38),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

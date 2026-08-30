@@ -171,7 +171,6 @@ const attachFeesToTickets = async (tickets) => {
 
       ticketObj.technicianFee = ticketObj.type === 'installation' ? ticketObj.technicianInstallationFee : ticketObj.technicianServiceFee;
       ticketObj.dealerFee = ticketObj.type === 'installation' ? ticketObj.dealerInstallationFee : ticketObj.dealerServiceFee;
-      ticketObj.customerFee = ticketObj.type === 'installation' ? ticketObj.customerInstallationFee : ticketObj.customerServiceFee;
     } else {
       ticketObj.serviceFee = 0;
       ticketObj.installationFee = 0;
@@ -184,6 +183,14 @@ const attachFeesToTickets = async (tickets) => {
     const iType = ticketObj.installationType || (ticketObj.installationDetails && ticketObj.installationDetails.installationType) || 'Free Installation';
     ticketObj.serviceType = sType;
     ticketObj.installationType = iType;
+
+    if (ticketObj.type === 'service') {
+      ticketObj.customerFee = sType === 'Out Warranty' ? (ticketObj.customerServiceFee || 0) : 0;
+    } else if (ticketObj.type === 'installation') {
+      ticketObj.customerFee = iType === 'Paid Installation' ? (ticketObj.customerInstallationFee || 0) : 0;
+    } else {
+      ticketObj.customerFee = 0;
+    }
 
     const isPaidByDealer = (ticketObj.type === 'service' && sType === 'Paid by Dealer') || (ticketObj.type === 'installation' && iType === 'Paid by Dealer');
 
@@ -660,7 +667,6 @@ const getTicketById = async (req, res) => {
 
       ticketObj.technicianFee = ticketObj.type === 'installation' ? ticketObj.technicianInstallationFee : ticketObj.technicianServiceFee;
       ticketObj.dealerFee = ticketObj.type === 'installation' ? ticketObj.dealerInstallationFee : ticketObj.dealerServiceFee;
-      ticketObj.customerFee = ticketObj.type === 'installation' ? ticketObj.customerInstallationFee : ticketObj.customerServiceFee;
     } else {
       ticketObj.serviceFee = 0;
       ticketObj.installationFee = 0;
@@ -673,6 +679,14 @@ const getTicketById = async (req, res) => {
     const iType = ticketObj.installationType || (ticketObj.installationDetails && ticketObj.installationDetails.installationType) || 'Free Installation';
     ticketObj.serviceType = sType;
     ticketObj.installationType = iType;
+
+    if (ticketObj.type === 'service') {
+      ticketObj.customerFee = sType === 'Out Warranty' ? (ticketObj.customerServiceFee || 0) : 0;
+    } else if (ticketObj.type === 'installation') {
+      ticketObj.customerFee = iType === 'Paid Installation' ? (ticketObj.customerInstallationFee || 0) : 0;
+    } else {
+      ticketObj.customerFee = 0;
+    }
 
     const isPaidByDealer = (ticketObj.type === 'service' && sType === 'Paid by Dealer') || (ticketObj.type === 'installation' && iType === 'Paid by Dealer');
 

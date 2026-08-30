@@ -9178,6 +9178,94 @@ export default function App() {
                 </div>
               )}
 
+              {/* Live Fee & Expense Breakdown */}
+              {(() => {
+                const selectedBrand = brands.find(b => {
+                  const appObj = appliances.find(a => a.name === newRequestForm.product.category);
+                  return appObj && (b.appliance === appObj._id || b.appliance?._id === appObj._id) && b.name === newRequestForm.product.name;
+                });
+
+                let custFee = 0;
+                let dlrExpense = 0;
+                const configuredCustServiceFee = selectedBrand ? (selectedBrand.customerServiceFee ?? selectedBrand.serviceFee ?? 0) : 0;
+                const configuredCustInstallFee = selectedBrand ? (selectedBrand.customerInstallationFee ?? selectedBrand.installationFee ?? 0) : 0;
+                const configuredDlrServiceFee = selectedBrand ? (selectedBrand.dealerServiceFee ?? selectedBrand.serviceFee ?? 0) : 0;
+                const configuredDlrInstallFee = selectedBrand ? (selectedBrand.dealerInstallationFee ?? selectedBrand.installationFee ?? 0) : 0;
+
+                const isService = newRequestForm.type === 'service';
+                const sType = newRequestForm.serviceType || newRequestForm.serviceDetails?.serviceType || 'In Warranty';
+                const iType = newRequestForm.installationType || newRequestForm.installationDetails?.installationType || 'Free Installation';
+
+                if (isService) {
+                  if (sType === 'Out Warranty') {
+                    custFee = configuredCustServiceFee;
+                    dlrExpense = 0;
+                  } else if (sType === 'Paid by Dealer') {
+                    custFee = 0;
+                    dlrExpense = configuredDlrServiceFee;
+                  } else {
+                    custFee = 0;
+                    dlrExpense = 0;
+                  }
+                } else {
+                  if (iType === 'Paid Installation') {
+                    custFee = configuredCustInstallFee;
+                    dlrExpense = 0;
+                  } else if (iType === 'Paid by Dealer') {
+                    custFee = 0;
+                    dlrExpense = configuredDlrInstallFee;
+                  } else {
+                    custFee = 0;
+                    dlrExpense = 0;
+                  }
+                }
+
+                return (
+                  <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>💰</span> Applicable Fee & Expense Details
+                      </h4>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {isService ? sType : iType}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Customer Fee */}
+                      <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Customer Fee</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {custFee > 0 ? 'To be collected from customer' : (isService ? (sType === 'In Warranty' ? 'Free (In Warranty)' : 'Covered by Dealer') : (iType === 'Free Installation' ? 'Free Installation' : 'Covered by Dealer'))}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className={`text-base font-black ${custFee > 0 ? 'text-violet-400' : 'text-slate-400'}`}>
+                            ₹ {custFee}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Dealer Expense */}
+                      <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Dealer Expense</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {dlrExpense > 0 ? 'Incurred by dealer on completion' : 'No dealer expense incurred'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className={`text-base font-black ${dlrExpense > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
+                            ₹ {dlrExpense}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Attachments & Remarks */}
               <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
                 <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Attachment & Remarks</h4>
