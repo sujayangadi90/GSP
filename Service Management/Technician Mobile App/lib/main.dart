@@ -1103,9 +1103,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     value: selectedItem,
                     isExpanded: true,
                     items: _inventory.map((item) {
+                      final price = (item['sellingPrice'] is num) ? (item['sellingPrice'] as num).toInt() : 0;
                       return DropdownMenuItem<dynamic>(
                         value: item,
-                        child: Text('${item['name']} - Avail: ${item['quantity']}'),
+                        child: Text('${item['name']} (₹$price) - Avail: ${item['quantity']}'),
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -1139,12 +1140,17 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                       return;
                     }
                     
+                    final sellingPrice = (selectedItem['sellingPrice'] is num)
+                        ? (selectedItem['sellingPrice'] as num).toDouble()
+                        : 0.0;
+
                     setState(() {
                       _selectedParts.add({
                         'part': selectedItem['_id'],
                         'quantity': qty,
                         'name': selectedItem['name'],
-                        'sku': selectedItem['sku']
+                        'sku': selectedItem['sku'],
+                        'sellingPrice': sellingPrice,
                       });
                     });
                     Navigator.pop(context);
@@ -1495,6 +1501,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               'Model: ${_job!['product']['modelNumber'] ?? 'N/A'}',
               'Serial: ${_job!['product']['serialNumber'] ?? 'N/A'}',
               'Scope: ${_job!['type'].toString().toUpperCase()}',
+              'Type: ${_job!['type'].toString().toLowerCase() == 'service' ? (_job!['serviceType'] ?? _job!['serviceDetails']?['serviceType'] ?? 'In Warranty') : (_job!['installationType'] ?? _job!['installationDetails']?['installationType'] ?? 'Free Installation')}',
               'Priority: ${((_job!['installationDetails']?['priority'] ?? _job!['serviceDetails']?['priority'] ?? 'medium').toString()).toLowerCase() == 'medium' ? 'MID' : ((_job!['installationDetails']?['priority'] ?? _job!['serviceDetails']?['priority'] ?? 'medium').toString()).toUpperCase()}',
               if (_job!['serviceDetails']?['description'] != null)
                 'Issue: ${_job!['serviceDetails']['description']}',
@@ -1698,26 +1705,59 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                 itemCount: _selectedParts.length,
                 itemBuilder: (context, idx) {
                   final p = _selectedParts[idx];
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    title: Text(p['name'] ?? '', style: const TextStyle(fontSize: 13, color: Colors.white)),
-                    subtitle: Text('SKU: ${p['sku']} • Quantity: ${p['quantity']}', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, size: 16, color: Colors.red),
-                      onPressed: () => setState(() => _selectedParts.removeAt(idx)),
+                  final qty = (p['quantity'] is num) ? (p['quantity'] as num).toInt() : 1;
+                  final price = (p['sellingPrice'] is num) ? (p['sellingPrice'] as num).toDouble() : 0.0;
+                  final partItemTotal = price * qty;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF151917),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(p['name'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                              const SizedBox(height: 2),
+                              Text('SKU: ${p['sku']} • Qty: $qty × ₹${price.toInt()}', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+                            ],
+                          ),
+                        ),
+                        Text('₹ ${partItemTotal.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.tealAccent)),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => setState(() => _selectedParts.removeAt(idx)),
+                        ),
+                      ],
                     ),
                   );
                 },
               )
             ] else ...[
-              Text('No parts added.', style: TextStyle(color: Colors.grey[500], fontSize: 12, fontStyle: FontStyle.italic)),
+              Text('No spare parts added.', style: TextStyle(color: Colors.grey[500], fontSize: 12, fontStyle: FontStyle.italic)),
             ],
+
+            const SizedBox(height: 20),
+            _buildPaymentSummaryCard(),
+
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _submitCompletion,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-              child: const Text('Submit Completion Details'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Submit Completion Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -1739,6 +1779,173 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               'Status: ${status.replaceAll('_', ' ').toUpperCase()}\nWaiting for Admin verification/closure.',
               style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentSummaryCard() {
+    if (_job == null) return const SizedBox.shrink();
+
+    final type = (_job!['type'] ?? '').toString().toLowerCase();
+    final sType = (_job!['serviceType'] ?? _job!['serviceDetails']?['serviceType'] ?? 'In Warranty').toString();
+    final iType = (_job!['installationType'] ?? _job!['installationDetails']?['installationType'] ?? 'Free Installation').toString();
+
+    final custServiceFee = ((_job!['customerServiceFee'] ?? _job!['serviceFee'] ?? 0) is num)
+        ? (_job!['customerServiceFee'] ?? _job!['serviceFee'] ?? 0).toDouble()
+        : 0.0;
+    final custInstallFee = ((_job!['customerInstallationFee'] ?? _job!['installationFee'] ?? 0) is num)
+        ? (_job!['customerInstallationFee'] ?? _job!['installationFee'] ?? 0).toDouble()
+        : 0.0;
+
+    final dlrServiceFee = ((_job!['dealerServiceFee'] ?? _job!['serviceFee'] ?? 0) is num)
+        ? (_job!['dealerServiceFee'] ?? _job!['serviceFee'] ?? 0).toDouble()
+        : 0.0;
+    final dlrInstallFee = ((_job!['dealerInstallationFee'] ?? _job!['installationFee'] ?? 0) is num)
+        ? (_job!['dealerInstallationFee'] ?? _job!['installationFee'] ?? 0).toDouble()
+        : 0.0;
+
+    final isCustomerPaying = (type == 'service' && sType == 'Out Warranty') || (type == 'installation' && iType == 'Paid Installation');
+    final isDealerPaying = (type == 'service' && sType == 'Paid by Dealer') || (type == 'installation' && iType == 'Paid by Dealer');
+
+    double baseFee = 0.0;
+    String feeLabel = '';
+    if (isCustomerPaying) {
+      if (type == 'service') {
+        baseFee = custServiceFee;
+        feeLabel = 'Customer Service Fee (Out Warranty)';
+      } else {
+        baseFee = custInstallFee;
+        feeLabel = 'Customer Installation Fee (Paid Installation)';
+      }
+    } else if (isDealerPaying) {
+      if (type == 'service') {
+        baseFee = dlrServiceFee;
+        feeLabel = 'Dealer Service Fee (Paid by Dealer)';
+      } else {
+        baseFee = dlrInstallFee;
+        feeLabel = 'Dealer Installation Fee (Paid by Dealer)';
+      }
+    } else {
+      feeLabel = type == 'service' ? 'Service Fee (In Warranty)' : 'Installation Fee (Free Installation)';
+    }
+
+    double partsTotal = 0.0;
+    for (var p in _selectedParts) {
+      final qty = (p['quantity'] is num) ? (p['quantity'] as num).toInt() : 1;
+      final price = (p['sellingPrice'] is num) ? (p['sellingPrice'] as num).toDouble() : 0.0;
+      partsTotal += price * qty;
+    }
+
+    final grandTotal = baseFee + partsTotal;
+
+    Color cardBorderColor = Colors.teal.withValues(alpha: 0.3);
+    Color headerBadgeBg = Colors.teal.withValues(alpha: 0.2);
+    Color headerBadgeTextColor = Colors.tealAccent;
+    String headerTitle = 'PAYMENT / BILLING SUMMARY';
+    String payerBadge = isCustomerPaying ? 'CUSTOMER PAYS' : (isDealerPaying ? 'PAID BY DEALER' : 'FREE / WARRANTY');
+
+    if (isCustomerPaying) {
+      cardBorderColor = Colors.greenAccent.withValues(alpha: 0.4);
+      headerBadgeBg = Colors.green.withValues(alpha: 0.2);
+      headerBadgeTextColor = Colors.greenAccent;
+      headerTitle = '💳 COLLECT FROM CUSTOMER';
+    } else if (isDealerPaying) {
+      cardBorderColor = Colors.purpleAccent.withValues(alpha: 0.4);
+      headerBadgeBg = Colors.purple.withValues(alpha: 0.2);
+      headerBadgeTextColor = Colors.purpleAccent;
+      headerTitle = '🏢 BILLED TO DEALER';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161C19),
+        border: Border.all(color: cardBorderColor, width: 1.5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                headerTitle,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: headerBadgeTextColor),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: headerBadgeBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  payerBadge,
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: headerBadgeTextColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  feeLabel,
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ),
+              Text(
+                '₹ ${baseFee.toInt()}',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Parts Total (${_selectedParts.length} item${_selectedParts.length == 1 ? '' : 's'})',
+                style: const TextStyle(fontSize: 12, color: Colors.white70),
+              ),
+              Text(
+                '₹ ${partsTotal.toInt()}',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ],
+          ),
+          const Divider(color: Colors.white24, height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isCustomerPaying ? 'TOTAL TO COLLECT' : (isDealerPaying ? 'TOTAL BILLED TO DEALER' : 'TOTAL AMOUNT'),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
+                  ),
+                  if (isCustomerPaying)
+                    const Text('Collect this total from customer on-site', style: TextStyle(fontSize: 10, color: Colors.greenAccent))
+                  else if (isDealerPaying)
+                    const Text('Customer does not pay. Billed to dealer.', style: TextStyle(fontSize: 10, color: Colors.purpleAccent))
+                  else
+                    const Text('No fee required for customer', style: TextStyle(fontSize: 10, color: Colors.white38)),
+                ],
+              ),
+              Text(
+                '₹ ${grandTotal.toInt()}',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: isCustomerPaying ? Colors.greenAccent : (isDealerPaying ? Colors.purpleAccent : Colors.white),
+                ),
+              ),
+            ],
           ),
         ],
       ),
