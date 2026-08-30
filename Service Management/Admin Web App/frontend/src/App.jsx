@@ -37,6 +37,7 @@ import {
   Unlock,
   BarChart2,
   Sparkles,
+  ChevronLeft,
   ChevronRight,
   Sliders
 } from 'lucide-react';
@@ -6432,49 +6433,221 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Stats Overview */}
+              {/* Employee of the Month Slider (Last 12 Months including Current Month) */}
               {(() => {
-                const total = evaluations.length;
-                const avg = total > 0 ? (evaluations.reduce((sum, e) => sum + e.finalScore, 0) / total).toFixed(1) : '0.0';
-                const finalized = evaluations.filter(e => e.status === 'finalized').length;
-                const drafts = evaluations.filter(e => e.status === 'draft').length;
+                const last12Months = [];
+                const now = new Date();
+                for (let i = 0; i < 12; i++) {
+                  const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                  const mName = MONTHS_LIST[d.getMonth()];
+                  const yVal = d.getFullYear();
+                  const monthEvals = evaluations.filter(e => e.month === mName && e.year === yVal);
+                  const topEval = monthEvals.length > 0
+                    ? [...monthEvals].sort((a, b) => b.finalScore - a.finalScore)[0]
+                    : null;
+                  last12Months.push({
+                    month: mName,
+                    year: yVal,
+                    isCurrent: i === 0,
+                    topEval,
+                    totalEvals: monthEvals.length
+                  });
+                }
 
                 return (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Evaluations</span>
-                      <div className="flex items-baseline justify-between mt-2">
-                        <span className="text-3xl font-black text-white">{total}</span>
-                        <span className="text-xs font-bold text-violet-400 bg-violet-950/60 px-2 py-0.5 rounded">All time</span>
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 relative overflow-hidden">
+                    {/* Background glow decoration */}
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+                    <div className="absolute bottom-0 left-0 w-96 h-96 bg-violet-500/5 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20" />
+
+                    {/* Section Header with Slider Navigation */}
+                    <div className="flex items-center justify-between relative z-10">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/20">
+                          <Star className="w-5 h-5 fill-slate-950" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
+                            Employee of the Month
+                            <span className="text-xs font-bold text-amber-400 bg-amber-950/70 border border-amber-800/60 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                              12-Month Roll of Honour
+                            </span>
+                          </h2>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Spotlighting top-rated technicians for each month over the past year
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Slider Navigation Buttons */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const el = document.getElementById('eom-slider-track');
+                            if (el) el.scrollBy({ left: -320, behavior: 'smooth' });
+                          }}
+                          className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition cursor-pointer shadow-md"
+                          title="Previous Months"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const el = document.getElementById('eom-slider-track');
+                            if (el) el.scrollBy({ left: 320, behavior: 'smooth' });
+                          }}
+                          className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition cursor-pointer shadow-md"
+                          title="Next Months"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Average Score</span>
-                      <div className="flex items-baseline justify-between mt-2">
-                        <span className="text-3xl font-black text-amber-400">{avg} <span className="text-base text-slate-400 font-normal">/ 10</span></span>
-                        <span className="text-xs font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded">Overall</span>
-                      </div>
-                    </div>
+                    {/* Horizontal Slider Track */}
+                    <div
+                      id="eom-slider-track"
+                      className="flex gap-4 overflow-x-auto pb-2 pt-1 scroll-smooth snap-x snap-mandatory relative z-10 scrollbar-none"
+                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
+                      {last12Months.map((item, idx) => {
+                        const top = item.topEval;
+                        const techUser = top 
+                          ? (technicians.find(t => (t._id === top.technician?._id || t._id === top.technician || t.id === top.technician)) || top.technician)
+                          : null;
+                        const photoUrl = techUser?.profilePic || top?.technician?.profilePic;
 
-                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Finalized (Locked)</span>
-                      <div className="flex items-baseline justify-between mt-2">
-                        <span className="text-3xl font-black text-emerald-400">{finalized}</span>
-                        <span className="text-xs font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded flex items-center gap-1">
-                          <Lock className="w-3 h-3" /> Locked
-                        </span>
-                      </div>
-                    </div>
+                        let bandClass = 'bg-amber-950 text-amber-300 border border-amber-800/60';
+                        if (top?.performanceBand === 'Excellent') {
+                          bandClass = 'bg-emerald-950 text-emerald-300 border border-emerald-800/60';
+                        } else if (top?.performanceBand === 'Good') {
+                          bandClass = 'bg-blue-950 text-blue-300 border border-blue-800/60';
+                        }
 
-                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pending Drafts</span>
-                      <div className="flex items-baseline justify-between mt-2">
-                        <span className="text-3xl font-black text-amber-400">{drafts}</span>
-                        <span className="text-xs font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded flex items-center gap-1">
-                          <Unlock className="w-3 h-3" /> In Progress
-                        </span>
-                      </div>
+                        return (
+                          <div
+                            key={`${item.month}-${item.year}`}
+                            className={`w-[260px] sm:w-[280px] shrink-0 snap-start rounded-2xl p-4.5 flex flex-col justify-between transition-all duration-200 relative overflow-hidden border ${
+                              item.isCurrent
+                                ? 'bg-gradient-to-b from-slate-900 via-slate-900 to-violet-950/40 border-violet-700/60 shadow-xl shadow-violet-950/40'
+                                : top
+                                ? 'bg-slate-900 border-slate-800 hover:border-amber-500/40 shadow-lg'
+                                : 'bg-slate-950/40 border-slate-800/80 border-dashed'
+                            }`}
+                          >
+                            {/* Card Top Banner */}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-black text-white tracking-wide">
+                                {item.month} {item.year}
+                              </span>
+                              {item.isCurrent ? (
+                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-violet-600 text-white shadow-sm">
+                                  Current
+                                </span>
+                              ) : top ? (
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-950/80 text-amber-400 border border-amber-800/60 flex items-center gap-1">
+                                  <Award className="w-2.5 h-2.5" /> Top Rated
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-medium text-slate-500 uppercase">
+                                  Pending
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Card Body */}
+                            {top ? (
+                              <div className="my-3 flex flex-col items-center text-center">
+                                {/* Photo Container */}
+                                <div className="relative mb-2.5">
+                                  <div className="w-18 h-18 rounded-2xl bg-slate-800 border-2 border-amber-400/60 overflow-hidden shadow-lg shadow-amber-500/10 flex items-center justify-center shrink-0">
+                                    {photoUrl ? (
+                                      <img
+                                        src={photoUrl.startsWith('http') ? photoUrl : `/${photoUrl}`}
+                                        alt={top.technicianName}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-gradient-to-tr from-amber-500 to-violet-600 flex items-center justify-center font-black text-white text-2xl">
+                                        {top.technicianName?.charAt(0).toUpperCase() || 'T'}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-md font-bold text-xs" title="Top Performer">
+                                    ★
+                                  </div>
+                                </div>
+
+                                {/* Tech Name & Code */}
+                                <h3 className="font-extrabold text-white text-sm truncate max-w-[220px]">
+                                  {top.technicianName}
+                                </h3>
+                                <p className="font-mono text-[11px] text-slate-400 mt-0.5">
+                                  {top.technicianCode || 'TECH'}
+                                </p>
+
+                                {/* Score & Badge */}
+                                <div className="flex items-center gap-2 mt-3">
+                                  <div className="bg-slate-950/80 px-3 py-1 rounded-xl border border-slate-800 flex items-center gap-1">
+                                    <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                                    <span className="text-sm font-black text-white">{top.finalScore}</span>
+                                    <span className="text-[10px] text-slate-500">/10</span>
+                                  </div>
+                                  <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-xl ${bandClass}`}>
+                                    {top.performanceBand}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="my-5 flex flex-col items-center text-center justify-center py-2 space-y-2">
+                                <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600">
+                                  <Award className="w-7 h-7 opacity-40" />
+                                </div>
+                                <p className="text-xs font-semibold text-slate-400">No evaluation yet</p>
+                                <button
+                                  onClick={() => {
+                                    const activeAreas = (performanceAreas || []).filter(a => a.isActive !== false);
+                                    const firstTech = technicians[0];
+                                    setEvaluationModal({
+                                      id: null,
+                                      technicianId: firstTech?._id || firstTech?.id || '',
+                                      technicianName: firstTech?.name || '',
+                                      technicianCode: firstTech?.code || '',
+                                      month: item.month,
+                                      year: item.year,
+                                      ratings: activeAreas.map(a => ({
+                                        areaId: a._id,
+                                        areaName: a.name,
+                                        rating: 8,
+                                        comments: ''
+                                      })),
+                                      remarks: '',
+                                      status: 'draft',
+                                      isLocked: false
+                                    });
+                                  }}
+                                  className="text-[11px] font-bold text-violet-400 hover:text-violet-300 bg-violet-950/40 hover:bg-violet-900/50 border border-violet-800/40 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                                >
+                                  + Evaluate {item.month.substring(0, 3)}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Card Footer */}
+                            {top && (
+                              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500">{item.totalEvals} evaluated</span>
+                                <button
+                                  onClick={() => fetchTechnicianProfile(top.technician?._id || top.technician)}
+                                  className="text-violet-400 hover:text-violet-300 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
+                                >
+                                  View Trend &rarr;
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );

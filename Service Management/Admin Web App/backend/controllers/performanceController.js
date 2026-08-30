@@ -144,7 +144,7 @@ const getEvaluations = async (req, res) => {
     }
 
     const evaluations = await PerformanceEvaluation.find(query)
-      .populate('technician', 'name code mobile email')
+      .populate('technician', 'name code mobile email profilePic')
       .sort({ year: -1, createdAt: -1 });
 
     res.json(evaluations);
@@ -159,7 +159,7 @@ const getEvaluations = async (req, res) => {
 const getEvaluationById = async (req, res) => {
   try {
     const evaluation = await PerformanceEvaluation.findById(req.params.id)
-      .populate('technician', 'name code mobile email appliances');
+      .populate('technician', 'name code mobile email profilePic appliances');
     if (!evaluation) {
       return res.status(404).json({ message: 'Evaluation not found' });
     }
