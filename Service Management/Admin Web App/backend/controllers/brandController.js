@@ -27,10 +27,24 @@ const getBrands = async (req, res) => {
 };
 
 // @desc    Create a new brand
+// @desc    Create a new brand
 // @route   POST /api/brands
 // @access  Private/Admin
 const createBrand = async (req, res) => {
-  const { name, applianceId, followUpDays, serviceFee, installationFee } = req.body;
+  const { 
+    name, 
+    applianceId, 
+    followUpDays, 
+    serviceFee, 
+    installationFee,
+    customerServiceFee,
+    customerInstallationFee,
+    dealerServiceFee,
+    dealerInstallationFee,
+    technicianServiceFee,
+    technicianInstallationFee
+  } = req.body;
+
   if (!name || !applianceId || followUpDays === undefined) {
     return res.status(400).json({ message: 'All fields (name, applianceId, followUpDays) are required' });
   }
@@ -40,21 +54,18 @@ const createBrand = async (req, res) => {
     return res.status(400).json({ message: 'Follow-up days must be a positive integer' });
   }
 
-  let parsedServiceFee = 0;
-  if (serviceFee !== undefined) {
-    parsedServiceFee = parseFloat(serviceFee);
-    if (isNaN(parsedServiceFee) || parsedServiceFee < 0) {
-      return res.status(400).json({ message: 'Service fee must be a non-negative number' });
-    }
-  }
+  const parseFee = (val) => {
+    if (val === undefined || val === null || val === '') return 0;
+    const num = parseFloat(val);
+    return isNaN(num) || num < 0 ? 0 : num;
+  };
 
-  let parsedInstallationFee = 0;
-  if (installationFee !== undefined) {
-    parsedInstallationFee = parseFloat(installationFee);
-    if (isNaN(parsedInstallationFee) || parsedInstallationFee < 0) {
-      return res.status(400).json({ message: 'Installation fee must be a non-negative number' });
-    }
-  }
+  const cServiceFee = customerServiceFee !== undefined ? parseFee(customerServiceFee) : parseFee(serviceFee);
+  const cInstallFee = customerInstallationFee !== undefined ? parseFee(customerInstallationFee) : parseFee(installationFee);
+  const dServiceFee = parseFee(dealerServiceFee);
+  const dInstallFee = parseFee(dealerInstallationFee);
+  const tServiceFee = parseFee(technicianServiceFee);
+  const tInstallFee = parseFee(technicianInstallationFee);
 
   try {
     // Check if appliance exists
@@ -76,8 +87,14 @@ const createBrand = async (req, res) => {
       name: name.trim(),
       appliance: applianceId,
       followUpDays: days,
-      serviceFee: parsedServiceFee,
-      installationFee: parsedInstallationFee
+      customerServiceFee: cServiceFee,
+      customerInstallationFee: cInstallFee,
+      dealerServiceFee: dServiceFee,
+      dealerInstallationFee: dInstallFee,
+      technicianServiceFee: tServiceFee,
+      technicianInstallationFee: tInstallFee,
+      serviceFee: cServiceFee,
+      installationFee: cInstallFee
     });
 
     const createdBrand = await brand.save();
@@ -91,7 +108,18 @@ const createBrand = async (req, res) => {
 // @route   PUT /api/brands/:id
 // @access  Private/Admin
 const updateBrand = async (req, res) => {
-  const { name, followUpDays, serviceFee, installationFee } = req.body;
+  const { 
+    name, 
+    followUpDays, 
+    serviceFee, 
+    installationFee,
+    customerServiceFee,
+    customerInstallationFee,
+    dealerServiceFee,
+    dealerInstallationFee,
+    technicianServiceFee,
+    technicianInstallationFee
+  } = req.body;
 
   try {
     const brand = await Brand.findById(req.params.id);
@@ -120,20 +148,39 @@ const updateBrand = async (req, res) => {
       brand.followUpDays = days;
     }
 
-    if (serviceFee !== undefined) {
-      const parsedServiceFee = parseFloat(serviceFee);
-      if (isNaN(parsedServiceFee) || parsedServiceFee < 0) {
-        return res.status(400).json({ message: 'Service fee must be a non-negative number' });
-      }
-      brand.serviceFee = parsedServiceFee;
+    const parseFee = (val) => {
+      if (val === undefined || val === null || val === '') return 0;
+      const num = parseFloat(val);
+      return isNaN(num) || num < 0 ? 0 : num;
+    };
+
+    if (customerServiceFee !== undefined) {
+      brand.customerServiceFee = parseFee(customerServiceFee);
+      brand.serviceFee = brand.customerServiceFee;
+    } else if (serviceFee !== undefined) {
+      brand.customerServiceFee = parseFee(serviceFee);
+      brand.serviceFee = brand.customerServiceFee;
     }
 
-    if (installationFee !== undefined) {
-      const parsedInstallationFee = parseFloat(installationFee);
-      if (isNaN(parsedInstallationFee) || parsedInstallationFee < 0) {
-        return res.status(400).json({ message: 'Installation fee must be a non-negative number' });
-      }
-      brand.installationFee = parsedInstallationFee;
+    if (customerInstallationFee !== undefined) {
+      brand.customerInstallationFee = parseFee(customerInstallationFee);
+      brand.installationFee = brand.customerInstallationFee;
+    } else if (installationFee !== undefined) {
+      brand.customerInstallationFee = parseFee(installationFee);
+      brand.installationFee = brand.customerInstallationFee;
+    }
+
+    if (dealerServiceFee !== undefined) {
+      brand.dealerServiceFee = parseFee(dealerServiceFee);
+    }
+    if (dealerInstallationFee !== undefined) {
+      brand.dealerInstallationFee = parseFee(dealerInstallationFee);
+    }
+    if (technicianServiceFee !== undefined) {
+      brand.technicianServiceFee = parseFee(technicianServiceFee);
+    }
+    if (technicianInstallationFee !== undefined) {
+      brand.technicianInstallationFee = parseFee(technicianInstallationFee);
     }
 
     const updatedBrand = await brand.save();

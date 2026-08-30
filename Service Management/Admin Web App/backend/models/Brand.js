@@ -26,6 +26,40 @@ const BrandSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // 1. Customer Fees
+  customerServiceFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  customerInstallationFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  // 2. Dealer Fees
+  dealerServiceFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  dealerInstallationFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  // 3. Technician Fees
+  technicianServiceFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  technicianInstallationFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  // Legacy fields kept for backward compatibility
   serviceFee: {
     type: Number,
     default: 0,

@@ -142,8 +142,15 @@ const attachFeesToTickets = async (tickets) => {
     const bName = t.product.name ? t.product.name.trim().toLowerCase() : '';
     const brandObj = brandMap[`${appName}_${bName}`];
     if (brandObj) {
-      ticketObj.serviceFee = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 0;
-      ticketObj.installationFee = brandObj.installationFee !== undefined ? brandObj.installationFee : 0;
+      ticketObj.customerServiceFee = brandObj.customerServiceFee !== undefined ? brandObj.customerServiceFee : (brandObj.serviceFee || 0);
+      ticketObj.customerInstallationFee = brandObj.customerInstallationFee !== undefined ? brandObj.customerInstallationFee : (brandObj.installationFee || 0);
+      ticketObj.dealerServiceFee = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee || 0);
+      ticketObj.dealerInstallationFee = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee || 0);
+      ticketObj.technicianServiceFee = brandObj.technicianServiceFee !== undefined ? brandObj.technicianServiceFee : (brandObj.serviceFee || 0);
+      ticketObj.technicianInstallationFee = brandObj.technicianInstallationFee !== undefined ? brandObj.technicianInstallationFee : (brandObj.installationFee || 0);
+
+      ticketObj.serviceFee = ticketObj.customerServiceFee;
+      ticketObj.installationFee = ticketObj.customerInstallationFee;
     } else {
       ticketObj.serviceFee = 0;
       ticketObj.installationFee = 0;
@@ -155,9 +162,9 @@ const attachFeesToTickets = async (tickets) => {
       } else {
         if (brandObj) {
           if (ticketObj.type === 'service') {
-            ticketObj.dealerExpense = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured';
+            ticketObj.dealerExpense = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
           } else if (ticketObj.type === 'installation') {
-            ticketObj.dealerExpense = brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured';
+            ticketObj.dealerExpense = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
           } else {
             ticketObj.dealerExpense = 'Fee Not Configured';
           }
@@ -171,9 +178,9 @@ const attachFeesToTickets = async (tickets) => {
       } else {
         if (brandObj) {
           if (ticketObj.type === 'service') {
-            ticketObj.technicianEarning = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured';
+            ticketObj.technicianEarning = brandObj.technicianServiceFee !== undefined ? brandObj.technicianServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
           } else if (ticketObj.type === 'installation') {
-            ticketObj.technicianEarning = brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured';
+            ticketObj.technicianEarning = brandObj.technicianInstallationFee !== undefined ? brandObj.technicianInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
           } else {
             ticketObj.technicianEarning = 'Fee Not Configured';
           }
@@ -606,8 +613,15 @@ const getTicketById = async (req, res) => {
       match: { name: { $regex: new RegExp(`^${appName}$`, 'i') } }
     });
     if (brandObj && brandObj.appliance) {
-      ticketObj.serviceFee = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 0;
-      ticketObj.installationFee = brandObj.installationFee !== undefined ? brandObj.installationFee : 0;
+      ticketObj.customerServiceFee = brandObj.customerServiceFee !== undefined ? brandObj.customerServiceFee : (brandObj.serviceFee || 0);
+      ticketObj.customerInstallationFee = brandObj.customerInstallationFee !== undefined ? brandObj.customerInstallationFee : (brandObj.installationFee || 0);
+      ticketObj.dealerServiceFee = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee || 0);
+      ticketObj.dealerInstallationFee = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee || 0);
+      ticketObj.technicianServiceFee = brandObj.technicianServiceFee !== undefined ? brandObj.technicianServiceFee : (brandObj.serviceFee || 0);
+      ticketObj.technicianInstallationFee = brandObj.technicianInstallationFee !== undefined ? brandObj.technicianInstallationFee : (brandObj.installationFee || 0);
+
+      ticketObj.serviceFee = ticketObj.customerServiceFee;
+      ticketObj.installationFee = ticketObj.customerInstallationFee;
     } else {
       ticketObj.serviceFee = 0;
       ticketObj.installationFee = 0;
@@ -619,9 +633,9 @@ const getTicketById = async (req, res) => {
       } else {
         if (brandObj && brandObj.appliance) {
           if (ticketObj.type === 'service') {
-            ticketObj.dealerExpense = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured';
+            ticketObj.dealerExpense = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
           } else if (ticketObj.type === 'installation') {
-            ticketObj.dealerExpense = brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured';
+            ticketObj.dealerExpense = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
           } else {
             ticketObj.dealerExpense = 'Fee Not Configured';
           }
@@ -635,9 +649,9 @@ const getTicketById = async (req, res) => {
       } else {
         if (brandObj && brandObj.appliance) {
           if (ticketObj.type === 'service') {
-            ticketObj.technicianEarning = brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured';
+            ticketObj.technicianEarning = brandObj.technicianServiceFee !== undefined ? brandObj.technicianServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
           } else if (ticketObj.type === 'installation') {
-            ticketObj.technicianEarning = brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured';
+            ticketObj.technicianEarning = brandObj.technicianInstallationFee !== undefined ? brandObj.technicianInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
           } else {
             ticketObj.technicianEarning = 'Fee Not Configured';
           }
@@ -914,11 +928,11 @@ const verifyWork = async (req, res) => {
         });
         if (brandObj && brandObj.appliance) {
           if (ticket.type === 'service') {
-            ticket.dealerExpense = brandObj.serviceFee !== undefined ? brandObj.serviceFee : null;
-            ticket.technicianEarning = brandObj.serviceFee !== undefined ? brandObj.serviceFee : null;
+            ticket.dealerExpense = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null);
+            ticket.technicianEarning = brandObj.technicianServiceFee !== undefined ? brandObj.technicianServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null);
           } else if (ticket.type === 'installation') {
-            ticket.dealerExpense = brandObj.installationFee !== undefined ? brandObj.installationFee : null;
-            ticket.technicianEarning = brandObj.installationFee !== undefined ? brandObj.installationFee : null;
+            ticket.dealerExpense = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null);
+            ticket.technicianEarning = brandObj.technicianInstallationFee !== undefined ? brandObj.technicianInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null);
           }
         } else {
           ticket.dealerExpense = null;
