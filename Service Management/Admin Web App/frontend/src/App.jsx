@@ -695,6 +695,15 @@ export default function App() {
     }
   };
 
+  const fetchTechnicians = async () => {
+    try {
+      const data = await apiFetch('/technicians');
+      setTechnicians(data);
+    } catch (err) {
+      console.error('Error fetching technicians:', err);
+    }
+  };
+
   const fetchAppliances = async () => {
     try {
       const data = await apiFetch('/appliances');
@@ -1292,6 +1301,7 @@ export default function App() {
         fetchFollowUps();
       } else if (activeTab === 'inventory') {
         fetchInventory();
+        fetchTechnicians();
       } else if (activeTab === 'video_library') {
         fetchVideoLibraryItems();
         fetchAppliances();
@@ -1372,6 +1382,12 @@ export default function App() {
       fetchActiveTechs();
     }
   }, [selectedTicket]);
+
+  useEffect(() => {
+    if (showStockAdjustment && showStockAdjustment.mode === 'out') {
+      fetchTechnicians();
+    }
+  }, [showStockAdjustment?.mode]);
 
   useEffect(() => {
     setTicketPage(1);
@@ -5665,6 +5681,7 @@ export default function App() {
                                   </button>
                                   <button
                                     onClick={() => {
+                                      fetchTechnicians();
                                       setShowStockAdjustment({
                                         id: item._id,
                                         name: item.name,
@@ -6683,11 +6700,15 @@ export default function App() {
                       }}
                     >
                       <option value="">-- Select Technician (Optional) --</option>
-                      {technicians.map(tech => (
-                        <option key={tech._id || tech.id} value={tech._id || tech.id}>
-                          {tech.name} {tech.code ? `(${tech.code})` : ''} {tech.mobile ? `- ${tech.mobile}` : ''}
-                        </option>
-                      ))}
+                      {technicians && technicians.length > 0 ? (
+                        technicians.map(tech => (
+                          <option key={tech._id || tech.id} value={tech._id || tech.id}>
+                            {tech.name} {tech.code ? `(${tech.code})` : ''} {tech.mobile ? `- ${tech.mobile}` : ''}
+                          </option>
+                        ))
+                      ) : (
+                        <option disabled value="">No technicians available</option>
+                      )}
                     </select>
                   </div>
                 )}
