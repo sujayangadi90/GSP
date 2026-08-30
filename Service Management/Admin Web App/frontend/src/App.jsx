@@ -30,10 +30,25 @@ import {
   Video,
   Film,
   Play,
-  Upload
+  Upload,
+  Award,
+  Star,
+  Lock,
+  Unlock,
+  BarChart2,
+  Sparkles,
+  ChevronRight,
+  Sliders
 } from 'lucide-react';
 
 const API_BASE = '/api';
+
+const MONTHS_LIST = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const YEARS_LIST = [2024, 2025, 2026, 2027, 2028];
 
 // Donut Chart Component
 const DonutChart = ({ data = [] }) => {
@@ -369,6 +384,24 @@ export default function App() {
   const [showStockAdjustment, setShowStockAdjustment] = useState(null); // null or { id, name, sku, mode, quantity, technicianId, technicianName }
   const [selectedItemTransactions, setSelectedItemTransactions] = useState(null); // null or item object
   const [inventoryPage, setInventoryPage] = useState(1);
+  
+  // Performance states
+  const [evaluations, setEvaluations] = useState([]);
+  const [performanceAreas, setPerformanceAreas] = useState([]);
+  const [performanceFilters, setPerformanceFilters] = useState({
+    technician: '',
+    month: '',
+    year: '',
+    status: 'all',
+    search: ''
+  });
+  const [performancePage, setPerformancePage] = useState(1);
+  const [evaluationModal, setEvaluationModal] = useState(null); // null or { id, technicianId, technicianName, technicianCode, month, year, ratings: [], remarks, status, finalScore, performanceBand }
+  const [selectedTechProfile, setSelectedTechProfile] = useState(null);
+  const [loadingTechProfile, setLoadingTechProfile] = useState(false);
+  const [showAreasConfigModal, setShowAreasConfigModal] = useState(false);
+  const [newAreaForm, setNewAreaForm] = useState({ name: '', description: '', weight: 1, order: 0 });
+  const [editingArea, setEditingArea] = useState(null);
   
   const [newRequestForm, setNewRequestForm] = useState({
     dealer: '',
@@ -820,6 +853,42 @@ export default function App() {
       setInventory(data);
     } catch (err) {
       console.error('Error fetching inventory:', err);
+    }
+  };
+
+  const fetchPerformanceAreas = async () => {
+    try {
+      const data = await apiFetch('/performance/areas');
+      setPerformanceAreas(data);
+      return data;
+    } catch (err) {
+      console.error('Error fetching performance areas:', err);
+      return [];
+    }
+  };
+
+  const fetchEvaluations = async () => {
+    try {
+      let q = `/performance/evaluations?search=${encodeURIComponent(performanceFilters.search || '')}&status=${performanceFilters.status || 'all'}`;
+      if (performanceFilters.technician) q += `&technician=${performanceFilters.technician}`;
+      if (performanceFilters.month) q += `&month=${performanceFilters.month}`;
+      if (performanceFilters.year) q += `&year=${performanceFilters.year}`;
+      const data = await apiFetch(q);
+      setEvaluations(data);
+    } catch (err) {
+      console.error('Error fetching evaluations:', err);
+    }
+  };
+
+  const fetchTechnicianProfile = async (techId) => {
+    setLoadingTechProfile(true);
+    try {
+      const data = await apiFetch(`/performance/technician/${techId}/summary`);
+      setSelectedTechProfile(data);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoadingTechProfile(false);
     }
   };
 
@@ -1302,6 +1371,10 @@ export default function App() {
       } else if (activeTab === 'inventory') {
         fetchInventory();
         fetchTechnicians();
+      } else if (activeTab === 'performance') {
+        fetchEvaluations();
+        fetchPerformanceAreas();
+        fetchTechnicians();
       } else if (activeTab === 'video_library') {
         fetchVideoLibraryItems();
         fetchAppliances();
@@ -1315,9 +1388,10 @@ export default function App() {
         fetchBrands();
         fetchCustomers();
         fetchInventory();
+        fetchEvaluations();
       }
     }
-  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters, inventoryFilters]);
+  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters, inventoryFilters, performanceFilters]);
 
   useEffect(() => {
     setCustomerPage(1);
@@ -1330,6 +1404,10 @@ export default function App() {
   useEffect(() => {
     setInventoryPage(1);
   }, [inventoryFilters]);
+
+  useEffect(() => {
+    setPerformancePage(1);
+  }, [performanceFilters]);
 
   useEffect(() => {
     if (user && user.role === 'admin') {
@@ -1836,6 +1914,156 @@ export default function App() {
     }
   };
 
+  // Performance Evaluation handlers
+  const openNewEvaluationModal = async () => {
+    let areas = performanceAreas;
+    if (!areas || areas.length === 0) {
+      areas = await fetchPerformanceAreas();
+    }
+    const currentMonth = MONTHS_LIST[new Date().getMonth()];
+    const currentYear = new Date().getFullYear();
+    const activeAreas = (areas || []).filter(a => a.isActive !== false);
+
+    const firstTech = technicians[0];
+    setEvaluationModal({
+      id: null,
+      technicianId: firstTech?._id || firstTech?.id || '',
+      technicianName: firstTech?.name || '',
+      technicianCode: firstTech?.code || '',
+      month: currentMonth,
+      year: currentYear,
+      ratings: activeAreas.map(a => ({
+        areaId: a._id,
+        areaName: a.name,
+        rating: 8,
+        comments: ''
+      })),
+      remarks: '',
+      status: 'draft',
+      isLocked: false
+    });
+  };
+
+  const openEditEvaluationModal = (ev) => {
+    setEvaluationModal({
+      id: ev._id,
+      technicianId: ev.technician?._id || ev.technician,
+      technicianName: ev.technicianName,
+      technicianCode: ev.technicianCode,
+      month: ev.month,
+      year: ev.year,
+      ratings: ev.ratings ? ev.ratings.map(r => ({
+        areaId: r.areaId,
+        areaName: r.areaName,
+        rating: r.rating,
+        comments: r.comments || ''
+      })) : [],
+      remarks: ev.remarks || '',
+      status: ev.status,
+      isLocked: ev.status === 'finalized'
+    });
+  };
+
+  const saveEvaluation = async (submitStatus = 'draft') => {
+    if (!evaluationModal.technicianId) {
+      return alert('Please select a technician.');
+    }
+    if (!evaluationModal.ratings || evaluationModal.ratings.length === 0) {
+      return alert('Evaluation ratings are required.');
+    }
+
+    try {
+      const payload = {
+        technicianId: evaluationModal.technicianId,
+        month: evaluationModal.month,
+        year: evaluationModal.year,
+        ratings: evaluationModal.ratings,
+        remarks: evaluationModal.remarks,
+        status: submitStatus
+      };
+
+      if (evaluationModal.id) {
+        await apiFetch(`/performance/evaluations/${evaluationModal.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ ...payload, unlock: true })
+        });
+      } else {
+        await apiFetch('/performance/evaluations', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+      }
+
+      setEvaluationModal(null);
+      fetchEvaluations();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const finalizeEvaluationHandler = async (id) => {
+    if (!confirm('Are you sure you want to finalize this evaluation? It will be locked from editing.')) return;
+    try {
+      await apiFetch(`/performance/evaluations/${id}/finalize`, { method: 'PATCH' });
+      fetchEvaluations();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const unlockEvaluationHandler = async (id) => {
+    if (!confirm('Unlock this evaluation to allow modifications?')) return;
+    try {
+      await apiFetch(`/performance/evaluations/${id}/unlock`, { method: 'PATCH' });
+      fetchEvaluations();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const deleteEvaluationHandler = async (id) => {
+    if (!confirm('Are you sure you want to delete this evaluation record?')) return;
+    try {
+      await apiFetch(`/performance/evaluations/${id}`, { method: 'DELETE' });
+      fetchEvaluations();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const savePerformanceAreaHandler = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingArea) {
+        await apiFetch(`/performance/areas/${editingArea._id}`, {
+          method: 'PUT',
+          body: JSON.stringify(editingArea)
+        });
+        setEditingArea(null);
+      } else {
+        if (!newAreaForm.name.trim()) return alert('Area name is required');
+        await apiFetch('/performance/areas', {
+          method: 'POST',
+          body: JSON.stringify(newAreaForm)
+        });
+        setNewAreaForm({ name: '', description: '', weight: 1, order: 0 });
+      }
+      fetchPerformanceAreas();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const deletePerformanceAreaHandler = async (id) => {
+    if (!confirm('Are you sure you want to delete this performance area?')) return;
+    try {
+      await apiFetch(`/performance/areas/${id}`, { method: 'DELETE' });
+      fetchPerformanceAreas();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   // Ticket assignments
   const handleAssign = async (e) => {
     e.preventDefault();
@@ -2274,6 +2502,15 @@ export default function App() {
             >
               <Wrench className="w-5 h-5" />
               Manage Technicians
+            </button>
+          )}
+          {(!user || user.permissions?.manageTechnicians !== false) && (
+            <button
+              onClick={() => { setActiveTab('performance'); setMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'performance' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <Award className="w-5 h-5 text-amber-400" />
+              Performance
             </button>
           )}
           {(!user || user.permissions?.followups !== false) && (
@@ -6163,6 +6400,353 @@ export default function App() {
             </div>
           )}
 
+          {/* Performance Main Tab */}
+          {activeTab === 'performance' && (
+            <div className="space-y-8">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                    <Award className="w-8 h-8 text-amber-400" />
+                    Technician Performance Management
+                  </h1>
+                  <p className="text-slate-400 mt-1">
+                    Evaluate monthly technician performance, track ratings, and monitor quality trends
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => setShowAreasConfigModal(true)}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-4 rounded-xl border border-slate-700 text-sm flex items-center gap-2 cursor-pointer transition duration-150 shadow-md"
+                  >
+                    <Sliders className="w-4 h-4 text-violet-400" />
+                    Configure Areas
+                  </button>
+                  <button
+                    onClick={openNewEvaluationModal}
+                    className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150 shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                    New Evaluation
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats Overview */}
+              {(() => {
+                const total = evaluations.length;
+                const avg = total > 0 ? (evaluations.reduce((sum, e) => sum + e.finalScore, 0) / total).toFixed(1) : '0.0';
+                const finalized = evaluations.filter(e => e.status === 'finalized').length;
+                const drafts = evaluations.filter(e => e.status === 'draft').length;
+
+                return (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Evaluations</span>
+                      <div className="flex items-baseline justify-between mt-2">
+                        <span className="text-3xl font-black text-white">{total}</span>
+                        <span className="text-xs font-bold text-violet-400 bg-violet-950/60 px-2 py-0.5 rounded">All time</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Average Score</span>
+                      <div className="flex items-baseline justify-between mt-2">
+                        <span className="text-3xl font-black text-amber-400">{avg} <span className="text-base text-slate-400 font-normal">/ 10</span></span>
+                        <span className="text-xs font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded">Overall</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Finalized (Locked)</span>
+                      <div className="flex items-baseline justify-between mt-2">
+                        <span className="text-3xl font-black text-emerald-400">{finalized}</span>
+                        <span className="text-xs font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded flex items-center gap-1">
+                          <Lock className="w-3 h-3" /> Locked
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pending Drafts</span>
+                      <div className="flex items-baseline justify-between mt-2">
+                        <span className="text-3xl font-black text-amber-400">{drafts}</span>
+                        <span className="text-xs font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded flex items-center gap-1">
+                          <Unlock className="w-3 h-3" /> In Progress
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Filters Bar */}
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-wrap gap-4 items-end shadow-xl">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Search Evaluations</label>
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Search technician name, code, evaluator..."
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                      value={performanceFilters.search}
+                      onChange={e => setPerformanceFilters({ ...performanceFilters, search: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="w-48">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Technician</label>
+                  <select
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    value={performanceFilters.technician}
+                    onChange={e => setPerformanceFilters({ ...performanceFilters, technician: e.target.value })}
+                  >
+                    <option value="">All Technicians</option>
+                    {technicians.map(t => (
+                      <option key={t._id || t.id} value={t._id || t.id}>
+                        {t.name} {t.code ? `(${t.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-36">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Month</label>
+                  <select
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    value={performanceFilters.month}
+                    onChange={e => setPerformanceFilters({ ...performanceFilters, month: e.target.value })}
+                  >
+                    <option value="">All Months</option>
+                    {MONTHS_LIST.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-32">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Year</label>
+                  <select
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    value={performanceFilters.year}
+                    onChange={e => setPerformanceFilters({ ...performanceFilters, year: e.target.value })}
+                  >
+                    <option value="">All Years</option>
+                    {YEARS_LIST.map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-36">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Status</label>
+                  <select
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    value={performanceFilters.status}
+                    onChange={e => setPerformanceFilters({ ...performanceFilters, status: e.target.value })}
+                  >
+                    <option value="all">All Status</option>
+                    <option value="finalized">Finalized</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                </div>
+
+                {(performanceFilters.search || performanceFilters.technician || performanceFilters.month || performanceFilters.year || performanceFilters.status !== 'all') && (
+                  <button
+                    onClick={() => setPerformanceFilters({ technician: '', month: '', year: '', status: 'all', search: '' })}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-sm transition"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+
+              {/* Evaluations Directory Table */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800/50 border-b border-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <th className="p-4">Technician</th>
+                        <th className="p-4">Evaluation Period</th>
+                        <th className="p-4 text-center">Areas Rated</th>
+                        <th className="p-4 text-center">Final Score</th>
+                        <th className="p-4">Rating Band</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4">Evaluated By</th>
+                        <th className="p-4 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {evaluations.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="p-12 text-center text-slate-500 text-sm">
+                            <Award className="w-12 h-12 mx-auto mb-3 text-slate-600 opacity-50" />
+                            No performance evaluations found matching current filters.
+                            <div className="mt-3">
+                              <button
+                                onClick={openNewEvaluationModal}
+                                className="text-violet-400 hover:text-violet-300 font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Plus className="w-4 h-4" /> Create First Monthly Evaluation
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        evaluations.slice((performancePage - 1) * 15, performancePage * 15).map(ev => {
+                          let bandClass = 'bg-amber-950/80 text-amber-400 border border-amber-800/50';
+                          if (ev.performanceBand === 'Excellent') {
+                            bandClass = 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50';
+                          } else if (ev.performanceBand === 'Good') {
+                            bandClass = 'bg-blue-950/80 text-blue-400 border border-blue-800/50';
+                          } else if (ev.performanceBand === 'Needs Improvement') {
+                            bandClass = 'bg-rose-950/80 text-rose-400 border border-rose-800/50';
+                          }
+
+                          return (
+                            <tr key={ev._id} className="hover:bg-slate-800/20 transition text-sm">
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-xl bg-violet-950/60 border border-violet-800/40 flex items-center justify-center font-black text-violet-300 text-sm shrink-0">
+                                    {ev.technicianName ? ev.technicianName.charAt(0).toUpperCase() : 'T'}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-white leading-tight">{ev.technicianName}</p>
+                                    <p className="font-mono text-xs text-slate-400 mt-0.5">{ev.technicianCode || 'TECH'}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-4 font-semibold text-slate-200">
+                                <div className="flex items-center gap-1.5">
+                                  <Calendar className="w-4 h-4 text-violet-400" />
+                                  <span>{ev.month} {ev.year}</span>
+                                </div>
+                              </td>
+                              <td className="p-4 text-center">
+                                <span className="bg-slate-800 text-slate-300 text-xs px-2.5 py-1 rounded-lg font-bold border border-slate-700">
+                                  {ev.ratings?.length || 0} criteria
+                                </span>
+                              </td>
+                              <td className="p-4 text-center">
+                                <div className="inline-flex items-center gap-1 font-black text-base text-white bg-slate-950/60 px-3 py-1 rounded-xl border border-slate-800">
+                                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                                  <span>{ev.finalScore}</span>
+                                  <span className="text-[11px] font-normal text-slate-500">/10</span>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider inline-block ${bandClass}`}>
+                                  {ev.performanceBand || 'Average'}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                {ev.status === 'finalized' ? (
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-900/50 px-2.5 py-1 rounded-lg">
+                                    <Lock className="w-3.5 h-3.5" /> Finalized
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-950/60 border border-amber-900/50 px-2.5 py-1 rounded-lg">
+                                    <Unlock className="w-3.5 h-3.5" /> Draft
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-4 text-xs text-slate-400">
+                                <div>{ev.evaluatedBy}</div>
+                                <div className="text-[11px] text-slate-500 mt-0.5">{new Date(ev.createdAt).toLocaleDateString('en-GB')}</div>
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    onClick={() => fetchTechnicianProfile(ev.technician?._id || ev.technician)}
+                                    className="bg-violet-950/40 hover:bg-violet-900/50 text-violet-400 border border-violet-900/30 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-xs flex items-center gap-1"
+                                    title="View Technician Performance Profile & Trend"
+                                  >
+                                    <BarChart2 className="w-3.5 h-3.5" /> Profile & Trend
+                                  </button>
+                                  <button
+                                    onClick={() => openEditEvaluationModal(ev)}
+                                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition flex items-center gap-1"
+                                  >
+                                    <Edit className="w-3.5 h-3.5" /> Edit
+                                  </button>
+                                  {ev.status === 'draft' ? (
+                                    <button
+                                      onClick={() => finalizeEvaluationHandler(ev._id)}
+                                      className="bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-900/40 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition"
+                                      title="Finalize and Lock"
+                                    >
+                                      Finalize
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => unlockEvaluationHandler(ev._id)}
+                                      className="bg-amber-950/40 hover:bg-amber-900/50 text-amber-400 border border-amber-900/30 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition"
+                                      title="Unlock for edits"
+                                    >
+                                      Unlock
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => deleteEvaluationHandler(ev._id)}
+                                    className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
+                                    title="Delete Evaluation"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {evaluations.length > 0 && (
+                  <div className="bg-slate-850 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800">
+                    <span className="text-xs text-slate-400">
+                      Showing <span className="font-semibold text-slate-200">{(performancePage - 1) * 15 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(performancePage * 15, evaluations.length)}</span> of <span className="font-semibold text-slate-200">{evaluations.length}</span> evaluations
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setPerformancePage(prev => Math.max(prev - 1, 1))}
+                        disabled={performancePage === 1}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition text-xs font-bold"
+                      >
+                        Prev
+                      </button>
+                      {Array.from({ length: Math.ceil(evaluations.length / 15) }, (_, i) => i + 1).map(page => (
+                        <button
+                          key={page}
+                          onClick={() => setPerformancePage(page)}
+                          className={`w-8 h-8 rounded-lg text-xs font-bold transition ${
+                            page === performancePage
+                              ? 'bg-violet-600 text-white'
+                              : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setPerformancePage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(evaluations.length / 15))))}
+                        disabled={performancePage === Math.max(1, Math.ceil(evaluations.length / 15))}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition text-xs font-bold"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Video Library Main Tab */}
           {activeTab === 'video_library' && (
             <div className="space-y-6">
@@ -8546,6 +9130,566 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Performance Evaluation Modal (Create / Edit) */}
+      {evaluationModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden my-8 flex flex-col max-h-[90vh]">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-950/60 border border-amber-800/40 flex items-center justify-center text-amber-400">
+                  <Award className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-lg">
+                    {evaluationModal.id ? 'Edit Performance Evaluation' : 'New Monthly Performance Evaluation'}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Rate the technician from 1 to 10 across key service performance criteria
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setEvaluationModal(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Lock Warning if finalized */}
+              {evaluationModal.isLocked && (
+                <div className="bg-amber-950/40 border border-amber-800/50 p-4 rounded-xl flex items-center justify-between text-xs text-amber-300">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>This evaluation is <strong>FINALIZED</strong> and locked. As an Admin, you can edit and re-save or unlock it.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Technician, Month, Year Selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-950/40 p-4 rounded-2xl border border-slate-800">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+                    Technician *
+                  </label>
+                  <select
+                    disabled={Boolean(evaluationModal.id)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 disabled:opacity-60"
+                    value={evaluationModal.technicianId}
+                    onChange={e => {
+                      const techId = e.target.value;
+                      const tech = technicians.find(t => (t._id === techId || t.id === techId));
+                      setEvaluationModal({
+                        ...evaluationModal,
+                        technicianId: techId,
+                        technicianName: tech ? tech.name : '',
+                        technicianCode: tech ? tech.code : ''
+                      });
+                    }}
+                  >
+                    <option value="">Select Technician</option>
+                    {technicians.map(t => (
+                      <option key={t._id || t.id} value={t._id || t.id}>
+                        {t.name} {t.code ? `(${t.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+                    Evaluation Month *
+                  </label>
+                  <select
+                    disabled={Boolean(evaluationModal.id)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 disabled:opacity-60"
+                    value={evaluationModal.month}
+                    onChange={e => setEvaluationModal({ ...evaluationModal, month: e.target.value })}
+                  >
+                    {MONTHS_LIST.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+                    Year *
+                  </label>
+                  <select
+                    disabled={Boolean(evaluationModal.id)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 disabled:opacity-60"
+                    value={evaluationModal.year}
+                    onChange={e => setEvaluationModal({ ...evaluationModal, year: Number(e.target.value) })}
+                  >
+                    {YEARS_LIST.map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Live Final Score Banner */}
+              {(() => {
+                const totalRatings = evaluationModal.ratings || [];
+                const sum = totalRatings.reduce((acc, r) => acc + Number(r.rating || 0), 0);
+                const avgScore = totalRatings.length > 0 ? (sum / totalRatings.length).toFixed(1) : '0.0';
+                const scoreNum = Number(avgScore);
+
+                let bandLabel = 'Average';
+                let bandStyle = 'bg-amber-950 text-amber-400 border border-amber-800/60';
+                if (scoreNum >= 9.0) {
+                  bandLabel = 'Excellent';
+                  bandStyle = 'bg-emerald-950 text-emerald-300 border border-emerald-800/60';
+                } else if (scoreNum >= 7.5) {
+                  bandLabel = 'Good';
+                  bandStyle = 'bg-blue-950 text-blue-300 border border-blue-800/60';
+                } else if (scoreNum < 5.0) {
+                  bandLabel = 'Needs Improvement';
+                  bandStyle = 'bg-rose-950 text-rose-300 border border-rose-800/60';
+                }
+
+                return (
+                  <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-violet-950/40 p-4 rounded-2xl border border-violet-900/40 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+                    <div className="space-y-0.5 text-center sm:text-left">
+                      <span className="text-[11px] font-bold text-violet-400 uppercase tracking-wider flex items-center gap-1 justify-center sm:justify-start">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Real-time Calculated Final Score
+                      </span>
+                      <p className="text-xs text-slate-400">
+                        Final Score = Average of all {totalRatings.length} evaluated criteria ratings
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-700/80 text-center">
+                        <span className="text-2xl font-black text-white">{avgScore}</span>
+                        <span className="text-xs text-slate-400 ml-1">/ 10</span>
+                      </div>
+                      <span className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider ${bandStyle}`}>
+                        {bandLabel}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Performance Areas Ratings */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                    Performance Criteria Ratings (1 – 10)
+                  </h4>
+                  <span className="text-[11px] text-slate-500">1: Poor &bull; 10: Outstanding</span>
+                </div>
+
+                <div className="space-y-3">
+                  {(evaluationModal.ratings || []).map((r, idx) => {
+                    const ratingVal = Number(r.rating) || 1;
+                    return (
+                      <div key={r.areaId || idx} className="bg-slate-950/40 border border-slate-800/80 p-4 rounded-xl space-y-3 hover:border-slate-700/80 transition">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <p className="font-bold text-white text-sm">{r.areaName}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-slate-400">Rating:</span>
+                            <span className="font-black text-sm px-2.5 py-0.5 rounded-lg bg-violet-950/80 text-violet-300 border border-violet-800/40">
+                              {ratingVal} / 10
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 1-10 Pill Buttons */}
+                        <div className="grid grid-cols-10 gap-1 sm:gap-1.5">
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => {
+                            const isSelected = ratingVal === num;
+                            let btnColor = 'bg-slate-800/90 text-slate-400 hover:bg-slate-700 hover:text-slate-200 border-slate-700/60';
+                            if (isSelected) {
+                              if (num >= 9) btnColor = 'bg-emerald-600 text-white font-black shadow-md shadow-emerald-600/30 border-emerald-500';
+                              else if (num >= 7) btnColor = 'bg-blue-600 text-white font-black shadow-md shadow-blue-600/30 border-blue-500';
+                              else if (num >= 5) btnColor = 'bg-amber-600 text-white font-black shadow-md shadow-amber-600/30 border-amber-500';
+                              else btnColor = 'bg-rose-600 text-white font-black shadow-md shadow-rose-600/30 border-rose-500';
+                            }
+
+                            return (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => {
+                                  const newRatings = [...evaluationModal.ratings];
+                                  newRatings[idx] = { ...newRatings[idx], rating: num };
+                                  setEvaluationModal({ ...evaluationModal, ratings: newRatings });
+                                }}
+                                className={`py-1.5 sm:py-2 text-xs font-bold rounded-lg border transition cursor-pointer text-center ${btnColor}`}
+                              >
+                                {num}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Optional notes for this area */}
+                        <input
+                          type="text"
+                          placeholder={`Add specific remark for ${r.areaName} (Optional)...`}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                          value={r.comments || ''}
+                          onChange={e => {
+                            const newRatings = [...evaluationModal.ratings];
+                            newRatings[idx] = { ...newRatings[idx], comments: e.target.value };
+                            setEvaluationModal({ ...evaluationModal, ratings: newRatings });
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Overall Remarks / Feedback */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+                  Admin Remarks & Improvement Feedback
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Enter overall feedback, commendations, areas of improvement, or notes..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                  value={evaluationModal.remarks || ''}
+                  onChange={e => setEvaluationModal({ ...evaluationModal, remarks: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-t border-slate-800 gap-3">
+              <button 
+                type="button" 
+                onClick={() => setEvaluationModal(null)} 
+                className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                Cancel
+              </button>
+              
+              <div className="flex items-center gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => saveEvaluation('draft')}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-4 rounded-xl text-xs border border-slate-700 cursor-pointer transition flex items-center gap-1.5"
+                >
+                  <Unlock className="w-3.5 h-3.5 text-amber-400" />
+                  Save as Draft
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => saveEvaluation('finalized')}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-xs shadow-md cursor-pointer transition flex items-center gap-1.5"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  Submit & Finalize
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Technician Performance Profile & Trend Modal */}
+      {selectedTechProfile && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden my-8 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="bg-slate-850 px-6 py-5 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center font-black text-white text-xl shadow-lg shrink-0">
+                  {selectedTechProfile.technician?.name?.charAt(0).toUpperCase() || 'T'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-white text-xl">
+                      {selectedTechProfile.technician?.name}
+                    </h3>
+                    <span className="font-mono text-xs bg-slate-800 text-violet-400 px-2.5 py-0.5 rounded-lg border border-slate-700">
+                      {selectedTechProfile.technician?.code || 'TECH'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Mobile: {selectedTechProfile.technician?.mobile || 'N/A'} &bull; Email: {selectedTechProfile.technician?.email || 'N/A'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedTechProfile(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Summary Stats Card Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Lifetime Avg Score</span>
+                    <p className="text-2xl font-black text-amber-400 mt-1">
+                      {selectedTechProfile.lifetimeAverageScore} <span className="text-xs text-slate-400 font-normal">/ 10</span>
+                    </p>
+                  </div>
+                  <Star className="w-8 h-8 text-amber-400/30 fill-amber-400/20" />
+                </div>
+
+                <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Overall Rating Band</span>
+                    <p className="text-base font-extrabold text-white mt-1">
+                      {selectedTechProfile.currentBand}
+                    </p>
+                  </div>
+                  <Award className="w-8 h-8 text-violet-400/30" />
+                </div>
+
+                <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Months Evaluated</span>
+                    <p className="text-2xl font-black text-white mt-1">
+                      {selectedTechProfile.totalEvaluations}
+                    </p>
+                  </div>
+                  <Calendar className="w-8 h-8 text-slate-600" />
+                </div>
+              </div>
+
+              {/* Monthly Performance Trend Section */}
+              <div className="bg-slate-950/40 border border-slate-800 p-5 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-violet-400" />
+                    Monthly Score Progression & Trend
+                  </h4>
+                  <span className="text-xs text-slate-500">Historical performance timeline</span>
+                </div>
+
+                {(!selectedTechProfile.monthlyTrend || selectedTechProfile.monthlyTrend.length === 0) ? (
+                  <p className="text-xs text-slate-500 italic py-4 text-center">No monthly evaluations recorded yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {selectedTechProfile.monthlyTrend.map((item, idx) => {
+                        const prev = idx > 0 ? selectedTechProfile.monthlyTrend[idx - 1] : null;
+                        const diff = prev ? (item.finalScore - prev.finalScore).toFixed(1) : null;
+
+                        return (
+                          <div key={item.id || idx} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl space-y-2 relative overflow-hidden">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-300">{item.month} {item.year}</span>
+                              {diff !== null && (
+                                <span className={`text-[10px] font-bold ${Number(diff) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                  {Number(diff) >= 0 ? `+${diff}` : diff}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-xl font-black text-white">{item.finalScore} <span className="text-[10px] text-slate-400 font-normal">/10</span></span>
+                              <span className="text-[10px] uppercase font-bold text-slate-400">{item.performanceBand}</span>
+                            </div>
+                            {/* Score Progress Bar */}
+                            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className="bg-gradient-to-r from-violet-500 to-indigo-500 h-full rounded-full" 
+                                style={{ width: `${(item.finalScore / 10) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Performance Criteria Averages Breakdown */}
+              <div className="bg-slate-950/40 border border-slate-800 p-5 rounded-2xl space-y-4">
+                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                  Area-wise Average Ratings Across Evaluations
+                </h4>
+
+                {(!selectedTechProfile.areaAverages || selectedTechProfile.areaAverages.length === 0) ? (
+                  <p className="text-xs text-slate-500 italic py-4 text-center">No area breakdown data available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {selectedTechProfile.areaAverages.map(area => (
+                      <div key={area.areaName} className="bg-slate-900 border border-slate-800/80 p-3.5 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-300">{area.areaName}</span>
+                          <span className="font-black text-white">{area.averageRating} / 10</span>
+                        </div>
+                        <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${
+                              area.averageRating >= 8.5 ? 'bg-emerald-500' :
+                              area.averageRating >= 7.0 ? 'bg-blue-500' :
+                              area.averageRating >= 5.0 ? 'bg-amber-500' : 'bg-rose-500'
+                            }`}
+                            style={{ width: `${(area.averageRating / 10) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Past Evaluations Table */}
+              <div className="bg-slate-950/40 border border-slate-800 rounded-2xl overflow-hidden">
+                <div className="p-4 border-b border-slate-800">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    Evaluation Records & Remarks History
+                  </h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 font-bold uppercase">
+                        <th className="p-3">Period</th>
+                        <th className="p-3 text-center">Final Score</th>
+                        <th className="p-3">Rating Band</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Evaluator</th>
+                        <th className="p-3">Remarks / Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {(selectedTechProfile.evaluations || []).map(ev => (
+                        <tr key={ev._id} className="hover:bg-slate-900/40">
+                          <td className="p-3 font-bold text-white">{ev.month} {ev.year}</td>
+                          <td className="p-3 text-center font-black text-amber-400">{ev.finalScore} / 10</td>
+                          <td className="p-3 uppercase text-[10px] font-bold">{ev.performanceBand}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${ev.status === 'finalized' ? 'text-emerald-400 bg-emerald-950' : 'text-amber-400 bg-amber-950'}`}>
+                              {ev.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-slate-400">{ev.evaluatedBy}</td>
+                          <td className="p-3 text-slate-300 italic">{ev.remarks || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-end border-t border-slate-800">
+              <button 
+                onClick={() => setSelectedTechProfile(null)} 
+                className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-xl text-xs cursor-pointer shadow-md transition"
+              >
+                Close Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Configure Performance Areas Modal */}
+      {showAreasConfigModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden my-8 flex flex-col max-h-[85vh]">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <Sliders className="w-5 h-5 text-violet-400" />
+                <div>
+                  <h3 className="font-extrabold text-white text-base">Configure Performance Areas</h3>
+                  <p className="text-xs text-slate-400">Add, rename, or manage evaluation rating criteria</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowAreasConfigModal(false)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Existing Areas List */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Performance Criteria</h4>
+                <div className="space-y-2">
+                  {performanceAreas.map((area, idx) => (
+                    <div key={area._id || idx} className="bg-slate-950/40 border border-slate-800 p-3.5 rounded-xl flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-bold text-white text-sm">{area.name}</p>
+                        {area.description && <p className="text-xs text-slate-400 mt-0.5">{area.description}</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => deletePerformanceAreaHandler(area._id)}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
+                          title="Delete Area"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add New Area Form */}
+              <form onSubmit={savePerformanceAreaHandler} className="bg-slate-850 p-4 rounded-2xl border border-slate-800 space-y-3">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5 text-violet-400" /> Add New Performance Criterion
+                </h4>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Criterion Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Communication Skills, Tool Maintenance..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                    value={newAreaForm.name}
+                    onChange={e => setNewAreaForm({ ...newAreaForm, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Description (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Brief description of what is evaluated..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                    value={newAreaForm.description}
+                    onChange={e => setNewAreaForm({ ...newAreaForm, description: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-md transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Save Criterion
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-end border-t border-slate-800">
+              <button 
+                onClick={() => setShowAreasConfigModal(false)} 
+                className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-5 rounded-xl text-xs cursor-pointer transition border border-slate-700"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

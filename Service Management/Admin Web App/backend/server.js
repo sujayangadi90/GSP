@@ -63,6 +63,7 @@ app.use('/api/admins', require('./routes/adminRoutes'));
 app.use('/api/amcs', require('./routes/amcRoutes'));
 app.use('/api/inventory', require('./routes/inventoryRoutes'));
 app.use('/api/video-library', require('./routes/videoLibraryRoutes'));
+app.use('/api/performance', require('./routes/performanceRoutes'));
 
 // Fallback base route
 app.get('/', (req, res) => {
