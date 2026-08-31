@@ -2643,7 +2643,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
   }
 }
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   final Map<String, dynamic> user;
   final String role;
   final String? token;
@@ -2660,7 +2660,461 @@ class ProfileScreen extends StatelessWidget {
   });
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  int _selectedMonth = DateTime.now().month;
+  int _selectedYear = DateTime.now().year;
+  bool _eomLoading = false;
+  Map<String, dynamic>? _topEvaluation;
+
+  final List<String> _monthsList = const [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  String get _currentMonthName => _monthsList[_selectedMonth - 1];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchEmployeeOfTheMonth();
+  }
+
+  Future<void> _fetchEmployeeOfTheMonth() async {
+    if (widget.token == null || widget.apiUrl == null) return;
+    setState(() => _eomLoading = true);
+
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/performance/evaluations?month=$_currentMonthName&year=$_selectedYear'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final dynamic raw = jsonDecode(res.body);
+        if (raw is List && raw.isNotEmpty) {
+          final List list = List.from(raw);
+          list.sort((a, b) {
+            final double scoreA = (a['finalScore'] is num) ? (a['finalScore'] as num).toDouble() : double.tryParse(a['finalScore'].toString()) ?? 0.0;
+            final double scoreB = (b['finalScore'] is num) ? (b['finalScore'] as num).toDouble() : double.tryParse(b['finalScore'].toString()) ?? 0.0;
+            return scoreB.compareTo(scoreA);
+          });
+          setState(() {
+            _topEvaluation = Map<String, dynamic>.from(list.first);
+          });
+        } else {
+          setState(() {
+            _topEvaluation = null;
+          });
+        }
+      } else {
+        setState(() {
+          _topEvaluation = null;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching employee of the month: $e');
+      setState(() {
+        _topEvaluation = null;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _eomLoading = false);
+      }
+    }
+  }
+
+  Future<void> _selectMonthYear(BuildContext context) async {
+    int tempMonth = _selectedMonth;
+    int tempYear = _selectedYear;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E293B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Select Month & Year', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int>(
+                    value: tempMonth,
+                    dropdownColor: const Color(0xFF1E293B),
+                    decoration: const InputDecoration(
+                      labelText: 'Month',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    items: List.generate(12, (index) {
+                      return DropdownMenuItem(
+                        value: index + 1,
+                        child: Text(_monthsList[index]),
+                      );
+                    }),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => tempMonth = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    value: tempYear,
+                    dropdownColor: const Color(0xFF1E293B),
+                    decoration: const InputDecoration(
+                      labelText: 'Year',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    items: [2024, 2025, 2026, 2027, 2028].map((y) {
+                      return DropdownMenuItem(value: y, child: Text(y.toString()));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => tempYear = val);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = tempMonth;
+                      _selectedYear = tempYear;
+                    });
+                    Navigator.pop(context);
+                    _fetchEmployeeOfTheMonth();
+                  },
+                  child: const Text('Select', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildEmployeeOfTheMonthCard() {
+    final baseUrl = widget.apiUrl != null ? widget.apiUrl!.replaceAll('/api', '') : '';
+    final techObj = _topEvaluation != null && _topEvaluation!['technician'] is Map ? _topEvaluation!['technician'] : null;
+    final photoPath = techObj != null ? techObj['profilePic'] : null;
+    final techName = _topEvaluation != null ? (_topEvaluation!['technicianName'] ?? techObj?['name'] ?? 'Technician') : '';
+    final techCode = _topEvaluation != null ? (_topEvaluation!['technicianCode'] ?? techObj?['code'] ?? '') : '';
+    final score = _topEvaluation != null ? (_topEvaluation!['finalScore'] ?? 0) : 0;
+    final band = _topEvaluation != null ? (_topEvaluation!['performanceBand'] ?? 'Average') : '';
+    final remarks = _topEvaluation != null ? (_topEvaluation!['remarks'] ?? '') : '';
+
+    String? fullPhotoUrl;
+    if (photoPath != null && photoPath.toString().isNotEmpty) {
+      if (photoPath.toString().startsWith('http://') || photoPath.toString().startsWith('https://')) {
+        fullPhotoUrl = photoPath.toString();
+      } else {
+        fullPhotoUrl = '$baseUrl/$photoPath';
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF2C2210), // Warm amber dark
+            Color(0xFF1E2422), // Teal dark
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.amber.withOpacity(0.4), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.amber.withOpacity(0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(18.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header with Trophy & Month Picker
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                    ),
+                    child: const Icon(Icons.emoji_events, color: Colors.amberAccent, size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'EMPLOYEE OF THE MONTH',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.amberAccent,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      Text(
+                        'Top Performer Spotlight',
+                        style: TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              GestureDetector(
+                onTap: () => _selectMonthYear(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_month, color: Colors.amber, size: 13),
+                      const SizedBox(width: 5),
+                      Text(
+                        '${_currentMonthName.substring(0, 3)} $_selectedYear',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(Icons.arrow_drop_down, color: Colors.white70, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+          const Divider(color: Colors.white12, height: 1),
+          const SizedBox(height: 16),
+
+          if (_eomLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24.0),
+              child: Center(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(color: Colors.amber, strokeWidth: 2.5),
+                ),
+              ),
+            )
+          else if (_topEvaluation == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20.0),
+              child: Column(
+                children: [
+                  Icon(Icons.star_border, size: 40, color: Colors.grey[600]),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No Employee of the Month announced',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Evaluations for $_currentMonthName $_selectedYear have not been posted yet.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  ),
+                ],
+              ),
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Technician Photo
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.amberAccent, width: 2.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.withOpacity(0.3),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: fullPhotoUrl != null
+                            ? Image.network(
+                                fullPhotoUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.amber.shade900,
+                                    child: Center(
+                                      child: Text(
+                                        techName.isNotEmpty ? techName[0].toUpperCase() : 'T',
+                                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : Container(
+                                color: Colors.amber.shade900,
+                                child: Center(
+                                  child: Text(
+                                    techName.isNotEmpty ? techName[0].toUpperCase() : 'T',
+                                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                        color: Colors.amber,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.star, color: Colors.black, size: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 14),
+                // Tech Info & Score
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        techName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (techCode.toString().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Code: $techCode',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey, fontFamily: 'monospace'),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.star_rate_rounded, color: Colors.amberAccent, size: 15),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '$score / 10',
+                                  style: const TextStyle(
+                                    color: Colors.amberAccent,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.emerald.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.emerald.withOpacity(0.4)),
+                            ),
+                            child: Text(
+                              band.toString().toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.emeraldAccent,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (remarks.toString().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '"$remarks"',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontStyle: FontStyle.italic,
+                            fontSize: 11,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final baseUrl = widget.apiUrl != null ? widget.apiUrl!.replaceAll('/api', '') : '';
+    final userPhoto = widget.user['profilePic'];
+    String? userPhotoUrl;
+    if (userPhoto != null && userPhoto.toString().isNotEmpty) {
+      if (userPhoto.toString().startsWith('http://') || userPhoto.toString().startsWith('https://')) {
+        userPhotoUrl = userPhoto.toString();
+      } else {
+        userPhotoUrl = '$baseUrl/$userPhoto';
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -2670,17 +3124,41 @@ class ProfileScreen extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 16),
-            CircleAvatar(
-              radius: 48,
-              backgroundColor: Colors.purple.shade900,
-              child: Text(
-                (user['name'] ?? 'U').substring(0, 1).toUpperCase(),
-                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+            if (userPhotoUrl != null)
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.purpleAccent, width: 2),
+                ),
+                child: ClipOval(
+                  child: Image.network(
+                    userPhotoUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => CircleAvatar(
+                      radius: 48,
+                      backgroundColor: Colors.purple.shade900,
+                      child: Text(
+                        (widget.user['name'] ?? 'U').substring(0, 1).toUpperCase(),
+                        style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else
+              CircleAvatar(
+                radius: 48,
+                backgroundColor: Colors.purple.shade900,
+                child: Text(
+                  (widget.user['name'] ?? 'U').substring(0, 1).toUpperCase(),
+                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
               ),
-            ),
             const SizedBox(height: 16),
             Text(
-              user['name'] ?? 'No Name',
+              widget.user['name'] ?? 'No Name',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
             ),
@@ -2693,11 +3171,16 @@ class ProfileScreen extends StatelessWidget {
                 border: Border.all(color: Colors.purpleAccent.withOpacity(0.5)),
               ),
               child: Text(
-                role.toUpperCase(),
+                widget.role.toUpperCase(),
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.purpleAccent),
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+            
+            // Employee of the Month Section
+            _buildEmployeeOfTheMonthCard(),
+
+            const SizedBox(height: 24),
             Card(
               color: Colors.grey.shade900.withOpacity(0.5),
               shape: RoundedRectangleBorder(
@@ -2708,28 +3191,28 @@ class ProfileScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    _buildInfoRow(Icons.badge, 'Partner Code', user['code'] ?? '—'),
+                    _buildInfoRow(Icons.badge, 'Partner Code', widget.user['code'] ?? '—'),
                     const Divider(color: Colors.grey),
-                    _buildInfoRow(Icons.email, 'Email Address', user['email'] ?? '—'),
+                    _buildInfoRow(Icons.email, 'Email Address', widget.user['email'] ?? '—'),
                     const Divider(color: Colors.grey),
-                    _buildInfoRow(Icons.phone, 'Mobile Number', user['mobile'] ?? '—'),
-                    if (user['contactPerson'] != null) ...[
+                    _buildInfoRow(Icons.phone, 'Mobile Number', widget.user['mobile'] ?? '—'),
+                    if (widget.user['contactPerson'] != null) ...[
                       const Divider(color: Colors.grey),
-                      _buildInfoRow(Icons.person, 'Contact Person', user['contactPerson']),
+                      _buildInfoRow(Icons.person, 'Contact Person', widget.user['contactPerson']),
                     ],
-                    if (user['address'] != null) ...[
+                    if (widget.user['address'] != null) ...[
                       const Divider(color: Colors.grey),
-                      _buildInfoRow(Icons.location_on, 'Address', user['address']),
+                      _buildInfoRow(Icons.location_on, 'Address', widget.user['address']),
                     ],
-                    if (user['city'] != null) ...[
+                    if (widget.user['city'] != null) ...[
                       const Divider(color: Colors.grey),
-                      _buildInfoRow(Icons.location_city, 'City', user['city']),
+                      _buildInfoRow(Icons.location_city, 'City', widget.user['city']),
                     ],
                   ],
                 ),
               ),
             ),
-            if (token != null && apiUrl != null) ...[
+            if (widget.token != null && widget.apiUrl != null) ...[
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: () {
@@ -2737,8 +3220,8 @@ class ProfileScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => VideoLibraryScreen(
-                        token: token!,
-                        apiUrl: apiUrl!,
+                        token: widget.token!,
+                        apiUrl: widget.apiUrl!,
                       ),
                     ),
                   );
@@ -2756,12 +3239,12 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             ],
-            if (onLogout != null) ...[
+            if (widget.onLogout != null) ...[
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.pop(context);
-                  onLogout!();
+                  widget.onLogout!();
                 },
                 icon: const Icon(Icons.logout),
                 label: const Text('Sign Out'),

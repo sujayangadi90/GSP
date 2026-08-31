@@ -632,6 +632,7 @@ export default function App() {
   const [followUpPage, setFollowUpPage] = useState(1);
   const [ticketPage, setTicketPage] = useState(1);
   const [historyPage, setHistoryPage] = useState(1);
+  const [amcPage, setAmcPage] = useState(1);
 
   // Dealer Video States
   const [dealerVideos, setDealerVideos] = useState([]);
@@ -1494,6 +1495,10 @@ export default function App() {
   useEffect(() => {
     setVideoLibraryPage(1);
   }, [videoLibrarySearch, videoLibraryApplianceFilter, videoLibraryBrandFilter]);
+
+  useEffect(() => {
+    setAmcPage(1);
+  }, [amcFilters]);
 
   useEffect(() => {
     if (user && user.role === 'admin') {
@@ -4888,7 +4893,7 @@ export default function App() {
                           </td>
                         </tr>
                       ) : (
-                        amcs.map(amc => {
+                        amcs.slice((amcPage - 1) * 20, amcPage * 20).map(amc => {
                           const remaining = amc.visitsIncluded - amc.visitsUsed;
                           return (
                             <tr key={amc._id} className="hover:bg-slate-800/25 transition duration-150 text-sm">
@@ -5002,6 +5007,42 @@ export default function App() {
                       )}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="px-6 py-4 bg-slate-955/30 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-xs text-slate-400">
+                    Showing <span className="font-semibold text-slate-200">{amcs.length === 0 ? 0 : (amcPage - 1) * 20 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(amcPage * 20, amcs.length)}</span> of <span className="font-semibold text-slate-200">{amcs.length}</span> entries
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setAmcPage(prev => Math.max(prev - 1, 1))}
+                      disabled={amcPage === 1}
+                      className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold cursor-pointer"
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: Math.ceil(amcs.length / 20) }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setAmcPage(page)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                          page === amcPage
+                            ? 'bg-violet-600 text-white shadow-md'
+                            : 'bg-slate-850 text-slate-355 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setAmcPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(amcs.length / 20))))}
+                      disabled={amcPage === Math.max(1, Math.ceil(amcs.length / 20))}
+                      className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-355 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold cursor-pointer"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
