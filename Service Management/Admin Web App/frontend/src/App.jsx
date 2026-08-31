@@ -8543,31 +8543,85 @@ export default function App() {
                   <h4 className="font-bold text-white text-sm border-b border-slate-700 pb-2">Ticket Actions</h4>
                   
                   {/* Assignment Form */}
-                  {selectedTicket.status === 'new' && (
-                    <form onSubmit={handleAssign} className="space-y-3">
-                      <label className="block text-xs font-semibold text-slate-400">Assign Technician</label>
-                      <select 
-                        required
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white cursor-pointer"
-                        value={assignTechId}
-                        onChange={e => setAssignTechId(e.target.value)}
-                      >
-                        <option value="">Select Technician...</option>
-                        {activeTechniciansForAssign.map(tech => (
-                          <option key={tech._id} value={tech._id}>{tech.name} ({tech.code})</option>
-                        ))}
-                      </select>
-                      <textarea
-                        placeholder="Assignment notes/schedule..."
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-hidden"
-                        value={assignNotes}
-                        onChange={e => setAssignNotes(e.target.value)}
-                      />
-                      <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-lg text-xs cursor-pointer">
-                        Assign Technician
-                      </button>
-                    </form>
-                  )}
+                  {selectedTicket.status === 'new' && (() => {
+                    const ticketPincode = (selectedTicket.customer?.pincode || '').toString().trim();
+                    const ticketApplianceName = (selectedTicket.product?.category || '').toString().trim().toLowerCase();
+                    const targetAppObj = appliances.find(a => a.name && a.name.trim().toLowerCase() === ticketApplianceName);
+                    const targetAppId = targetAppObj ? targetAppObj._id.toString() : null;
+
+                    const eligibleTechnicians = activeTechniciansForAssign.filter(tech => {
+                      // Check Pincode
+                      const servesPincode = Array.isArray(tech.pincodes) && tech.pincodes.some(p => p && p.toString().trim() === ticketPincode);
+                      
+                      // Check Appliance
+                      const servesAppliance = Array.isArray(tech.appliances) && tech.appliances.some(a => {
+                        if (!a) return false;
+                        if (typeof a === 'object') {
+                          const nameMatch = a.name && a.name.toString().trim().toLowerCase() === ticketApplianceName;
+                          const idMatch = targetAppId && (a._id ? a._id.toString() === targetAppId : false);
+                          return nameMatch || idMatch;
+                        } else if (typeof a === 'string') {
+                          return (targetAppId && a.toString() === targetAppId) || a.toString().trim().toLowerCase() === ticketApplianceName;
+                        }
+                        return false;
+                      });
+
+                      return servesPincode && servesAppliance;
+                    });
+
+                    return (
+                      <form onSubmit={handleAssign} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-semibold text-slate-400">Assign Technician</label>
+                          <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                            Pincode: <strong className="text-violet-400">{ticketPincode || 'N/A'}</strong> | Appliance: <strong className="text-violet-400">{selectedTicket.product?.category || 'N/A'}</strong>
+                          </span>
+                        </div>
+
+                        {eligibleTechnicians.length > 0 ? (
+                          <select 
+                            required
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white cursor-pointer focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                            value={assignTechId}
+                            onChange={e => setAssignTechId(e.target.value)}
+                          >
+                            <option value="">Select Technician ({eligibleTechnicians.length} available)...</option>
+                            {eligibleTechnicians.map(tech => (
+                              <option key={tech._id} value={tech._id}>
+                                {tech.name} ({tech.code})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="bg-amber-950/40 border border-amber-800/40 rounded-xl p-3 text-xs text-amber-300 space-y-1">
+                            <p className="font-bold flex items-center gap-1.5 text-amber-400">
+                              <span>⚠️</span> No eligible technicians found
+                            </p>
+                            <p className="text-[11px] text-slate-400">
+                              No active technician is configured to serve pincode <span className="font-semibold text-amber-300">{ticketPincode || 'N/A'}</span> for appliance <span className="font-semibold text-amber-300">{selectedTicket.product?.category || 'N/A'}</span>.
+                            </p>
+                            <p className="text-[11px] text-slate-400">
+                              Go to <span className="text-violet-400 font-semibold">Manage Technicians → Edit Details</span> to add this pincode and associate this appliance.
+                            </p>
+                          </div>
+                        )}
+
+                        <textarea
+                          placeholder="Assignment notes/schedule..."
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-hidden"
+                          value={assignNotes}
+                          onChange={e => setAssignNotes(e.target.value)}
+                        />
+                        <button 
+                          type="submit" 
+                          disabled={eligibleTechnicians.length === 0}
+                          className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-2 rounded-lg text-xs cursor-pointer shadow-md transition"
+                        >
+                          Assign Technician
+                        </button>
+                      </form>
+                    );
+                  })()}
 
                   {/* Verification Form */}
                   {selectedTicket.status === 'verification_pending' && (
