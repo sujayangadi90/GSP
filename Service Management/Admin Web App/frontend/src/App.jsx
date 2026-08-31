@@ -460,6 +460,7 @@ export default function App() {
 
   // Sidebar / Submenu states
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [employeeMenuOpen, setEmployeeMenuOpen] = useState(false);
 
   // Settings: Appliances & Brands states
   const [appliances, setAppliances] = useState([]);
@@ -2875,22 +2876,38 @@ export default function App() {
             </button>
           )}
           {(!user || user.role === 'admin') && (
-            <button
-              onClick={() => { setActiveTab('employees'); setMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${(activeTab === 'employees' || activeTab === 'add-employee' || activeTab === 'edit-employee') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-            >
-              <Users className="w-5 h-5 text-indigo-400" />
-              Employees
-            </button>
-          )}
-          {(!user || user.role === 'admin') && (
-            <button
-              onClick={() => { setActiveTab('attendance'); setMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'attendance' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-            >
-              <Clock className="w-5 h-5 text-emerald-400" />
-              Attendance
-            </button>
+            <div>
+              <button
+                onClick={() => setEmployeeMenuOpen(!employeeMenuOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              >
+                <span className="flex items-center gap-3">
+                  <Users className="w-5 h-5 text-indigo-400" />
+                  Employee
+                </span>
+                <span>
+                  {(employeeMenuOpen || activeTab === 'employees' || activeTab === 'attendance' || activeTab === 'add-employee' || activeTab === 'edit-employee') ? '▲' : '▼'}
+                </span>
+              </button>
+              {(employeeMenuOpen || activeTab === 'employees' || activeTab === 'attendance' || activeTab === 'add-employee' || activeTab === 'edit-employee') && (
+                <div className="pl-6 mt-1 space-y-1">
+                  <button
+                    onClick={() => { setActiveTab('employees'); setMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${(activeTab === 'employees' || activeTab === 'add-employee' || activeTab === 'edit-employee') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <Users className="w-4 h-4" />
+                    Employees
+                  </button>
+                  <button
+                    onClick={() => { setActiveTab('attendance'); setMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'attendance' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <Clock className="w-4 h-4 text-emerald-400" />
+                    Attendance
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           {(!user || user.permissions?.settings !== false) && (
             <div>
