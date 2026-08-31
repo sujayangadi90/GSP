@@ -17,10 +17,18 @@ import {
 } from "lucide-react";
 
 export default function AttendancePortal() {
-  const [employeeToken, setEmployeeToken] = useState(localStorage.getItem("gsp_emp_token") || "");
+  const [employeeToken, setEmployeeToken] = useState(() => {
+    try {
+      return localStorage.getItem("gsp_emp_token") || "";
+    } catch {
+      return "";
+    }
+  });
+
   const [employee, setEmployee] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("gsp_emp_user") || "null");
+      const saved = localStorage.getItem("gsp_emp_user");
+      return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
     }
@@ -55,7 +63,9 @@ export default function AttendancePortal() {
   // Photo viewer modal
   const [viewPhoto, setViewPhoto] = useState(null);
 
-  const API_BASE = window.location.origin.includes("localhost") ? "http://localhost:5050" : "";
+  const API_BASE = window.location.origin.includes("localhost:5173") || window.location.origin.includes("localhost:3000")
+    ? "http://localhost:5050" 
+    : "";
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -77,9 +87,11 @@ export default function AttendancePortal() {
       });
       const data = await res.json();
       if (res.ok) {
-        setEmployee(data.employee);
-        localStorage.setItem("gsp_emp_user", JSON.stringify(data.employee));
-        setTodayData(data.todayAttendance);
+        if (data.employee) {
+          setEmployee(data.employee);
+          localStorage.setItem("gsp_emp_user", JSON.stringify(data.employee));
+        }
+        setTodayData(data.todayAttendance || null);
       } else {
         if (res.status === 401 || res.status === 403) {
           handleLogout();
@@ -119,7 +131,7 @@ export default function AttendancePortal() {
       });
       const data = await res.json();
 
-      if (res.ok) {
+      if (res.ok && data.token && data.employee) {
         localStorage.setItem("gsp_emp_token", data.token);
         localStorage.setItem("gsp_emp_user", JSON.stringify(data.employee));
         setEmployeeToken(data.token);
@@ -135,8 +147,12 @@ export default function AttendancePortal() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("gsp_emp_token");
-    localStorage.removeItem("gsp_emp_user");
+    try {
+      localStorage.removeItem("gsp_emp_token");
+      localStorage.removeItem("gsp_emp_user");
+    } catch (e) {
+      console.error(e);
+    }
     setEmployeeToken("");
     setEmployee(null);
     setTodayData(null);
@@ -175,7 +191,7 @@ export default function AttendancePortal() {
 
   // Handle Selfie selection
   const handleSelfieChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (file) {
       setSelfieFile(file);
       const reader = new FileReader();
@@ -186,7 +202,7 @@ export default function AttendancePortal() {
 
   // Clock In Action
   const handleClockIn = async () => {
-    if (!location) {
+    if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
       setActionError("Please capture your GPS location before clocking in.");
       return;
     }
@@ -212,7 +228,7 @@ export default function AttendancePortal() {
       });
       const data = await res.json();
 
-      if (res.ok) {
+      if (res.ok && data.attendance) {
         setActionSuccess("Clock In Successful!");
         setTodayData(data.attendance);
         setSelfieFile(null);
@@ -231,7 +247,7 @@ export default function AttendancePortal() {
 
   // Clock Out Action
   const handleClockOut = async () => {
-    if (!location) {
+    if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
       setActionError("Please capture your GPS location before clocking out.");
       return;
     }
@@ -254,7 +270,7 @@ export default function AttendancePortal() {
       });
       const data = await res.json();
 
-      if (res.ok) {
+      if (res.ok && data.attendance) {
         setActionSuccess("Clock Out Successful!");
         setTodayData(data.attendance);
         setLocation(null);
@@ -269,16 +285,27 @@ export default function AttendancePortal() {
     }
   };
 
-  // Calculate Elapsed Duration if clocked in
+  // Calculate Elapsed Duration safely
   const getElapsedDuration = () => {
-    if (!todayData || !todayData.clockInTime) return "0h 0m";
-    const startTime = new Date(todayData.clockInTime);
-    const endTime = todayData.clockOutTime ? new Date(todayData.clockOutTime) : currentTime;
-    const diffMs = Math.max(0, endTime.getTime() - startTime.getTime());
-    const totalMinutes = Math.floor(diffMs / 60000);
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    return `${hours}h ${mins}m`;
+    try {
+      if (!todayData || !todayData.clockInTime) return "0h 0m";
+      const startTime = new Date(todayData.clockInTime);
+      if (isNaN(startTime.getTime())) return "0h 0m";
+      const endTime = todayData.clockOutTime ? new Date(todayData.clockOutTime) : currentTime;
+      const diffMs = Math.max(0, endTime.getTime() - startTime.getTime());
+      const totalMinutes = Math.floor(diffMs / 60000);
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      return `${hours}h ${mins}m`;
+    } catch {
+      return "0h 0m";
+    }
+  };
+
+  // Helper for coordinates format
+  const formatCoords = (loc) => {
+    if (!loc || typeof loc.lat !== "number" || typeof loc.lng !== "number") return null;
+    return `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`;
   };
 
   // Render Login View if not authenticated
@@ -363,9 +390,14 @@ export default function AttendancePortal() {
   const isCompleted = todayData && (todayData.status === "completed" || todayData.status === "corrected");
   const notStarted = !todayData;
 
-  const profileImgUrl = employee.profilePic
-    ? (employee.profilePic.startsWith("http") ? employee.profilePic : `${API_BASE}/${employee.profilePic}`)
-    : null;
+  const getImgUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith("http")) return path;
+    const clean = path.replace(/^\//, "");
+    return API_BASE ? `${API_BASE}/${clean}` : `/${clean}`;
+  };
+
+  const profileImgUrl = getImgUrl(employee?.profilePic);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-16">
@@ -378,7 +410,7 @@ export default function AttendancePortal() {
             </div>
             <div>
               <div className="font-extrabold text-sm text-white tracking-tight leading-none">GSP ATTENDANCE</div>
-              <div className="text-[10px] text-slate-400 font-mono mt-0.5">{employee.employeeId}</div>
+              <div className="text-[10px] text-slate-400 font-mono mt-0.5">{employee?.employeeId || "EMP"}</div>
             </div>
           </div>
 
@@ -409,9 +441,11 @@ export default function AttendancePortal() {
             <div className="relative">
               <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-800 border-2 border-violet-500/50 shadow-lg flex items-center justify-center">
                 {profileImgUrl ? (
-                  <img src={profileImgUrl} alt={employee.name} className="w-full h-full object-cover" />
+                  <img src={profileImgUrl} alt={employee?.name || "Profile"} className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-2xl font-black text-violet-400">{employee.name.charAt(0).toUpperCase()}</span>
+                  <span className="text-2xl font-black text-violet-400">
+                    {(employee?.name || "E").charAt(0).toUpperCase()}
+                  </span>
                 )}
               </div>
               <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-slate-950 p-1 rounded-full border-2 border-slate-900">
@@ -422,13 +456,13 @@ export default function AttendancePortal() {
             {/* Info */}
             <div className="flex-1 text-center sm:text-left space-y-1">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <h2 className="text-xl font-black text-white">{employee.name}</h2>
+                <h2 className="text-xl font-black text-white">{employee?.name || "Employee"}</h2>
                 <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-violet-950/70 text-violet-400 border border-violet-800/60 self-center sm:self-auto">
-                  {employee.employeeId}
+                  {employee?.employeeId || "EMP"}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono">{employee.phone}</p>
-              {employee.address && <p className="text-xs text-slate-400">{employee.address}</p>}
+              <p className="text-xs text-slate-400 font-mono">{employee?.phone || ""}</p>
+              {employee?.address && <p className="text-xs text-slate-400">{employee.address}</p>}
             </div>
 
             {/* Live Clock Widget */}
@@ -505,9 +539,9 @@ export default function AttendancePortal() {
                   <div className="text-lg font-black text-white font-mono mt-1">
                     {todayData?.clockInTime ? new Date(todayData.clockInTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                   </div>
-                  {todayData?.clockInLocation && (
+                  {formatCoords(todayData?.clockInLocation) && (
                     <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
-                      {todayData.clockInLocation.lat.toFixed(4)}, {todayData.clockInLocation.lng.toFixed(4)}
+                      {formatCoords(todayData.clockInLocation)}
                     </div>
                   )}
                 </div>
@@ -517,9 +551,9 @@ export default function AttendancePortal() {
                   <div className="text-lg font-black text-white font-mono mt-1">
                     {todayData?.clockOutTime ? new Date(todayData.clockOutTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                   </div>
-                  {todayData?.clockOutLocation && (
+                  {formatCoords(todayData?.clockOutLocation) && (
                     <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
-                      {todayData.clockOutLocation.lat.toFixed(4)}, {todayData.clockOutLocation.lng.toFixed(4)}
+                      {formatCoords(todayData.clockOutLocation)}
                     </div>
                   )}
                 </div>
@@ -536,7 +570,7 @@ export default function AttendancePortal() {
               </div>
             </div>
 
-            {/* ACTION CARD: CLOCK IN OR CLOCK OUT */}
+            {/* ACTION CARD: CLOCK IN */}
             {notStarted && (
               <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-violet-950/40 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
                 <div className="space-y-1">
@@ -601,7 +635,7 @@ export default function AttendancePortal() {
                     Step 2: Detect GPS Location *
                   </label>
 
-                  {location ? (
+                  {location && typeof location.lat === "number" && typeof location.lng === "number" ? (
                     <div className="flex items-center justify-between bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center">
@@ -673,6 +707,7 @@ export default function AttendancePortal() {
               </div>
             )}
 
+            {/* ACTION CARD: CLOCK OUT */}
             {isClockedIn && (
               <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
                 <div className="space-y-1">
@@ -691,7 +726,7 @@ export default function AttendancePortal() {
                     Verify GPS Location for Clock-Out *
                   </label>
 
-                  {location ? (
+                  {location && typeof location.lat === "number" && typeof location.lng === "number" ? (
                     <div className="flex items-center justify-between bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center">
@@ -779,14 +814,14 @@ export default function AttendancePortal() {
                   <div>
                     <span className="text-slate-400 text-xs block">IN</span>
                     <strong className="text-white">
-                      {new Date(todayData.clockInTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      {todayData?.clockInTime ? new Date(todayData.clockInTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                     </strong>
                   </div>
                   <div className="text-slate-600 font-bold">→</div>
                   <div>
                     <span className="text-slate-400 text-xs block">OUT</span>
                     <strong className="text-white">
-                      {new Date(todayData.clockOutTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      {todayData?.clockOutTime ? new Date(todayData.clockOutTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                     </strong>
                   </div>
                   <div className="border-l border-slate-800 pl-4">
@@ -823,9 +858,7 @@ export default function AttendancePortal() {
                     {history.map((record) => {
                       const inDate = record.clockInTime ? new Date(record.clockInTime) : null;
                       const outDate = record.clockOutTime ? new Date(record.clockOutTime) : null;
-                      const selfieUrl = record.clockInSelfie
-                        ? (record.clockInSelfie.startsWith("http") ? record.clockInSelfie : `${API_BASE}/${record.clockInSelfie}`)
-                        : null;
+                      const selfieUrl = getImgUrl(record.clockInSelfie);
 
                       const durationText = record.durationMinutes 
                         ? `${Math.floor(record.durationMinutes / 60)}h ${record.durationMinutes % 60}m`
@@ -835,7 +868,7 @@ export default function AttendancePortal() {
                         <tr key={record._id} className="hover:bg-slate-800/30 transition">
                           <td className="py-3.5 px-4 font-bold text-white font-mono">{record.date}</td>
                           <td className="py-3.5 px-4 font-mono">
-                            {inDate ? inDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                            {inDate && !isNaN(inDate.getTime()) ? inDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                           </td>
                           <td className="py-3.5 px-4">
                             {selfieUrl ? (
@@ -849,7 +882,7 @@ export default function AttendancePortal() {
                             ) : "—"}
                           </td>
                           <td className="py-3.5 px-4 font-mono">
-                            {outDate ? outDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                            {outDate && !isNaN(outDate.getTime()) ? outDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                           </td>
                           <td className="py-3.5 px-4 font-bold text-emerald-400 font-mono">
                             {durationText}
@@ -861,7 +894,7 @@ export default function AttendancePortal() {
                               record.status === "corrected" ? "bg-violet-950/80 text-violet-400 border border-violet-800/50" :
                               "bg-slate-800 text-slate-400 border border-slate-700"
                             }`}>
-                              {record.status.replace("_", " ")}
+                              {(record.status || "").replace("_", " ")}
                             </span>
                           </td>
                         </tr>

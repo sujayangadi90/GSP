@@ -252,7 +252,7 @@ export default function AttendanceTab({
                         <div className="font-mono text-white font-bold">
                           {inDate ? inDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                         </div>
-                        {inLoc?.lat ? (
+                        {typeof inLoc?.lat === 'number' && typeof inLoc?.lng === 'number' ? (
                           <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate flex items-center gap-1">
                             <MapPin className="w-3 h-3 text-emerald-400 shrink-0" />
                             <span>{inLoc.lat.toFixed(4)}, {inLoc.lng.toFixed(4)}</span>
@@ -279,9 +279,9 @@ export default function AttendanceTab({
                       {/* Clock Out */}
                       <td className="py-3.5 px-4">
                         <div className="font-mono text-white font-bold">
-                          {outDate ? outDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                          {outDate && !isNaN(outDate.getTime()) ? outDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                         </div>
-                        {outLoc?.lat ? (
+                        {typeof outLoc?.lat === 'number' && typeof outLoc?.lng === 'number' ? (
                           <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate flex items-center gap-1">
                             <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
                             <span>{outLoc.lat.toFixed(4)}, {outLoc.lng.toFixed(4)}</span>

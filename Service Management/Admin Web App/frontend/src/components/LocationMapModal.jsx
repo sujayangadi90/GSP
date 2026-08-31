@@ -172,7 +172,7 @@ export default function LocationMapModal({ isOpen, onClose, attendance }) {
                 </a>
               )}
             </div>
-            {inLoc?.lat ? (
+            {typeof inLoc?.lat === 'number' && typeof inLoc?.lng === 'number' ? (
               <div className="text-xs text-slate-300 font-mono">
                 Lat: {inLoc.lat.toFixed(5)}, Lng: {inLoc.lng.toFixed(5)}
               </div>
@@ -200,7 +200,7 @@ export default function LocationMapModal({ isOpen, onClose, attendance }) {
                 </a>
               )}
             </div>
-            {outLoc?.lat ? (
+            {typeof outLoc?.lat === 'number' && typeof outLoc?.lng === 'number' ? (
               <div className="text-xs text-slate-300 font-mono">
                 Lat: {outLoc.lat.toFixed(5)}, Lng: {outLoc.lng.toFixed(5)}
               </div>
