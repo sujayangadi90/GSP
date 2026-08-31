@@ -652,6 +652,7 @@ export default function App() {
   const [videoLibrarySearch, setVideoLibrarySearch] = useState('');
   const [videoLibraryApplianceFilter, setVideoLibraryApplianceFilter] = useState('');
   const [videoLibraryBrandFilter, setVideoLibraryBrandFilter] = useState('');
+  const [videoLibraryPage, setVideoLibraryPage] = useState(1);
   const [videoLibraryModal, setVideoLibraryModal] = useState(false); // false | 'add' | 'edit'
   const [videoLibraryForm, setVideoLibraryForm] = useState({
     id: '',
@@ -1489,6 +1490,10 @@ export default function App() {
   useEffect(() => {
     setPerformancePage(1);
   }, [performanceFilters]);
+
+  useEffect(() => {
+    setVideoLibraryPage(1);
+  }, [videoLibrarySearch, videoLibraryApplianceFilter, videoLibraryBrandFilter]);
 
   useEffect(() => {
     if (user && user.role === 'admin') {
@@ -7372,76 +7377,114 @@ export default function App() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {videoLibraryItems.map(item => (
-                    <div
-                      key={item._id}
-                      className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 hover:shadow-2xl transition duration-200"
-                    >
-                      <div className="space-y-3">
-                        {/* Appliance & Brand Badges */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[11px] font-black uppercase px-2.5 py-1 rounded-lg bg-violet-950/60 text-violet-300 border border-violet-800/40">
-                            {item.appliance?.name || 'Appliance'}
-                          </span>
-                          <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
-                            {item.brand?.name || 'Brand'}
-                          </span>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {videoLibraryItems.slice((videoLibraryPage - 1) * 9, videoLibraryPage * 9).map(item => (
+                      <div
+                        key={item._id}
+                        className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 hover:shadow-2xl transition duration-200"
+                      >
+                        <div className="space-y-3">
+                          {/* Appliance & Brand Badges */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[11px] font-black uppercase px-2.5 py-1 rounded-lg bg-violet-950/60 text-violet-300 border border-violet-800/40">
+                              {item.appliance?.name || 'Appliance'}
+                            </span>
+                            <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
+                              {item.brand?.name || 'Brand'}
+                            </span>
+                          </div>
+
+                          <h3 className="text-base font-bold text-white line-clamp-2" title={item.title}>
+                            {item.title}
+                          </h3>
+
+                          {item.description && (
+                            <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed" title={item.description}>
+                              {item.description}
+                            </p>
+                          )}
                         </div>
 
-                        <h3 className="text-base font-bold text-white line-clamp-2" title={item.title}>
-                          {item.title}
-                        </h3>
+                        <div className="mt-5 pt-4 border-t border-slate-800/80 space-y-3">
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono truncate">
+                            <span className="truncate" title={item.videoUrl}>
+                              🔗 {item.videoUrl.replace(/^https?:\/\//, '')}
+                            </span>
+                          </div>
 
-                        {item.description && (
-                          <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed" title={item.description}>
-                            {item.description}
-                          </p>
-                        )}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setActivePlayingLibraryVideo(item)}
+                              className="flex-1 bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-current" /> Watch Video
+                            </button>
+                            <button
+                              onClick={() => {
+                                setVideoLibraryForm({
+                                  id: item._id,
+                                  title: item.title,
+                                  appliance: item.appliance?._id || item.appliance,
+                                  brand: item.brand?._id || item.brand,
+                                  description: item.description || '',
+                                  videoUrl: item.videoUrl
+                                });
+                                setVideoLibraryModal('edit');
+                              }}
+                              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+                              title="Edit Video Item"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteVideoLibraryItem(item._id)}
+                              className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-900/50 transition cursor-pointer"
+                              title="Delete Video Item"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
+                    ))}
+                  </div>
 
-                      <div className="mt-5 pt-4 border-t border-slate-800/80 space-y-3">
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono truncate">
-                          <span className="truncate" title={item.videoUrl}>
-                            🔗 {item.videoUrl.replace(/^https?:\/\//, '')}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setActivePlayingLibraryVideo(item)}
-                            className="flex-1 bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition"
-                          >
-                            <Play className="w-3.5 h-3.5 fill-current" /> Watch Video
-                          </button>
-                          <button
-                            onClick={() => {
-                              setVideoLibraryForm({
-                                id: item._id,
-                                title: item.title,
-                                appliance: item.appliance?._id || item.appliance,
-                                brand: item.brand?._id || item.brand,
-                                description: item.description || '',
-                                videoUrl: item.videoUrl
-                              });
-                              setVideoLibraryModal('edit');
-                            }}
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
-                            title="Edit Video Item"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteVideoLibraryItem(item._id)}
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-900/50 transition cursor-pointer"
-                            title="Delete Video Item"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
+                  {/* Pagination Controls */}
+                  <div className="px-6 py-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-xs text-slate-400">
+                      Showing <span className="font-semibold text-slate-200">{videoLibraryItems.length === 0 ? 0 : (videoLibraryPage - 1) * 9 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(videoLibraryPage * 9, videoLibraryItems.length)}</span> of <span className="font-semibold text-slate-200">{videoLibraryItems.length}</span> videos
                     </div>
-                  ))}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setVideoLibraryPage(prev => Math.max(prev - 1, 1))}
+                        disabled={videoLibraryPage === 1}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold cursor-pointer"
+                      >
+                        Previous
+                      </button>
+                      {Array.from({ length: Math.ceil(videoLibraryItems.length / 9) }, (_, i) => i + 1).map(page => (
+                        <button
+                          key={page}
+                          onClick={() => setVideoLibraryPage(page)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                            page === videoLibraryPage
+                              ? 'bg-violet-600 text-white shadow-md'
+                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setVideoLibraryPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(videoLibraryItems.length / 9))))}
+                        disabled={videoLibraryPage === Math.max(1, Math.ceil(videoLibraryItems.length / 9))}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold cursor-pointer"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

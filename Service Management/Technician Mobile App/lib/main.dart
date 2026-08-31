@@ -572,6 +572,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.video_library_outlined),
+            tooltip: 'Video Library',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VideoLibraryScreen(
+                    token: widget.token,
+                    apiUrl: widget.apiUrl,
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadJobs,
           ),
@@ -584,6 +599,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   builder: (context) => ProfileScreen(
                     user: widget.user,
                     role: 'Technician Partner',
+                    token: widget.token,
+                    apiUrl: widget.apiUrl,
                     onLogout: widget.onLogout,
                   ),
                 ),
@@ -989,27 +1006,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        ElevatedButton.icon(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => JobHistoryScreen(
-                token: widget.token,
-                apiUrl: widget.apiUrl,
-                initialMonth: _selectedMonth,
-                initialYear: _selectedYear,
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VideoLibraryScreen(
+                      token: widget.token,
+                      apiUrl: widget.apiUrl,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.video_library, color: Colors.purpleAccent),
+                label: const Text('Video Library', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E2422),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.purple.withOpacity(0.3)),
+                  ),
+                ),
               ),
             ),
-          ),
-          icon: const Icon(Icons.history),
-          label: const Text('View Job History'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blueGrey[850],
-            foregroundColor: Colors.white,
-            minimumSize: const Size.fromHeight(48),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => JobHistoryScreen(
+                      token: widget.token,
+                      apiUrl: widget.apiUrl,
+                      initialMonth: _selectedMonth,
+                      initialYear: _selectedYear,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.history, color: Colors.tealAccent),
+                label: const Text('Job History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueGrey[850],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -2599,12 +2646,16 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
 class ProfileScreen extends StatelessWidget {
   final Map<String, dynamic> user;
   final String role;
+  final String? token;
+  final String? apiUrl;
   final VoidCallback? onLogout;
 
   const ProfileScreen({
     super.key,
     required this.user,
     required this.role,
+    this.token,
+    this.apiUrl,
     this.onLogout,
   });
 
@@ -2678,8 +2729,35 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
+            if (token != null && apiUrl != null) ...[
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => VideoLibraryScreen(
+                        token: token!,
+                        apiUrl: apiUrl!,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.video_library, color: Colors.purpleAccent),
+                label: const Text('Access Video Library'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E2422),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.purple.withOpacity(0.4)),
+                  ),
+                ),
+              ),
+            ],
             if (onLogout != null) ...[
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.pop(context);
@@ -3213,6 +3291,427 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
         Text(label),
         const SizedBox(width: 16),
       ],
+    );
+  }
+}
+
+class VideoLibraryScreen extends StatefulWidget {
+  final String token;
+  final String apiUrl;
+
+  const VideoLibraryScreen({
+    super.key,
+    required this.token,
+    required this.apiUrl,
+  });
+
+  @override
+  State<VideoLibraryScreen> createState() => _VideoLibraryScreenState();
+}
+
+class _VideoLibraryScreenState extends State<VideoLibraryScreen> {
+  bool _isLoading = true;
+  List<dynamic> _videos = [];
+  List<dynamic> _appliances = [];
+  List<dynamic> _brands = [];
+
+  String _searchQuery = '';
+  String? _selectedApplianceId;
+  String? _selectedBrandId;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFiltersAndVideos();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadFiltersAndVideos() async {
+    setState(() => _isLoading = true);
+    await Future.wait([
+      _fetchAppliances(),
+      _fetchBrands(),
+      _fetchVideos(),
+    ]);
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchAppliances() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/appliances'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (mounted && data is List) {
+          setState(() {
+            _appliances = data;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching appliances: $e');
+    }
+  }
+
+  Future<void> _fetchBrands() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/brands'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (mounted && data is List) {
+          setState(() {
+            _brands = data;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching brands: $e');
+    }
+  }
+
+  Future<void> _fetchVideos() async {
+    try {
+      final queryParams = <String, String>{};
+      if (_selectedApplianceId != null && _selectedApplianceId!.isNotEmpty) {
+        queryParams['appliance'] = _selectedApplianceId!;
+      }
+      if (_selectedBrandId != null && _selectedBrandId!.isNotEmpty) {
+        queryParams['brand'] = _selectedBrandId!;
+      }
+      if (_searchQuery.trim().isNotEmpty) {
+        queryParams['search'] = _searchQuery.trim();
+      }
+
+      final uri = Uri.parse('${widget.apiUrl}/video-library').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final res = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (mounted && data is List) {
+          setState(() {
+            _videos = data;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching videos: $e');
+    }
+  }
+
+  Future<void> _launchVideoUrl(String url) async {
+    if (url.isEmpty) return;
+    try {
+      String validUrl = url.trim();
+      if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://')) {
+        validUrl = 'https://$validUrl';
+      }
+      final uri = Uri.parse(validUrl);
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not launch video URL: $validUrl')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error playing video: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Filter available brands based on selected appliance
+    final filteredBrands = _brands.where((b) {
+      if (_selectedApplianceId == null || _selectedApplianceId!.isEmpty) return true;
+      final appVal = b['appliance'];
+      final appId = appVal is Map ? appVal['_id'] : appVal;
+      return appId == _selectedApplianceId;
+    }).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Video Library', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: Column(
+        children: [
+          // Filter & Search Section
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: const Color(0xFF161E1B),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Search Field
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search videos by title or topic...',
+                    hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+                    prefixIcon: const Icon(Icons.search, color: Colors.teal),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                              _fetchVideos();
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: const Color(0xFF1E2422),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.teal.withOpacity(0.3)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.teal.withOpacity(0.2)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.teal),
+                    ),
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  onSubmitted: (val) {
+                    setState(() => _searchQuery = val);
+                    _fetchVideos();
+                  },
+                ),
+                const SizedBox(height: 10),
+                // Dropdowns for Appliance and Brand
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E2422),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.teal.withOpacity(0.2)),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String?>(
+                            isExpanded: true,
+                            value: _selectedApplianceId,
+                            dropdownColor: const Color(0xFF1E2422),
+                            hint: const Text('All Appliances', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('All Appliances', style: TextStyle(fontSize: 12)),
+                              ),
+                              ..._appliances.map((app) {
+                                return DropdownMenuItem<String?>(
+                                  value: app['_id'].toString(),
+                                  child: Text(app['name'] ?? '', style: const TextStyle(fontSize: 12)),
+                                );
+                              }),
+                            ],
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedApplianceId = val;
+                                _selectedBrandId = null;
+                              });
+                              _fetchVideos();
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E2422),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.teal.withOpacity(0.2)),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String?>(
+                            isExpanded: true,
+                            value: _selectedBrandId,
+                            dropdownColor: const Color(0xFF1E2422),
+                            hint: const Text('All Brands', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('All Brands', style: TextStyle(fontSize: 12)),
+                              ),
+                              ...filteredBrands.map((b) {
+                                return DropdownMenuItem<String?>(
+                                  value: b['_id'].toString(),
+                                  child: Text(b['name'] ?? '', style: const TextStyle(fontSize: 12)),
+                                );
+                              }),
+                            ],
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedBrandId = val;
+                              });
+                              _fetchVideos();
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Videos List
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: _loadFiltersAndVideos,
+                    child: _videos.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: const [
+                              SizedBox(height: 100),
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.video_library_outlined, size: 64, color: Colors.grey),
+                                    SizedBox(height: 16),
+                                    Text(
+                                      'No Training Videos Found',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                    SizedBox(height: 6),
+                                    Text(
+                                      'Try adjusting your search or filters.',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _videos.length,
+                            itemBuilder: (context, index) {
+                              final item = _videos[index];
+                              final title = item['title'] ?? 'Untitled Video';
+                              final description = item['description'] ?? '';
+                              final applianceName = item['appliance'] is Map ? item['appliance']['name'] : 'Appliance';
+                              final brandName = item['brand'] is Map ? item['brand']['name'] : 'Brand';
+                              final videoUrl = item['videoUrl'] ?? '';
+
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 14),
+                                color: const Color(0xFF1E2422),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: BorderSide(color: Colors.teal.withOpacity(0.2)),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.teal.withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: Colors.teal.withOpacity(0.4)),
+                                            ),
+                                            child: Text(
+                                              applianceName.toString().toUpperCase(),
+                                              style: const TextStyle(color: Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blueGrey.withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: Colors.blueGrey.withOpacity(0.4)),
+                                            ),
+                                            child: Text(
+                                              brandName.toString().toUpperCase(),
+                                              style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        title,
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                      ),
+                                      if (description.toString().isNotEmpty) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          description,
+                                          style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 16),
+                                      ElevatedButton.icon(
+                                        onPressed: () => _launchVideoUrl(videoUrl),
+                                        icon: const Icon(Icons.play_arrow, size: 18),
+                                        label: const Text('Watch Video', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.teal,
+                                          foregroundColor: Colors.white,
+                                          minimumSize: const Size.fromHeight(42),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
