@@ -2854,7 +2854,10 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   String? _selectedApplianceId;
   String? _selectedApplianceName;
   String? _selectedBrandName;
+  dynamic _selectedBrandObject;
   String? _selectedCity;
+  String _serviceType = 'In Warranty';
+  String _installationType = 'Free Installation';
 
   @override
   void initState() {
@@ -2911,6 +2914,111 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
     }
   }
 
+  double _calculateCustomerCost() {
+    if (_selectedBrandObject == null) return 0.0;
+
+    if (widget.type == 'service') {
+      if (_serviceType == 'In Warranty') {
+        final fee = _selectedBrandObject['customerServiceFee'] ?? _selectedBrandObject['serviceFee'] ?? 0;
+        return (fee is num) ? fee.toDouble() : double.tryParse(fee.toString()) ?? 0.0;
+      } else {
+        // Out Warranty -> Price is 0
+        return 0.0;
+      }
+    } else {
+      // Installation
+      if (_installationType == 'Paid Installation') {
+        final fee = _selectedBrandObject['customerInstallationFee'] ?? _selectedBrandObject['installationFee'] ?? 0;
+        return (fee is num) ? fee.toDouble() : double.tryParse(fee.toString()) ?? 0.0;
+      } else {
+        // Free Installation -> Price is 0
+        return 0.0;
+      }
+    }
+  }
+
+  Widget _buildCustomerCostCard() {
+    final cost = _calculateCustomerCost();
+    final bool isService = widget.type == 'service';
+    final String currentSelection = isService ? _serviceType : _installationType;
+    
+    String subtitle;
+    if (isService) {
+      if (_serviceType == 'In Warranty') {
+        subtitle = _selectedBrandObject != null 
+            ? 'Configured Service Fee for ${_selectedBrandObject['name'] ?? 'brand'}' 
+            : 'Select appliance & brand to view configured fee';
+      } else {
+        subtitle = 'Out of warranty service (Price: ₹ 0)';
+      }
+    } else {
+      if (_installationType == 'Paid Installation') {
+        subtitle = _selectedBrandObject != null 
+            ? 'Configured Installation Fee for ${_selectedBrandObject['name'] ?? 'brand'}' 
+            : 'Select appliance & brand to view configured fee';
+      } else {
+        subtitle = 'Free installation covered (Price: ₹ 0)';
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16.0),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFF162521),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.teal.withOpacity(0.4)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.currency_rupee, color: Colors.tealAccent, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Customer Cost ($currentSelection)',
+                      style: const TextStyle(
+                        color: Colors.tealAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.teal.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.teal.withOpacity(0.3)),
+            ),
+            child: Text(
+              '₹ ${cost.toStringAsFixed(0)}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
@@ -2952,8 +3060,12 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
       if (widget.type == 'service') {
         request.fields['serviceDetails[description]'] = _serviceDesc.text.trim();
         request.fields['serviceDetails[priority]'] = _priority;
+        request.fields['serviceDetails[serviceType]'] = _serviceType;
+        request.fields['serviceType'] = _serviceType;
       } else {
         request.fields['installationDetails[priority]'] = _priority;
+        request.fields['installationDetails[installationType]'] = _installationType;
+        request.fields['installationType'] = _installationType;
       }
 
       if (_visitDateController.text.isNotEmpty) {
@@ -3010,7 +3122,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                   _buildSectionHeader('Customer Details'),
                   _buildTextField(_custName, 'Customer Name'),
                   _buildTextField(
-                    _custMobile, 
+                     _custMobile, 
                     'Mobile Number', 
                     keyboardType: TextInputType.phone,
                     maxLength: 10,
@@ -3094,6 +3206,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                           _selectedApplianceId = val;
                           _selectedApplianceName = _appliances.firstWhere((a) => a['_id'] == val)['name'];
                           _selectedBrandName = null;
+                          _selectedBrandObject = null;
                           _brands = [];
                         });
                         if (val != null) {
@@ -3121,6 +3234,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                       onChanged: (val) {
                         setState(() {
                           _selectedBrandName = val;
+                          _selectedBrandObject = _brands.firstWhere((b) => b['name'] == val, orElse: () => null);
                         });
                       },
                       validator: (val) => val == null ? 'Please select a brand' : null,
@@ -3134,6 +3248,29 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                   if (widget.type == 'service') ...[
                     const SizedBox(height: 24),
                     _buildSectionHeader('Service Details'),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: DropdownButtonFormField<String>(
+                        value: _serviceType,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Service Warranty Type *',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'In Warranty', child: Text('In Warranty')),
+                          DropdownMenuItem(value: 'Out Warranty', child: Text('Out Warranty')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _serviceType = val;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    _buildCustomerCostCard(),
                     _buildTextField(_serviceDesc, 'Problem Description', maxLines: 3, required: false),
                     const SizedBox(height: 8),
                     const Text('Priority *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
@@ -3147,6 +3284,29 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                   ] else ...[
                     const SizedBox(height: 24),
                     _buildSectionHeader('Installation Details'),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: DropdownButtonFormField<String>(
+                        value: _installationType,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Installation Type *',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'Free Installation', child: Text('Free Installation')),
+                          DropdownMenuItem(value: 'Paid Installation', child: Text('Paid Installation')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _installationType = val;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    _buildCustomerCostCard(),
                     const Text('Priority *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
                     Row(
                       children: [
