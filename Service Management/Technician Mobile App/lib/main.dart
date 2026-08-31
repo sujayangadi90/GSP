@@ -1163,13 +1163,26 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       // 1. Try instant last known position first
       Position? position = await Geolocator.getLastKnownPosition();
       
-      // 2. If no cached position, request with short time limit
+      // 2. If no cached position, request fresh position via Android Fused Provider
       if (position == null) {
         try {
           position = await Geolocator.getCurrentPosition(
             locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.low,
-              timeLimit: Duration(seconds: 4),
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 10),
+            ),
+          );
+        } catch (_) {}
+      }
+
+      // 3. Fallback: try direct Android Location Manager if fused provider returned null
+      if (position == null && Platform.isAndroid) {
+        try {
+          position = await Geolocator.getCurrentPosition(
+            locationSettings: AndroidSettings(
+              accuracy: LocationAccuracy.balanced,
+              forceAndroidLocationManager: true,
+              timeLimit: const Duration(seconds: 10),
             ),
           );
         } catch (_) {}
@@ -1188,13 +1201,13 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
           SnackBar(
             content: Text('GPS Location Captured: ${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}'),
             backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
+            duration: const Duration(seconds: 3),
           ),
         );
       } else {
         setState(() {
           _isFetchingLocation = false;
-          _locationError = 'Could not get GPS fix. Please ensure GPS is active and try again.';
+          _locationError = 'Could not get GPS fix. Please ensure GPS/Location is enabled and try again.';
         });
       }
     } catch (e) {
