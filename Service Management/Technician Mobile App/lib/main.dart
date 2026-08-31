@@ -1160,26 +1160,22 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         return;
       }
 
-      // Fast initial fix from last known position (prevents freezing/ANR)
+      // 1. Try instant last known position first
       Position? position = await Geolocator.getLastKnownPosition();
-      if (position != null && mounted) {
-        setState(() {
-          _capturedPosition = position;
-        });
+      
+      // 2. If no cached position, request with short time limit
+      if (position == null) {
+        try {
+          position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.low,
+              timeLimit: Duration(seconds: 4),
+            ),
+          );
+        } catch (_) {}
       }
 
-      // Fresh fix with short timeout and balanced accuracy (never blocks UI)
-      try {
-        final freshPosition = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.medium,
-            timeLimit: Duration(seconds: 6),
-          ),
-        ).timeout(const Duration(seconds: 6));
-        position = freshPosition;
-      } catch (_) {
-        // If fresh fix timed out, position remains lastKnownPosition
-      }
+      if (!mounted) return;
 
       if (position != null) {
         setState(() {
@@ -1188,15 +1184,13 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
           _locationError = null;
         });
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('GPS Location Captured: ${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('GPS Location Captured: ${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
       } else {
         setState(() {
           _isFetchingLocation = false;
@@ -1204,10 +1198,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         });
       }
     } catch (e) {
-      setState(() {
-        _isFetchingLocation = false;
-        _locationError = 'Error fetching GPS location: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isFetchingLocation = false;
+          _locationError = 'Error fetching GPS location: $e';
+        });
+      }
     }
   }
 
