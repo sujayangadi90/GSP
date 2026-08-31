@@ -44,6 +44,14 @@ import {
   RotateCcw
 } from 'lucide-react';
 
+import AttendancePortal from './AttendancePortal.jsx';
+import LocationMapModal from './components/LocationMapModal.jsx';
+import EmployeesTab from './components/EmployeesTab.jsx';
+import AttendanceTab from './components/AttendanceTab.jsx';
+import EmployeeModal from './components/EmployeeModal.jsx';
+import EmployeeDetailsModal from './components/EmployeeDetailsModal.jsx';
+import CorrectAttendanceModal from './components/CorrectAttendanceModal.jsx';
+
 const API_BASE = '/api';
 
 const MONTHS_LIST = [
@@ -312,6 +320,10 @@ const LineGraph = ({ data = [], fromDate, toDate }) => {
 };
 
 export default function App() {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/attendanceportal')) {
+    return <AttendancePortal />;
+  }
+
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('gsp_user');
     return saved ? JSON.parse(saved) : null;
@@ -319,7 +331,7 @@ export default function App() {
   
   const [token, setToken] = useState(() => localStorage.getItem('gsp_token') || '');
   
-  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, dealers, technicians, tickets
+  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, dealers, technicians, tickets, employees, attendance
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
@@ -678,6 +690,47 @@ export default function App() {
     toDate: '',
     dashboardFilter: ''
   });
+
+  // Employee Management States
+  const [employees, setEmployees] = useState([]);
+  const [employeeStats, setEmployeeStats] = useState({
+    totalEmployees: 0,
+    activeEmployees: 0,
+    inactiveEmployees: 0,
+    presentToday: 0,
+    currentlyClockedIn: 0,
+    completedToday: 0,
+    notClockedIn: 0
+  });
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState('all');
+  const [employeePage, setEmployeePage] = useState(1);
+  const [employeeForm, setEmployeeForm] = useState(null);
+  const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
+  const [employeeSaving, setEmployeeSaving] = useState(false);
+  const [viewingEmployeeData, setViewingEmployeeData] = useState(null);
+
+  // Attendance States
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [attendanceStats, setAttendanceStats] = useState({
+    totalEmployees: 0,
+    activeEmployees: 0,
+    inactiveEmployees: 0,
+    presentToday: 0,
+    currentlyClockedIn: 0,
+    completedToday: 0,
+    missingClockOut: 0,
+    notClockedIn: 0
+  });
+  const [attendanceDateFilter, setAttendanceDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceEmployeeFilter, setAttendanceEmployeeFilter] = useState('');
+  const [attendanceStatusFilter, setAttendanceStatusFilter] = useState('all');
+  const [attendanceSearch, setAttendanceSearch] = useState('');
+  const [attendancePage, setAttendancePage] = useState(1);
+  const [mapAttendance, setMapAttendance] = useState(null);
+  const [correctingAttendance, setCorrectingAttendance] = useState(null);
+  const [correctingSaving, setCorrectingSaving] = useState(false);
+  const [viewSelfiePhoto, setViewSelfiePhoto] = useState(null);
 
   useEffect(() => {
     if (token) {
@@ -1431,6 +1484,135 @@ export default function App() {
     }
   }, [activeTab, reportTab]);
 
+  const fetchEmployees = async () => {
+    try {
+      let query = `/employees?status=${employeeStatusFilter}`;
+      if (employeeSearch) query += `&search=${encodeURIComponent(employeeSearch)}`;
+      const data = await apiFetch(query);
+      if (data) {
+        setEmployees(data.employees || []);
+        if (data.stats) setEmployeeStats(data.stats);
+      }
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    }
+  };
+
+  const fetchAttendance = async () => {
+    try {
+      let query = `/attendance/admin/records?status=${attendanceStatusFilter}`;
+      if (attendanceDateFilter) query += `&date=${attendanceDateFilter}`;
+      if (attendanceEmployeeFilter) query += `&employeeId=${encodeURIComponent(attendanceEmployeeFilter)}`;
+      if (attendanceSearch) query += `&search=${encodeURIComponent(attendanceSearch)}`;
+      const data = await apiFetch(query);
+      if (data && Array.isArray(data)) {
+        setAttendanceRecords(data);
+      }
+    } catch (err) {
+      console.error('Error fetching attendance records:', err);
+    }
+  };
+
+  const fetchAttendanceStats = async () => {
+    try {
+      const data = await apiFetch(`/attendance/admin/stats?date=${attendanceDateFilter || ''}`);
+      if (data) setAttendanceStats(data);
+    } catch (err) {
+      console.error('Error fetching attendance stats:', err);
+    }
+  };
+
+  const handleSaveEmployee = async (e) => {
+    e.preventDefault();
+    if (!employeeForm) return;
+    setEmployeeSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append('name', employeeForm.name || '');
+      formData.append('phone', employeeForm.phone || '');
+      if (employeeForm.password) formData.append('password', employeeForm.password);
+      formData.append('address', employeeForm.address || '');
+      formData.append('status', employeeForm.status || 'active');
+
+      if (employeeForm.profilePicFile) formData.append('profilePic', employeeForm.profilePicFile);
+      if (employeeForm.aadharFile) formData.append('aadhar', employeeForm.aadharFile);
+      if (employeeForm.drivingLicenseFile) formData.append('drivingLicense', employeeForm.drivingLicenseFile);
+      if (employeeForm.insuranceFile) formData.append('insurance', employeeForm.insuranceFile);
+
+      const endpoint = (employeeForm.id || employeeForm._id)
+        ? `/employees/${employeeForm.id || employeeForm._id}`
+        : `/employees`;
+
+      const method = (employeeForm.id || employeeForm._id) ? 'PUT' : 'POST';
+
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to save employee');
+      }
+
+      setEmployeeModalOpen(false);
+      setEmployeeForm(null);
+      fetchEmployees();
+    } catch (err) {
+      alert(err.message || 'Failed to save employee record');
+    } finally {
+      setEmployeeSaving(false);
+    }
+  };
+
+  const handleToggleEmployee = async (id) => {
+    try {
+      await apiFetch(`/employees/${id}/toggle`, { method: 'PATCH' });
+      fetchEmployees();
+    } catch (err) {
+      alert(err.message || 'Failed to toggle employee status');
+    }
+  };
+
+  const handleDeleteEmployee = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to delete employee "${name}"? All associated attendance records will also be removed.`)) return;
+    try {
+      await apiFetch(`/employees/${id}`, { method: 'DELETE' });
+      fetchEmployees();
+    } catch (err) {
+      alert(err.message || 'Failed to delete employee');
+    }
+  };
+
+  const handleViewEmployee = async (id) => {
+    try {
+      const data = await apiFetch(`/employees/${id}`);
+      if (data) {
+        setViewingEmployeeData(data);
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to load employee details');
+    }
+  };
+
+  const handleSaveAttendanceCorrection = async ({ id, clockInTime, clockOutTime, status, reason }) => {
+    setCorrectingSaving(true);
+    try {
+      await apiFetch(`/attendance/admin/correct/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ clockInTime, clockOutTime, status, reason })
+      });
+      setCorrectingAttendance(null);
+      fetchAttendance();
+      fetchAttendanceStats();
+    } catch (err) {
+      alert(err.message || 'Failed to correct attendance');
+    } finally {
+      setCorrectingSaving(false);
+    }
+  };
+
   // Run searches / filters trigger reload
   useEffect(() => {
     if (user) {
@@ -1462,6 +1644,12 @@ export default function App() {
         fetchVideoLibraryItems();
         fetchAppliances();
         fetchBrands();
+      } else if (activeTab === 'employees') {
+        fetchEmployees();
+      } else if (activeTab === 'attendance') {
+        fetchAttendance();
+        fetchAttendanceStats();
+        fetchEmployees();
       } else if (activeTab === 'dashboard') {
         fetchDashboardData();
       } else {
@@ -1474,7 +1662,7 @@ export default function App() {
         fetchEvaluations();
       }
     }
-  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters, inventoryFilters, performanceFilters]);
+  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters, inventoryFilters, performanceFilters, employeeSearch, employeeStatusFilter, attendanceDateFilter, attendanceEmployeeFilter, attendanceStatusFilter, attendanceSearch]);
 
   useEffect(() => {
     setCustomerPage(1);
@@ -2641,6 +2829,24 @@ export default function App() {
             >
               <Video className="w-5 h-5" />
               Video Library
+            </button>
+          )}
+          {(!user || user.role === 'admin') && (
+            <button
+              onClick={() => { setActiveTab('employees'); setMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${(activeTab === 'employees' || activeTab === 'add-employee' || activeTab === 'edit-employee') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <Users className="w-5 h-5 text-indigo-400" />
+              Employees
+            </button>
+          )}
+          {(!user || user.role === 'admin') && (
+            <button
+              onClick={() => { setActiveTab('attendance'); setMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'attendance' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <Clock className="w-5 h-5 text-emerald-400" />
+              Attendance
             </button>
           )}
           {(!user || user.permissions?.settings !== false) && (
@@ -7530,6 +7736,73 @@ export default function App() {
               )}
             </div>
           )}
+
+          {/* Employees Tab */}
+          {activeTab === 'employees' && (
+            <EmployeesTab
+              employees={employees}
+              stats={employeeStats}
+              search={employeeSearch}
+              setSearch={setEmployeeSearch}
+              statusFilter={employeeStatusFilter}
+              setStatusFilter={setEmployeeStatusFilter}
+              page={employeePage}
+              setPage={setEmployeePage}
+              onAddEmployee={() => {
+                setEmployeeForm({
+                  name: '',
+                  phone: '',
+                  password: '',
+                  address: '',
+                  status: 'active'
+                });
+                setEmployeeModalOpen(true);
+              }}
+              onEditEmployee={(emp) => {
+                setEmployeeForm({
+                  id: emp._id,
+                  employeeId: emp.employeeId,
+                  name: emp.name,
+                  phone: emp.phone,
+                  password: '',
+                  address: emp.address,
+                  status: emp.status,
+                  profilePic: emp.profilePic,
+                  aadhar: emp.aadhar,
+                  drivingLicense: emp.drivingLicense,
+                  insurance: emp.insurance
+                });
+                setEmployeeModalOpen(true);
+              }}
+              onViewEmployee={handleViewEmployee}
+              onToggleStatus={handleToggleEmployee}
+              onDeleteEmployee={handleDeleteEmployee}
+              API_BASE={API_BASE}
+            />
+          )}
+
+          {/* Attendance Tab */}
+          {activeTab === 'attendance' && (
+            <AttendanceTab
+              records={attendanceRecords}
+              stats={attendanceStats}
+              employees={employees}
+              dateFilter={attendanceDateFilter}
+              setDateFilter={setAttendanceDateFilter}
+              employeeFilter={attendanceEmployeeFilter}
+              setEmployeeFilter={setAttendanceEmployeeFilter}
+              statusFilter={attendanceStatusFilter}
+              setStatusFilter={setAttendanceStatusFilter}
+              search={attendanceSearch}
+              setSearch={setAttendanceSearch}
+              page={attendancePage}
+              setPage={setAttendancePage}
+              onViewMap={(rec) => setMapAttendance(rec)}
+              onViewSelfie={(url) => setViewSelfiePhoto(url)}
+              onCorrectAttendance={(rec) => setCorrectingAttendance(rec)}
+              API_BASE={API_BASE}
+            />
+          )}
         </main>
       </div>
 
@@ -10626,6 +10899,80 @@ export default function App() {
                 Done
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Employee Add/Edit Modal */}
+      <EmployeeModal
+        isOpen={employeeModalOpen}
+        onClose={() => {
+          setEmployeeModalOpen(false);
+          setEmployeeForm(null);
+        }}
+        employeeForm={employeeForm}
+        setEmployeeForm={setEmployeeForm}
+        onSave={handleSaveEmployee}
+        saving={employeeSaving}
+        API_BASE={API_BASE}
+      />
+
+      {/* Employee Details Modal */}
+      <EmployeeDetailsModal
+        isOpen={Boolean(viewingEmployeeData)}
+        onClose={() => setViewingEmployeeData(null)}
+        employee={viewingEmployeeData?.employee}
+        recentAttendance={viewingEmployeeData?.recentAttendance}
+        onEdit={(emp) => {
+          setViewingEmployeeData(null);
+          setEmployeeForm({
+            id: emp._id,
+            employeeId: emp.employeeId,
+            name: emp.name,
+            phone: emp.phone,
+            password: '',
+            address: emp.address,
+            status: emp.status,
+            profilePic: emp.profilePic,
+            aadhar: emp.aadhar,
+            drivingLicense: emp.drivingLicense,
+            insurance: emp.insurance
+          });
+          setEmployeeModalOpen(true);
+        }}
+        API_BASE={API_BASE}
+      />
+
+      {/* Correct Attendance Modal */}
+      <CorrectAttendanceModal
+        isOpen={Boolean(correctingAttendance)}
+        onClose={() => setCorrectingAttendance(null)}
+        attendance={correctingAttendance}
+        onSaveCorrection={handleSaveAttendanceCorrection}
+        saving={correctingSaving}
+      />
+
+      {/* OpenStreetMap Location Modal */}
+      <LocationMapModal
+        isOpen={Boolean(mapAttendance)}
+        onClose={() => setMapAttendance(null)}
+        attendance={mapAttendance}
+      />
+
+      {/* Selfie Photo Preview Modal */}
+      {viewSelfiePhoto && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 max-w-sm w-full space-y-3 relative shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <span className="text-xs font-bold text-white uppercase tracking-wider">Clock-In Selfie</span>
+              <button
+                onClick={() => setViewSelfiePhoto(null)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg bg-slate-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <img src={viewSelfiePhoto} alt="Clock-in selfie full" className="w-full rounded-2xl object-cover max-h-96" />
           </div>
         </div>
       )}
