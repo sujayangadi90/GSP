@@ -18,55 +18,86 @@ export default function EditTicketModal({
   const [invoiceFile, setInvoiceFile] = useState(null);
   const [invoicePreview, setInvoicePreview] = useState("");
 
+  const safeISOString = (val) => {
+    if (!val) return "";
+    try {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return "";
+      return d.toISOString().slice(0, 16);
+    } catch {
+      return "";
+    }
+  };
+
+  const safeDateString = (val) => {
+    if (!val) return "";
+    try {
+      if (typeof val === "string" && val.includes("T")) {
+        return val.split("T")[0];
+      }
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return "";
+      return d.toISOString().split("T")[0];
+    } catch {
+      return "";
+    }
+  };
+
   useEffect(() => {
     if (ticket) {
-      const type = ticket.type || "service";
-      const currentServiceType = ticket.serviceType || ticket.serviceDetails?.serviceType || "In Warranty";
-      const currentInstallationType = ticket.installationType || ticket.installationDetails?.installationType || "Free Installation";
-      const currentPriority = ticket.installationDetails?.priority || ticket.serviceDetails?.priority || "medium";
+      try {
+        const type = ticket.type || "service";
+        const currentServiceType = ticket.serviceType || ticket.serviceDetails?.serviceType || "In Warranty";
+        const currentInstallationType = ticket.installationType || ticket.installationDetails?.installationType || "Free Installation";
+        const currentPriority = ticket.installationDetails?.priority || ticket.serviceDetails?.priority || "medium";
 
-      setFormData({
-        _id: ticket._id,
-        ticketNumber: ticket.ticketNumber,
-        type: type,
-        // Customer
-        customerName: ticket.customer?.name || "",
-        customerMobile: ticket.customer?.mobile || "",
-        customerAltMobile: ticket.customer?.alternateMobile || "",
-        customerAddress: ticket.customer?.address || "",
-        customerCity: ticket.customer?.city || "",
-        customerPincode: ticket.customer?.pincode || "",
-        // Product
-        productName: ticket.product?.name || "",
-        productCategory: ticket.product?.category || "",
-        modelNumber: ticket.product?.modelNumber || "",
-        serialNumber: ticket.product?.serialNumber || "",
-        invoiceNumber: ticket.product?.invoiceNumber || "",
-        purchaseDate: ticket.product?.purchaseDate ? ticket.product.purchaseDate.split("T")[0] : "",
-        // Sub-types & Details
-        serviceType: currentServiceType,
-        installationType: currentInstallationType,
-        priority: currentPriority,
-        preferredVisitDate: ticket.preferredVisitDate 
-          ? new Date(ticket.preferredVisitDate).toISOString().slice(0, 16)
-          : (ticket.installationDetails?.preferredDate ? new Date(ticket.installationDetails.preferredDate).toISOString().slice(0, 16) : ""),
-        description: ticket.serviceDetails?.description || "",
-        remarks: ticket.remarks || "",
-        // Dealer & Tech & Status
-        dealer: ticket.dealer?._id || ticket.dealer || "",
-        assignedTechnician: ticket.assignedTechnician?._id || ticket.assignedTechnician || "",
-        status: ticket.status || "new",
-        // Fees
-        technicianEarning: ticket.technicianEarning !== undefined ? ticket.technicianEarning : (ticket.technicianFee !== undefined ? ticket.technicianFee : ""),
-        dealerExpense: ticket.dealerExpense !== undefined ? ticket.dealerExpense : "",
-        customerFee: ticket.customerFee !== undefined ? ticket.customerFee : (type === "installation" ? (ticket.customerInstallationFee ?? ticket.installationFee ?? "") : (ticket.customerServiceFee ?? ticket.serviceFee ?? "")),
-        // Invoice
-        invoiceImage: ticket.invoiceImage || ""
-      });
-      setInvoiceFile(null);
-      setInvoicePreview("");
+        const rawPrefDate = ticket.preferredVisitDate || ticket.installationDetails?.preferredDate || "";
+        const dealerVal = ticket.dealer && typeof ticket.dealer === "object" ? (ticket.dealer._id || "") : (ticket.dealer || "");
+        const techVal = ticket.assignedTechnician && typeof ticket.assignedTechnician === "object" ? (ticket.assignedTechnician._id || "") : (ticket.assignedTechnician || "");
+
+        setFormData({
+          _id: ticket._id,
+          ticketNumber: ticket.ticketNumber || "Ticket",
+          type: type,
+          // Customer
+          customerName: ticket.customer?.name || "",
+          customerMobile: ticket.customer?.mobile || "",
+          customerAltMobile: ticket.customer?.alternateMobile || "",
+          customerAddress: ticket.customer?.address || "",
+          customerCity: ticket.customer?.city || "",
+          customerPincode: ticket.customer?.pincode || "",
+          // Product
+          productName: ticket.product?.name || "",
+          productCategory: ticket.product?.category || "",
+          modelNumber: ticket.product?.modelNumber || "",
+          serialNumber: ticket.product?.serialNumber || "",
+          invoiceNumber: ticket.product?.invoiceNumber || "",
+          purchaseDate: safeDateString(ticket.product?.purchaseDate),
+          // Sub-types & Details
+          serviceType: currentServiceType,
+          installationType: currentInstallationType,
+          priority: currentPriority,
+          preferredVisitDate: safeISOString(rawPrefDate),
+          description: ticket.serviceDetails?.description || "",
+          remarks: ticket.remarks || "",
+          // Dealer & Tech & Status
+          dealer: dealerVal,
+          assignedTechnician: techVal,
+          status: ticket.status || "new",
+          // Fees
+          technicianEarning: ticket.technicianEarning !== undefined && ticket.technicianEarning !== null ? ticket.technicianEarning : (ticket.technicianFee !== undefined ? ticket.technicianFee : ""),
+          dealerExpense: ticket.dealerExpense !== undefined && ticket.dealerExpense !== null ? ticket.dealerExpense : "",
+          customerFee: ticket.customerFee !== undefined && ticket.customerFee !== null ? ticket.customerFee : (type === "installation" ? (ticket.customerInstallationFee ?? ticket.installationFee ?? "") : (ticket.customerServiceFee ?? ticket.serviceFee ?? "")),
+          // Invoice
+          invoiceImage: ticket.invoiceImage || ""
+        });
+        setInvoiceFile(null);
+        setInvoicePreview("");
+      } catch (err) {
+        console.error("Error setting up edit form data:", err);
+      }
     }
-  }, [ticket]);
+  }, [ticket, isOpen]);
 
   if (!isOpen || !formData) return null;
 
@@ -74,7 +105,11 @@ export default function EditTicketModal({
     const file = e.target.files && e.target.files[0];
     if (file) {
       setInvoiceFile(file);
-      setInvoicePreview(URL.createObjectURL(file));
+      try {
+        setInvoicePreview(URL.createObjectURL(file));
+      } catch {
+        setInvoicePreview("");
+      }
     }
   };
 
