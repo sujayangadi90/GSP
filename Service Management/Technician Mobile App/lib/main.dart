@@ -1180,8 +1180,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         try {
           position = await Geolocator.getCurrentPosition(
             locationSettings: AndroidSettings(
-              accuracy: LocationAccuracy.balanced,
-              forceAndroidLocationManager: true,
+              accuracy: LocationAccuracy.medium,
+              forceLocationManager: true,
               timeLimit: const Duration(seconds: 10),
             ),
           );
