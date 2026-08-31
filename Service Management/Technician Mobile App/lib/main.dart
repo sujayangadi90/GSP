@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:geolocator/geolocator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1093,6 +1094,101 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   List<dynamic> _inventory = [];
   final List<Map<String, dynamic>> _selectedParts = [];
 
+  Position? _capturedPosition;
+  bool _isFetchingLocation = false;
+  String? _locationError;
+
+  Future<void> _fetchLocation() async {
+    setState(() {
+      _isFetchingLocation = true;
+      _locationError = null;
+    });
+
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _isFetchingLocation = false;
+          _locationError = 'Location services are disabled. Please enable GPS in device settings.';
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_locationError!),
+              backgroundColor: Colors.red,
+              action: SnackBarAction(
+                label: 'Settings',
+                textColor: Colors.white,
+                onPressed: () => Geolocator.openLocationSettings(),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _isFetchingLocation = false;
+            _locationError = 'Location permission denied. Please allow location access.';
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _isFetchingLocation = false;
+          _locationError = 'Location permissions permanently denied. Enable in App Settings.';
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_locationError!),
+              backgroundColor: Colors.red,
+              action: SnackBarAction(
+                label: 'App Settings',
+                textColor: Colors.white,
+                onPressed: () => Geolocator.openAppSettings(),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+
+      setState(() {
+        _capturedPosition = position;
+        _isFetchingLocation = false;
+        _locationError = null;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('GPS Location Captured: ${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isFetchingLocation = false;
+        _locationError = 'Error fetching GPS location: $e';
+      });
+    }
+  }
+
   String _formatDateTime(String? dtStr) {
     if (dtStr == null || dtStr.isEmpty) return 'Flexible';
     try {
@@ -1348,6 +1444,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       
       request.fields['workDone'] = _workDoneController.text.trim();
       request.fields['remarks'] = _remarksController.text.trim();
+      if (_capturedPosition != null) {
+        request.fields['lat'] = _capturedPosition!.latitude.toString();
+        request.fields['lng'] = _capturedPosition!.longitude.toString();
+      }
       request.fields['usedParts'] = jsonEncode(_selectedParts.map((p) => {
         'part': p['part'],
         'quantity': p['quantity']
@@ -1762,6 +1862,125 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                 )).toList(),
               ),
             ],
+            const SizedBox(height: 16),
+
+            // LOCATION CAPTURE SECTION
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF151A18),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _capturedPosition != null
+                      ? Colors.teal.withOpacity(0.5)
+                      : Colors.white12,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 16,
+                            color: _capturedPosition != null
+                                ? Colors.tealAccent
+                                : Colors.grey[400],
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Work Location GPS',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: _isFetchingLocation ? null : _fetchLocation,
+                        icon: _isFetchingLocation
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Icon(
+                                _capturedPosition != null
+                                    ? Icons.refresh
+                                    : Icons.my_location,
+                                size: 14,
+                              ),
+                        label: Text(
+                          _isFetchingLocation
+                              ? 'Fetching...'
+                              : (_capturedPosition != null ? 'Recapture' : 'Fetch Location'),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _capturedPosition != null
+                              ? Colors.teal[800]
+                              : Colors.teal[600],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_capturedPosition != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, size: 14, color: Colors.tealAccent),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Lat: ${_capturedPosition!.latitude.toStringAsFixed(5)}, Lng: ${_capturedPosition!.longitude.toStringAsFixed(5)}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                                color: Colors.tealAccent,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (_locationError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _locationError!,
+                      style: const TextStyle(fontSize: 11, color: Colors.redAccent),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tap "Fetch Location" to record your live GPS position for this ticket completion.',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                    ),
+                  ],
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3064,14 +3283,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.emerald.withOpacity(0.2),
+                              color: Colors.green.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.emerald.withOpacity(0.4)),
+                              border: Border.all(color: Colors.green.withOpacity(0.4)),
                             ),
                             child: Text(
                               band.toString().toUpperCase(),
                               style: const TextStyle(
-                                color: Colors.emeraldAccent,
+                                color: Colors.greenAccent,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 10,
                               ),

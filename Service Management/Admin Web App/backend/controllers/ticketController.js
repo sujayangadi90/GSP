@@ -765,7 +765,7 @@ const updateTicketStatus = async (req, res) => {
 // @route   PATCH /api/tickets/:id/complete
 // @access  Private/Technician
 const submitWorkCompletion = async (req, res) => {
-  const { workDone, remarks, usedParts } = req.body;
+  const { workDone, remarks, usedParts, lat, lng, address } = req.body;
 
   try {
     const ticket = await Ticket.findById(req.params.id);
@@ -853,12 +853,22 @@ const submitWorkCompletion = async (req, res) => {
       await item.save();
     }
 
+    let completionLocation = undefined;
+    if (lat !== undefined && lng !== undefined && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
+      completionLocation = {
+        lat: Number(lat),
+        lng: Number(lng),
+        address: address ? address.trim() : ''
+      };
+    }
+
     const newCompletion = {
       photos: completionPhotos,
       beforePhotos: beforePhotos,
       afterPhotos: afterPhotos,
       workDone,
       remarks,
+      location: completionLocation,
       submittedAt: Date.now(),
       usedParts: parsedUsedParts
     };

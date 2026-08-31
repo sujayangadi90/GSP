@@ -95,6 +95,11 @@ const TicketSchema = new mongoose.Schema({
     workDone: String,
     remarks: String,
     submittedAt: Date,
+    location: {
+      lat: Number,
+      lng: Number,
+      address: String
+    },
     usedParts: [{
       part: { type: mongoose.Schema.Types.ObjectId, ref: 'InventoryItem' },
       quantity: { type: Number, required: true }
@@ -107,6 +112,11 @@ const TicketSchema = new mongoose.Schema({
     workDone: String,
     remarks: String,
     submittedAt: Date,
+    location: {
+      lat: Number,
+      lng: Number,
+      address: String
+    },
     usedParts: [{
       part: { type: mongoose.Schema.Types.ObjectId, ref: 'InventoryItem' },
       quantity: { type: Number, required: true }

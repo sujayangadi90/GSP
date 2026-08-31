@@ -52,6 +52,7 @@ import EmployeeModal from './components/EmployeeModal.jsx';
 import EmployeeDetailsModal from './components/EmployeeDetailsModal.jsx';
 import CorrectAttendanceModal from './components/CorrectAttendanceModal.jsx';
 import EditTicketModal from './components/EditTicketModal.jsx';
+import TicketLocationMap from './components/TicketLocationMap.jsx';
 
 const API_BASE = '/api';
 
@@ -8910,6 +8911,15 @@ export default function App() {
                         <div className="text-sm text-slate-300 space-y-2">
                           <p><span className="text-slate-500 font-semibold">Work Done:</span> {comp.workDone}</p>
                           <p><span className="text-slate-500 font-semibold">Remarks:</span> {comp.remarks || 'None'}</p>
+                          {comp.location?.lat && (
+                            <div className="text-xs text-emerald-400 font-mono flex items-center gap-1.5 pt-1 font-semibold">
+                              <span>📍 GPS Location:</span>
+                              <span className="bg-slate-900 px-2 py-0.5 rounded border border-emerald-800/50">
+                                {comp.location.lat.toFixed(5)}, {comp.location.lng.toFixed(5)}
+                              </span>
+                              {comp.location.address && <span className="text-slate-400 font-sans">({comp.location.address})</span>}
+                            </div>
+                          )}
                         </div>
                         {/* Before & After Photos */}
                         {(comp.beforePhotos && comp.beforePhotos.length > 0) || (comp.afterPhotos && comp.afterPhotos.length > 0) ? (
@@ -9314,6 +9324,26 @@ export default function App() {
                     ))}
                   </div>
                 </div>
+
+                {/* Work Completion Location Map */}
+                {(() => {
+                  const compLoc = selectedTicket.completion?.location?.lat 
+                    ? selectedTicket.completion.location 
+                    : (selectedTicket.completionHistory && selectedTicket.completionHistory.slice().reverse().find(c => c.location?.lat)?.location);
+                  
+                  const isFinished = ['verification_pending', 'completed', 'closed'].includes(selectedTicket.status);
+                  
+                  if (!compLoc && !isFinished) return null;
+
+                  return (
+                    <TicketLocationMap
+                      location={compLoc || null}
+                      technicianName={selectedTicket.assignedTechnician?.name || 'Assigned Technician'}
+                      ticketNumber={selectedTicket.ticketNumber}
+                      submittedAt={selectedTicket.completion?.submittedAt || selectedTicket.closedAt}
+                    />
+                  );
+                })()}
 
               </div>
             </div>
