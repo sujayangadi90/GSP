@@ -1114,7 +1114,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(_locationError!),
+              content: const Text('Please enable GPS in device settings'),
               backgroundColor: Colors.red,
               action: SnackBarAction(
                 label: 'Settings',
@@ -1147,7 +1147,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(_locationError!),
+              content: const Text('Location permissions denied. Enable in Settings.'),
               backgroundColor: Colors.red,
               action: SnackBarAction(
                 label: 'App Settings',
@@ -1160,26 +1160,48 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
+      // Fast initial fix from last known position (prevents freezing/ANR)
+      Position? position = await Geolocator.getLastKnownPosition();
+      if (position != null && mounted) {
+        setState(() {
+          _capturedPosition = position;
+        });
+      }
 
-      setState(() {
-        _capturedPosition = position;
-        _isFetchingLocation = false;
-        _locationError = null;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('GPS Location Captured: ${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}'),
-            backgroundColor: Colors.green,
+      // Fresh fix with short timeout and balanced accuracy (never blocks UI)
+      try {
+        final freshPosition = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 6),
           ),
-        );
+        ).timeout(const Duration(seconds: 6));
+        position = freshPosition;
+      } catch (_) {
+        // If fresh fix timed out, position remains lastKnownPosition
+      }
+
+      if (position != null) {
+        setState(() {
+          _capturedPosition = position;
+          _isFetchingLocation = false;
+          _locationError = null;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('GPS Location Captured: ${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          _isFetchingLocation = false;
+          _locationError = 'Could not get GPS fix. Please ensure GPS is active and try again.';
+        });
       }
     } catch (e) {
       setState(() {
