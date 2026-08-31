@@ -8820,24 +8820,65 @@ export default function App() {
                   
                   {/* Assignment Form */}
                   {selectedTicket.status === 'new' && (() => {
-                    const ticketPincode = (selectedTicket.customer?.pincode || '').toString().trim();
+                    const rawTicketPincode = (selectedTicket.customer?.pincode || '').toString().trim();
+                    const ticketPincodeDigits = rawTicketPincode.replace(/\D/g, '');
+
                     const ticketApplianceName = (selectedTicket.product?.category || '').toString().trim().toLowerCase();
-                    const targetAppObj = appliances.find(a => a.name && a.name.trim().toLowerCase() === ticketApplianceName);
+                    const cleanTicketAppName = ticketApplianceName.replace(/[^a-z0-9]/g, '');
+
+                    const targetAppObj = appliances.find(a => {
+                      if (!a || !a.name) return false;
+                      const aClean = a.name.toString().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                      return aClean === cleanTicketAppName || a.name.toString().trim().toLowerCase() === ticketApplianceName;
+                    });
                     const targetAppId = targetAppObj ? targetAppObj._id.toString() : null;
 
                     const eligibleTechnicians = activeTechniciansForAssign.filter(tech => {
-                      // Check Pincode
-                      const servesPincode = Array.isArray(tech.pincodes) && tech.pincodes.some(p => p && p.toString().trim() === ticketPincode);
-                      
-                      // Check Appliance
-                      const servesAppliance = Array.isArray(tech.appliances) && tech.appliances.some(a => {
+                      // 1. Flatten all pincodes (handles comma-separated strings inside array)
+                      const techPincodesList = [];
+                      if (Array.isArray(tech.pincodes)) {
+                        tech.pincodes.forEach(item => {
+                          if (typeof item === 'string') {
+                            item.split(',').forEach(sub => {
+                              const trimmed = sub.trim();
+                              if (trimmed) techPincodesList.push(trimmed);
+                            });
+                          } else if (item != null) {
+                            techPincodesList.push(String(item).trim());
+                          }
+                        });
+                      } else if (typeof tech.pincodes === 'string') {
+                        tech.pincodes.split(',').forEach(sub => {
+                          const trimmed = sub.trim();
+                          if (trimmed) techPincodesList.push(trimmed);
+                        });
+                      }
+
+                      // Match Pincode (by exact string or normalized 6-digit digits)
+                      const servesPincode = techPincodesList.some(p => {
+                        if (!p) return false;
+                        const pStr = p.toString().trim();
+                        const pDigits = pStr.replace(/\D/g, '');
+                        if (rawTicketPincode && pStr === rawTicketPincode) return true;
+                        if (ticketPincodeDigits && pDigits === ticketPincodeDigits) return true;
+                        return false;
+                      });
+
+                      // 2. Match Appliance
+                      const techAppList = Array.isArray(tech.appliances) ? tech.appliances : [];
+                      const servesAppliance = techAppList.some(a => {
                         if (!a) return false;
                         if (typeof a === 'object') {
-                          const nameMatch = a.name && a.name.toString().trim().toLowerCase() === ticketApplianceName;
-                          const idMatch = targetAppId && (a._id ? a._id.toString() === targetAppId : false);
+                          const aName = (a.name || '').toString().trim().toLowerCase();
+                          const aClean = aName.replace(/[^a-z0-9]/g, '');
+                          const nameMatch = aName === ticketApplianceName || (cleanTicketAppName && aClean === cleanTicketAppName);
+                          const idMatch = targetAppId && a._id && (a._id.toString() === targetAppId);
                           return nameMatch || idMatch;
                         } else if (typeof a === 'string') {
-                          return (targetAppId && a.toString() === targetAppId) || a.toString().trim().toLowerCase() === ticketApplianceName;
+                          const aStr = a.toString().trim();
+                          const aLower = aStr.toLowerCase();
+                          const aClean = aLower.replace(/[^a-z0-9]/g, '');
+                          return (targetAppId && aStr === targetAppId) || aLower === ticketApplianceName || (cleanTicketAppName && aClean === cleanTicketAppName);
                         }
                         return false;
                       });
@@ -8850,7 +8891,7 @@ export default function App() {
                         <div className="flex items-center justify-between">
                           <label className="block text-xs font-semibold text-slate-400">Assign Technician</label>
                           <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-                            Pincode: <strong className="text-violet-400">{ticketPincode || 'N/A'}</strong> | Appliance: <strong className="text-violet-400">{selectedTicket.product?.category || 'N/A'}</strong>
+                            Pincode: <strong className="text-violet-400">{rawTicketPincode || 'N/A'}</strong> | Appliance: <strong className="text-violet-400">{selectedTicket.product?.category || 'N/A'}</strong>
                           </span>
                         </div>
 
