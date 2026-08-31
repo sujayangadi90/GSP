@@ -351,6 +351,7 @@ export default function App() {
   // Modals & Forms
   const [dealerForm, setDealerForm] = useState(null); // null or { id?, name, contactPerson, mobile, email, address, city, password }
   const [techForm, setTechForm] = useState(null); // null or { id?, name, mobile, email, password }
+  const [pincodeInput, setPincodeInput] = useState('');
   const [selectedTicket, setSelectedTicket] = useState(null); // null or ticket details object
   const [editingTicket, setEditingTicket] = useState(null); // null or ticket to edit
   const [editTicketSaving, setEditTicketSaving] = useState(false);
@@ -1975,9 +1976,14 @@ export default function App() {
   const saveTech = async (e) => {
     e.preventDefault();
     try {
+      let finalPincodes = Array.isArray(techForm.pincodes) ? [...techForm.pincodes] : [];
+      if (pincodeInput && pincodeInput.trim()) {
+        const leftover = pincodeInput.split(/[,\s]+/).map(p => p.replace(/\D/g, '')).filter(Boolean);
+        finalPincodes = Array.from(new Set([...finalPincodes, ...leftover]));
+      }
       const cleanForm = {
         ...techForm,
-        pincodes: (techForm.pincodes || []).map(p => p.trim()).filter(Boolean)
+        pincodes: finalPincodes.map(p => String(p).trim()).filter(Boolean)
       };
       if (techForm.id) {
         await apiFetch(`/technicians/${techForm.id}`, {
@@ -1991,6 +1997,7 @@ export default function App() {
         });
       }
       setTechForm(null);
+      setPincodeInput('');
       setActiveTab('technicians');
       fetchData();
     } catch (err) {
@@ -3727,6 +3734,7 @@ export default function App() {
                       insurance: '',
                       pincodes: []
                     });
+                    setPincodeInput('');
                     setActiveTab('add-technician');
                   }}
                   className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150"
@@ -3849,6 +3857,7 @@ export default function App() {
                                 insurance: tech.insurance || '',
                                 pincodes: tech.pincodes || []
                               });
+                              setPincodeInput('');
                               setActiveTab('edit-technician');
                             }}
                             className="text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer"
@@ -4147,25 +4156,97 @@ export default function App() {
                   </div>
 
                   {/* Pincodes serving */}
-                  <div className="border-t border-slate-800 pt-5">
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Served Pincodes</label>
-                    <input 
-                      type="text" 
-                      placeholder="Enter pincodes separated by commas (e.g. 110001, 110002, 110003)"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500" 
-                      value={techForm.pincodes ? techForm.pincodes.join(', ') : ''} 
-                      onChange={e => {
-                        const arr = e.target.value.split(',');
-                        setTechForm({ ...techForm, pincodes: arr });
-                      }} 
-                    />
-                    <p className="text-[11px] text-slate-500 mt-1">Specify all postal pincodes this technician is available to service.</p>
+                  <div className="border-t border-slate-800 pt-5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Served Pincodes
+                      </label>
+                      {Array.isArray(techForm.pincodes) && techForm.pincodes.length > 0 && (
+                        <span className="text-[11px] text-violet-400 font-mono font-bold">
+                          {techForm.pincodes.length} {techForm.pincodes.length === 1 ? 'pincode' : 'pincodes'} added
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 p-2.5 bg-slate-800 border border-slate-700 rounded-xl focus-within:ring-1 focus-within:ring-violet-500 focus-within:border-violet-500 min-h-[48px] transition">
+                      {Array.isArray(techForm.pincodes) && techForm.pincodes.map((pin, idx) => (
+                        <span 
+                          key={`${pin}-${idx}`}
+                          className="inline-flex items-center gap-1.5 bg-violet-600/25 border border-violet-500/40 text-violet-200 px-3 py-1 rounded-lg text-xs font-mono font-bold shadow-xs animate-in fade-in zoom-in-95"
+                        >
+                          <span>{pin}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = techForm.pincodes.filter((_, i) => i !== idx);
+                              setTechForm({ ...techForm, pincodes: updated });
+                            }}
+                            className="hover:text-red-300 hover:bg-violet-800/60 p-0.5 rounded-full transition cursor-pointer text-violet-400"
+                            title="Remove pincode"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                      <input 
+                        type="text" 
+                        placeholder={(!techForm.pincodes || techForm.pincodes.length === 0) ? "Type 6-digit pincode and hit comma (,) or Enter..." : "Add more pincodes (hit comma)..."}
+                        className="bg-transparent border-none outline-hidden text-sm text-white placeholder-slate-500 flex-1 min-w-[200px] px-1 py-1 font-mono"
+                        value={pincodeInput}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val.includes(',') || val.includes('\n')) {
+                            const rawPins = val.split(/[,\n]+/);
+                            const newPins = [];
+                            rawPins.forEach(p => {
+                              const trimmed = p.trim().replace(/\D/g, '');
+                              if (trimmed && !techForm.pincodes?.includes(trimmed)) {
+                                newPins.push(trimmed);
+                              }
+                            });
+                            const existing = Array.isArray(techForm.pincodes) ? techForm.pincodes : [];
+                            const combined = [...existing, ...newPins];
+                            setTechForm({ ...techForm, pincodes: Array.from(new Set(combined)) });
+                            setPincodeInput('');
+                          } else {
+                            setPincodeInput(val);
+                          }
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ',') {
+                            e.preventDefault();
+                            const trimmed = pincodeInput.trim().replace(/\D/g, '');
+                            if (trimmed) {
+                              const existing = Array.isArray(techForm.pincodes) ? techForm.pincodes : [];
+                              if (!existing.includes(trimmed)) {
+                                setTechForm({ ...techForm, pincodes: [...existing, trimmed] });
+                              }
+                              setPincodeInput('');
+                            }
+                          } else if (e.key === 'Backspace' && !pincodeInput && techForm.pincodes?.length > 0) {
+                            const updated = techForm.pincodes.slice(0, -1);
+                            setTechForm({ ...techForm, pincodes: updated });
+                          }
+                        }}
+                        onBlur={() => {
+                          const trimmed = pincodeInput.trim().replace(/\D/g, '');
+                          if (trimmed) {
+                            const existing = Array.isArray(techForm.pincodes) ? techForm.pincodes : [];
+                            if (!existing.includes(trimmed)) {
+                              setTechForm({ ...techForm, pincodes: [...existing, trimmed] });
+                            }
+                            setPincodeInput('');
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500">Type a 6-digit pincode and hit <strong>Comma (,)</strong> or <strong>Enter</strong> to create a card tag. Click <strong>✕</strong> to remove.</p>
                   </div>
 
                   <div className="flex items-center justify-end gap-3 pt-5 border-t border-slate-800">
                     <button 
                       type="button" 
-                      onClick={() => { setTechForm(null); setActiveTab('technicians'); }} 
+                      onClick={() => { setTechForm(null); setPincodeInput(''); setActiveTab('technicians'); }} 
                       className="px-5 py-2.5 text-sm text-slate-400 hover:text-slate-200 cursor-pointer font-bold"
                     >
                       Cancel
