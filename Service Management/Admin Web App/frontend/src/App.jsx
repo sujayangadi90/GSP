@@ -8510,10 +8510,10 @@ export default function App() {
           <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden my-8">
             <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
               <div>
-                <h3 className="font-extrabold text-white text-lg">{selectedTicket.ticketNumber} Details</h3>
+                <h3 className="font-extrabold text-white text-lg">{selectedTicket.ticketNumber || 'Ticket'} Details</h3>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
                   <p className="text-xs text-slate-400 capitalize">
-                    Type: <span className="font-semibold text-white">{selectedTicket.type}</span> ({selectedTicket.type === 'service' ? (selectedTicket.serviceType || selectedTicket.serviceDetails?.serviceType || 'In Warranty') : (selectedTicket.installationType || selectedTicket.installationDetails?.installationType || 'Free Installation')}) • Status: {selectedTicket.status.replace('_', ' ')}
+                    Type: <span className="font-semibold text-white">{selectedTicket.type || 'Service'}</span> ({selectedTicket.type === 'service' ? (selectedTicket.serviceType || selectedTicket.serviceDetails?.serviceType || 'In Warranty') : (selectedTicket.installationType || selectedTicket.installationDetails?.installationType || 'Free Installation')}) • Status: {(selectedTicket.status || '').replace('_', ' ')}
                   </p>
                   <span className="text-slate-600 text-xs">•</span>
                   {(() => {
@@ -8566,15 +8566,15 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-4 text-sm text-slate-300">
                     <div>
                       <p className="text-xs text-slate-500 font-semibold">Name</p>
-                      <p className="font-bold text-slate-200">{selectedTicket.customer.name}</p>
+                      <p className="font-bold text-slate-200">{selectedTicket.customer?.name || 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500 font-semibold">Mobile</p>
-                      <p className="font-medium">{selectedTicket.customer.mobile} {selectedTicket.customer.alternateMobile && ` / ${selectedTicket.customer.alternateMobile}`}</p>
+                      <p className="font-medium">{selectedTicket.customer?.mobile || 'N/A'} {selectedTicket.customer?.alternateMobile && ` / ${selectedTicket.customer.alternateMobile}`}</p>
                     </div>
                     <div className="col-span-2">
                       <p className="text-xs text-slate-500 font-semibold">Address</p>
-                      <p>{selectedTicket.customer.address}, {selectedTicket.customer.city} - {selectedTicket.customer.pincode}</p>
+                      <p>{selectedTicket.customer?.address || 'N/A'}{selectedTicket.customer?.city ? `, ${selectedTicket.customer.city}` : ''}{selectedTicket.customer?.pincode ? ` - ${selectedTicket.customer.pincode}` : ''}</p>
                     </div>
                   </div>
                 </div>
@@ -8585,15 +8585,15 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-4 text-sm text-slate-300">
                     <div>
                       <p className="text-xs text-slate-500 font-semibold">Product Name</p>
-                      <p className="font-semibold text-slate-200">{selectedTicket.product.name} ({selectedTicket.product.category})</p>
+                      <p className="font-semibold text-slate-200">{selectedTicket.product?.name || 'N/A'} ({selectedTicket.product?.category || 'N/A'})</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500 font-semibold">Model / Serial Number</p>
-                      <p>{selectedTicket.product.modelNumber || 'N/A'} • {selectedTicket.product.serialNumber || 'N/A'}</p>
+                      <p>{selectedTicket.product?.modelNumber || 'N/A'} • {selectedTicket.product?.serialNumber || 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500 font-semibold">Invoice Number & Purchase Date</p>
-                      <p>{selectedTicket.product.invoiceNumber || 'N/A'} • {selectedTicket.product.purchaseDate ? new Date(selectedTicket.product.purchaseDate).toLocaleDateString() : 'N/A'}</p>
+                      <p>{selectedTicket.product?.invoiceNumber || 'N/A'} • {selectedTicket.product?.purchaseDate ? new Date(selectedTicket.product.purchaseDate).toLocaleDateString() : 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500 font-semibold">Preferred Visit Date & Time</p>
@@ -8915,7 +8915,7 @@ export default function App() {
                               <span>⚠️</span> No eligible technicians found
                             </p>
                             <p className="text-[11px] text-slate-400">
-                              No active technician is configured to serve pincode <span className="font-semibold text-amber-300">{ticketPincode || 'N/A'}</span> for appliance <span className="font-semibold text-amber-300">{selectedTicket.product?.category || 'N/A'}</span>.
+                              No active technician is configured to serve pincode <span className="font-semibold text-amber-300">{rawTicketPincode || 'N/A'}</span> for appliance <span className="font-semibold text-amber-300">{selectedTicket.product?.category || 'N/A'}</span>.
                             </p>
                             <p className="text-[11px] text-slate-400">
                               Go to <span className="text-violet-400 font-semibold">Manage Technicians → Edit Details</span> to add this pincode and associate this appliance.
@@ -8994,15 +8994,15 @@ export default function App() {
                     <div className="bg-rose-950/40 border border-rose-900/30 p-3 rounded-xl text-rose-400 text-xs font-semibold space-y-1">
                       <p>Ticket Cancelled</p>
                       {(() => {
-                        const cancelTimeline = selectedTicket.timeline?.slice().reverse().find(item => item.status === 'cancelled');
-                        return cancelTimeline && <p className="italic text-slate-300 mt-1">Reason: {cancelTimeline.note.replace('Ticket cancelled by Admin. Reason: ', '')}</p>;
+                        const cancelTimeline = Array.isArray(selectedTicket.timeline) ? selectedTicket.timeline.slice().reverse().find(item => item.status === 'cancelled') : null;
+                        return cancelTimeline && <p className="italic text-slate-300 mt-1">Reason: {(cancelTimeline.note || '').replace('Ticket cancelled by Admin. Reason: ', '')}</p>;
                       })()}
                     </div>
                   )}
 
                   {selectedTicket.status === 'assigned' || selectedTicket.status === 'in_progress' ? (
                     <div className="bg-slate-800 p-3.5 rounded-xl border border-slate-700/50 space-y-2 text-xs">
-                      <p className="font-semibold text-slate-300">Currently Assigned: {selectedTicket.assignedTechnician?.name}</p>
+                      <p className="font-semibold text-slate-300">Currently Assigned: {selectedTicket.assignedTechnician?.name || 'Technician'}</p>
                       <p className="text-slate-400">Waiting for technician updates.</p>
                       <button 
                         onClick={() => {
@@ -9118,16 +9118,16 @@ export default function App() {
                 <div className="bg-slate-800/30 p-5 rounded-2xl border border-slate-850 space-y-4">
                   <h4 className="font-bold text-white text-sm border-b border-slate-700 pb-2">Status Timeline</h4>
                   <div className="space-y-4 max-h-60 overflow-y-auto pr-1">
-                    {selectedTicket.timeline.map((entry, idx) => (
+                    {Array.isArray(selectedTicket.timeline) && selectedTicket.timeline.map((entry, idx) => (
                       <div key={idx} className="flex gap-3 text-xs">
                         <div className="flex flex-col items-center shrink-0">
                           <div className="w-2.5 h-2.5 rounded-full bg-violet-500" />
                           {idx < selectedTicket.timeline.length - 1 && <div className="w-0.5 flex-1 bg-slate-700 my-1" />}
                         </div>
                         <div className="space-y-1">
-                          <p className="font-bold text-slate-200 capitalize">{entry.status.replace('_', ' ')}</p>
-                          <p className="text-slate-400">{entry.note}</p>
-                          <p className="text-slate-500 text-[10px]">{entry.updatedBy} • {new Date(entry.timestamp).toLocaleString()}</p>
+                          <p className="font-bold text-slate-200 capitalize">{(entry?.status || '').replace('_', ' ')}</p>
+                          <p className="text-slate-400">{entry?.note || ''}</p>
+                          <p className="text-slate-500 text-[10px]">{entry?.updatedBy || 'System'} • {entry?.timestamp ? new Date(entry.timestamp).toLocaleString() : 'N/A'}</p>
                         </div>
                       </div>
                     ))}
