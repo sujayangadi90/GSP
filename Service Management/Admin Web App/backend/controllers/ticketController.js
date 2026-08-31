@@ -1607,10 +1607,193 @@ const getReports = async (req, res) => {
   }
 };
 
+// @desc    Update ticket details by Admin
+// @route   PUT /api/tickets/:id
+// @access  Private/Admin
+const updateTicketByAdmin = async (req, res) => {
+  try {
+    // Parse nested fields from multipart/form-data if flat keys
+    for (const key in req.body) {
+      if (key.includes('[') && key.endsWith(']')) {
+        const parts = key.split('[');
+        const parentKey = parts[0];
+        const childKey = parts[1].slice(0, -1);
+        if (!req.body[parentKey]) {
+          req.body[parentKey] = {};
+        }
+        req.body[parentKey][childKey] = req.body[key];
+      }
+    }
+
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    const {
+      type,
+      customer,
+      product,
+      serviceDetails,
+      installationDetails,
+      serviceType,
+      installationType,
+      preferredVisitDate,
+      remarks,
+      dealer,
+      assignedTechnician,
+      status,
+      technicianEarning,
+      technicianFee,
+      dealerExpense,
+      customerFee,
+      invoiceImage
+    } = req.body;
+
+    // Update Customer
+    if (customer) {
+      ticket.customer = {
+        name: customer.name !== undefined ? customer.name : ticket.customer?.name,
+        mobile: customer.mobile !== undefined ? customer.mobile : ticket.customer?.mobile,
+        alternateMobile: customer.alternateMobile !== undefined ? customer.alternateMobile : ticket.customer?.alternateMobile,
+        address: customer.address !== undefined ? customer.address : ticket.customer?.address,
+        city: customer.city !== undefined ? customer.city : ticket.customer?.city,
+        pincode: customer.pincode !== undefined ? customer.pincode : ticket.customer?.pincode
+      };
+    }
+
+    // Update Product
+    if (product) {
+      ticket.product = {
+        name: product.name !== undefined ? product.name : ticket.product?.name,
+        category: product.category !== undefined ? product.category : ticket.product?.category,
+        brand: product.brand !== undefined ? product.brand : ticket.product?.brand,
+        modelNumber: product.modelNumber !== undefined ? product.modelNumber : ticket.product?.modelNumber,
+        serialNumber: product.serialNumber !== undefined ? product.serialNumber : ticket.product?.serialNumber,
+        invoiceNumber: product.invoiceNumber !== undefined ? product.invoiceNumber : ticket.product?.invoiceNumber,
+        purchaseDate: product.purchaseDate !== undefined ? product.purchaseDate : ticket.product?.purchaseDate
+      };
+    }
+
+    // Update Type
+    if (type) ticket.type = type;
+
+    // Update Service / Installation Types & Details
+    const finalServiceType = (serviceDetails && serviceDetails.serviceType) || serviceType || ticket.serviceType || 'In Warranty';
+    const finalInstallationType = (installationDetails && installationDetails.installationType) || installationType || ticket.installationType || 'Free Installation';
+
+    if (ticket.type === 'service') {
+      ticket.serviceType = finalServiceType;
+      ticket.serviceDetails = {
+        ...(ticket.serviceDetails?.toObject ? ticket.serviceDetails.toObject() : ticket.serviceDetails || {}),
+        ...(serviceDetails || {}),
+        serviceType: finalServiceType
+      };
+    } else if (ticket.type === 'installation') {
+      ticket.installationType = finalInstallationType;
+      ticket.installationDetails = {
+        ...(ticket.installationDetails?.toObject ? ticket.installationDetails.toObject() : ticket.installationDetails || {}),
+        ...(installationDetails || {}),
+        installationType: finalInstallationType
+      };
+    }
+
+    if (preferredVisitDate !== undefined) ticket.preferredVisitDate = preferredVisitDate;
+    if (remarks !== undefined) ticket.remarks = remarks;
+    if (dealer !== undefined) ticket.dealer = dealer || null;
+    if (assignedTechnician !== undefined) ticket.assignedTechnician = assignedTechnician || null;
+    
+    // Update Status if provided
+    if (status && status !== ticket.status) {
+      ticket.status = status;
+      if (status === 'assigned' && !ticket.assignedAt) {
+        ticket.assignedAt = new Date();
+      }
+    }
+
+    // Custom Fees overrides if provided
+    if (technicianEarning !== undefined && technicianEarning !== '') ticket.technicianEarning = Number(technicianEarning);
+    if (technicianFee !== undefined && technicianFee !== '') ticket.technicianFee = Number(technicianFee);
+    if (dealerExpense !== undefined && dealerExpense !== '') ticket.dealerExpense = Number(dealerExpense);
+    if (customerFee !== undefined && customerFee !== '') ticket.customerFee = Number(customerFee);
+
+    // Invoice Image upload
+    if (req.file) {
+      ticket.invoiceImage = 'uploads/' + req.file.filename;
+    } else if (invoiceImage !== undefined) {
+      ticket.invoiceImage = invoiceImage;
+    }
+
+    // Add Timeline Entry
+    if (!ticket.timeline) ticket.timeline = [];
+    ticket.timeline.push({
+      status: ticket.status,
+      note: 'Ticket details updated by Admin.',
+      updatedBy: req.user.name || 'Admin',
+      timestamp: new Date()
+    });
+
+    const updatedTicket = await ticket.save();
+
+    // Sync Customer in Customer collection
+    if (ticket.customer && ticket.customer.mobile) {
+      try {
+        let applianceId = null;
+        if (ticket.product && ticket.product.category) {
+          const foundAppliance = await Appliance.findOne({
+            name: { $regex: new RegExp(`^${ticket.product.category.trim()}$`, 'i') }
+          });
+          if (foundAppliance) applianceId = foundAppliance._id;
+        }
+
+        let brandId = null;
+        if (ticket.product && ticket.product.name) {
+          const foundBrand = await Brand.findOne({
+            name: { $regex: new RegExp(`^${ticket.product.name.trim()}$`, 'i') }
+          });
+          if (foundBrand) brandId = foundBrand._id;
+        }
+
+        await Customer.findOneAndUpdate(
+          { mobile: ticket.customer.mobile },
+          {
+            $set: {
+              name: ticket.customer.name,
+              mobile: ticket.customer.mobile,
+              alternateMobile: ticket.customer.alternateMobile,
+              address: ticket.customer.address,
+              city: ticket.customer.city,
+              pincode: ticket.customer.pincode
+            },
+            $addToSet: {
+              ...(applianceId ? { appliances: applianceId } : {}),
+              ...(brandId ? { brands: brandId } : {})
+            }
+          },
+          { upsert: true, new: true }
+        );
+      } catch (custErr) {
+        console.error('Error syncing customer on ticket update:', custErr);
+      }
+    }
+
+    const populated = await Ticket.findById(updatedTicket._id)
+      .populate('dealer', 'name code mobile email address city')
+      .populate('assignedTechnician', 'name code mobile email status profilePic pincodes')
+      .populate('createdBy', 'name role code');
+
+    res.json(populated);
+  } catch (error) {
+    console.error('Error updating ticket by admin:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createTicket,
   getTickets,
   getTicketById,
+  updateTicketByAdmin,
   assignTechnician,
   updateTicketStatus,
   submitWorkCompletion,

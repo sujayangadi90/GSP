@@ -51,6 +51,7 @@ import AttendanceTab from './components/AttendanceTab.jsx';
 import EmployeeModal from './components/EmployeeModal.jsx';
 import EmployeeDetailsModal from './components/EmployeeDetailsModal.jsx';
 import CorrectAttendanceModal from './components/CorrectAttendanceModal.jsx';
+import EditTicketModal from './components/EditTicketModal.jsx';
 
 const API_BASE = '/api';
 
@@ -350,8 +351,9 @@ export default function App() {
   // Modals & Forms
   const [dealerForm, setDealerForm] = useState(null); // null or { id?, name, contactPerson, mobile, email, address, city, password }
   const [techForm, setTechForm] = useState(null); // null or { id?, name, mobile, email, password }
-  const [customerForm, setCustomerForm] = useState(null); // null or { name, mobile, alternateMobile, address, city, pincode, appliances }
   const [selectedTicket, setSelectedTicket] = useState(null); // null or ticket details object
+  const [editingTicket, setEditingTicket] = useState(null); // null or ticket to edit
+  const [editTicketSaving, setEditTicketSaving] = useState(false);
   const [selectedCustomerDetails, setSelectedCustomerDetails] = useState(null); // null or customer object
   const [amcs, setAmcs] = useState([]);
   const [amcFilters, setAmcFilters] = useState({
@@ -2401,6 +2403,35 @@ export default function App() {
     }
   };
 
+  const handleSaveEditTicket = async (ticketId, payloadFormData) => {
+    try {
+      setEditTicketSaving(true);
+      const res = await fetch(`${API_BASE}/tickets/${ticketId}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: payloadFormData
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to update ticket');
+      }
+      const updated = await res.json();
+      setEditingTicket(null);
+      if (selectedTicket && selectedTicket._id === ticketId) {
+        setSelectedTicket(updated);
+      }
+      fetchData();
+      fetchDashboardData();
+      alert('Ticket details updated successfully!');
+    } catch (err) {
+      alert(err.message || 'Error updating ticket');
+    } finally {
+      setEditTicketSaving(false);
+    }
+  };
+
   const handleCancel = async (e) => {
     e.preventDefault();
     if (!window.confirm("Are you sure you want to cancel this ticket? This action cannot be undone.")) {
@@ -3435,12 +3466,28 @@ export default function App() {
                               </div>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <button 
-                                onClick={() => setSelectedTicket(ticket)}
-                                className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition duration-150 cursor-pointer"
-                              >
-                                View Details
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button 
+                                  onClick={() => setSelectedTicket(ticket)}
+                                  className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-3.5 rounded-xl text-xs transition duration-150 cursor-pointer"
+                                >
+                                  View Details
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    fetchAppliances();
+                                    fetchBrands();
+                                    fetchTechnicians();
+                                    fetchDealers();
+                                    setEditingTicket(ticket);
+                                  }}
+                                  className="bg-violet-600/20 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/40 font-bold py-2 px-3 rounded-xl text-xs transition duration-150 cursor-pointer flex items-center gap-1.5 shadow-xs"
+                                  title="Edit Ticket Details"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -8553,7 +8600,29 @@ export default function App() {
                   })()}
                 </div>
               </div>
-              <button onClick={() => { setSelectedTicket(null); setShowCancelForm(false); setCancelReason(''); fetchData(); fetchDashboardData(); }} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-6 h-6" /></button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchAppliances();
+                    fetchBrands();
+                    fetchTechnicians();
+                    fetchDealers();
+                    setEditingTicket(selectedTicket);
+                  }}
+                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-1.5 px-3.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition"
+                  title="Edit Ticket Details"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Edit Ticket</span>
+                </button>
+                <button 
+                  onClick={() => { setSelectedTicket(null); setShowCancelForm(false); setCancelReason(''); fetchData(); fetchDashboardData(); }} 
+                  className="text-slate-400 hover:text-slate-200 cursor-pointer p-1 rounded-lg hover:bg-slate-800"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
             
             <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[calc(85vh-150px)] overflow-y-auto">
@@ -11020,6 +11089,21 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Edit Ticket Modal for Admin */}
+      <EditTicketModal
+        isOpen={Boolean(editingTicket)}
+        onClose={() => setEditingTicket(null)}
+        ticket={editingTicket}
+        onSave={handleSaveEditTicket}
+        saving={editTicketSaving}
+        appliances={appliances}
+        brands={brands}
+        dealers={dealers}
+        technicians={technicians}
+        cities={cities}
+        API_BASE={API_BASE}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ const {
   createTicket,
   getTickets,
   getTicketById,
+  updateTicketByAdmin,
   assignTechnician,
   updateTicketStatus,
   submitWorkCompletion,
@@ -48,9 +49,10 @@ router.route('/upload')
     res.status(200).json({ filePath: 'uploads/' + req.file.filename });
   });
 
-// Single ticket detail
+// Single ticket detail & Admin update
 router.route('/:id')
-  .get(getTicketById);
+  .get(getTicketById)
+  .put(authorize('admin'), upload.single('invoiceImage'), updateTicketByAdmin);
 
 // Admin-only assignment, verification, closure, messages
 router.route('/:id/assign').patch(authorize('admin'), assignTechnician);
