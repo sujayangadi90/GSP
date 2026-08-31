@@ -3387,6 +3387,7 @@ export default function App() {
                       <tr className="border-b border-slate-800 bg-slate-800/40 text-slate-400 text-xs font-bold uppercase tracking-wider">
                         <th className="px-6 py-4">Ticket Info</th>
                         <th className="px-6 py-4">Customer</th>
+                        <th className="px-6 py-4">Appliance</th>
                         <th className="px-6 py-4">Type</th>
                         <th className="px-6 py-4">Dealer</th>
                         <th className="px-6 py-4">Technician</th>
@@ -3397,7 +3398,7 @@ export default function App() {
                     <tbody className="divide-y divide-slate-800/80 text-sm">
                       {loading ? (
                         <tr>
-                          <td colSpan="7" className="text-center py-16 text-slate-400 font-medium">
+                          <td colSpan="8" className="text-center py-16 text-slate-400 font-medium">
                             <div className="flex flex-col items-center justify-center gap-3">
                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600"></div>
                               <p className="text-sm">Loading requests...</p>
@@ -3406,7 +3407,7 @@ export default function App() {
                         </tr>
                       ) : tickets.length === 0 ? (
                         <tr>
-                          <td colSpan="7" className="text-center py-8 text-slate-500 font-medium">No tickets found matches current filters</td>
+                          <td colSpan="8" className="text-center py-8 text-slate-500 font-medium">No tickets found matches current filters</td>
                         </tr>
                       ) : (
                         tickets.slice((ticketPage - 1) * 15, ticketPage * 15).map(ticket => (
@@ -3416,8 +3417,12 @@ export default function App() {
                               <p className="text-xs text-slate-500 mt-1">{new Date(ticket.createdAt).toLocaleDateString()}</p>
                             </td>
                             <td className="px-6 py-4">
-                              <p className="font-semibold text-slate-200">{ticket.customer.name}</p>
-                              <p className="text-xs text-slate-400">{ticket.customer.city}</p>
+                              <p className="font-semibold text-slate-200">{ticket.customer?.name || 'Customer'}</p>
+                              <p className="text-xs text-slate-400">{ticket.customer?.city || ''}</p>
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="font-semibold text-slate-200">{ticket.product?.category || 'General'}</p>
+                              <p className="text-xs text-slate-400 font-medium">{ticket.product?.name || '—'}</p>
                             </td>
                             <td className="px-6 py-4 capitalize text-slate-300">
                               <div className="font-semibold text-slate-200">{ticket.type}</div>
