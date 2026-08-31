@@ -838,6 +838,9 @@ export default function App() {
     try {
       const data = await apiFetch('/technicians');
       setTechnicians(data);
+      if (Array.isArray(data)) {
+        setActiveTechniciansForAssign(data.filter(t => t.status === 'active'));
+      }
     } catch (err) {
       console.error('Error fetching technicians:', err);
     }

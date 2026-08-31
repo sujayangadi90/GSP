@@ -50,6 +50,10 @@ const addTechnician = async (req, res) => {
     }
     const code = `TECH-${nextNum}`;
 
+    const cleanPincodes = Array.isArray(pincodes)
+      ? pincodes.map(p => String(p).trim()).filter(Boolean)
+      : (typeof pincodes === 'string' ? pincodes.split(',').map(p => p.trim()).filter(Boolean) : []);
+
     const technician = await User.create({
       name,
       mobile,
@@ -62,7 +66,7 @@ const addTechnician = async (req, res) => {
       drivingLicense: drivingLicense || '',
       aadhar: aadhar || '',
       insurance: insurance || '',
-      pincodes: pincodes || []
+      pincodes: cleanPincodes
     });
 
     res.status(201).json({
@@ -136,7 +140,9 @@ const updateTechnician = async (req, res) => {
     }
 
     if (req.body.pincodes !== undefined) {
-      technician.pincodes = req.body.pincodes;
+      technician.pincodes = Array.isArray(req.body.pincodes)
+        ? req.body.pincodes.map(p => String(p).trim()).filter(Boolean)
+        : (typeof req.body.pincodes === 'string' ? req.body.pincodes.split(',').map(p => p.trim()).filter(Boolean) : []);
     }
 
     const updatedTech = await technician.save();
