@@ -836,6 +836,15 @@ export default function App() {
     }
   };
 
+  const fetchDealers = async () => {
+    try {
+      const data = await apiFetch('/dealers');
+      setDealers(data);
+    } catch (err) {
+      console.error('Error fetching dealers:', err);
+    }
+  };
+
   const fetchTechnicians = async () => {
     try {
       const data = await apiFetch('/technicians');
