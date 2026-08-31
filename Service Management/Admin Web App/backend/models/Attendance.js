@@ -73,6 +73,14 @@ const AttendanceSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isAutoClockOut: {
+    type: Boolean,
+    default: false
+  },
+  autoClockOutNote: {
+    type: String,
+    default: ""
+  },
   corrections: [AttendanceCorrectionSchema]
 }, { timestamps: true });
 

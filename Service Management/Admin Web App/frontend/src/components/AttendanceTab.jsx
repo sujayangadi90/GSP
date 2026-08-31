@@ -222,10 +222,10 @@ export default function AttendanceTab({
                   const inDate = rec.clockInTime ? new Date(rec.clockInTime) : null;
                   const outDate = rec.clockOutTime ? new Date(rec.clockOutTime) : null;
                   const selfieUrl = rec.clockInSelfie
-                    ? (rec.clockInSelfie.startsWith("http") ? rec.clockInSelfie : `${API_BASE}/${rec.clockInSelfie}`)
+                    ? (rec.clockInSelfie.startsWith("http") ? rec.clockInSelfie : `/${rec.clockInSelfie.replace(/^\//, '')}`)
                     : null;
 
-                  const durationText = rec.durationMinutes 
+                  const durationText = rec.durationMinutes !== undefined && rec.durationMinutes !== null
                     ? `${Math.floor(rec.durationMinutes / 60)}h ${rec.durationMinutes % 60}m`
                     : (rec.status === "clocked_in" ? "In Progress" : "—");
 
@@ -250,7 +250,7 @@ export default function AttendanceTab({
                       {/* Clock In */}
                       <td className="py-3.5 px-4">
                         <div className="font-mono text-white font-bold">
-                          {inDate ? inDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                          {inDate && !isNaN(inDate.getTime()) ? inDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                         </div>
                         {typeof inLoc?.lat === 'number' && typeof inLoc?.lng === 'number' ? (
                           <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate flex items-center gap-1">
@@ -266,10 +266,24 @@ export default function AttendanceTab({
                           <button
                             type="button"
                             onClick={() => onViewSelfie(selfieUrl)}
-                            className="w-9 h-9 rounded-xl overflow-hidden border border-slate-700 hover:border-violet-500 transition cursor-pointer shadow-sm group"
+                            className="w-10 h-10 rounded-xl overflow-hidden border border-slate-700 bg-slate-800 hover:border-violet-500 transition cursor-pointer shadow-sm group relative"
                             title="Click to view full photo"
                           >
-                            <img src={selfieUrl} alt="Selfie" className="w-full h-full object-cover group-hover:scale-110 transition duration-150" />
+                            <img 
+                              src={selfieUrl} 
+                              alt="Selfie" 
+                              onError={(e) => {
+                                if (!e.target.dataset.tried) {
+                                  e.target.dataset.tried = "true";
+                                  if (selfieUrl.startsWith("/uploads")) {
+                                    e.target.src = "/api" + selfieUrl;
+                                  } else {
+                                    e.target.src = selfieUrl.replace("/api", "");
+                                  }
+                                }
+                              }}
+                              className="w-full h-full object-cover group-hover:scale-110 transition duration-150" 
+                            />
                           </button>
                         ) : (
                           <span className="text-slate-500 italic">—</span>
@@ -281,6 +295,11 @@ export default function AttendanceTab({
                         <div className="font-mono text-white font-bold">
                           {outDate && !isNaN(outDate.getTime()) ? outDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                         </div>
+                        {rec.isAutoClockOut && (
+                          <span className="block text-[9px] text-amber-400/90 font-mono font-bold" title="Auto clocked out at 12:00 AM midnight">
+                            (Auto: 12:00 AM)
+                          </span>
+                        )}
                         {typeof outLoc?.lat === 'number' && typeof outLoc?.lng === 'number' ? (
                           <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate flex items-center gap-1">
                             <MapPin className="w-3 h-3 text-rose-400 shrink-0" />

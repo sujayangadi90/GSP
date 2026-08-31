@@ -17,6 +17,39 @@ const getTodayDateString = () => {
   return istTime.toISOString().split("T")[0];
 };
 
+// Helper: Auto clock out any attendance records from previous days still in 'clocked_in' status at 12:00 AM midnight
+const performAutoClockOut = async () => {
+  try {
+    const todayStr = getTodayDateString();
+    const staleRecords = await Attendance.find({
+      status: "clocked_in",
+      date: { $lt: todayStr }
+    });
+
+    for (const rec of staleRecords) {
+      if (!rec.date) continue;
+      const parts = rec.date.split("-").map(Number);
+      if (parts.length === 3) {
+        const [year, month, day] = parts;
+        // 23:59:59 IST = 18:29:59 UTC
+        const midnightClockOut = new Date(Date.UTC(year, month - 1, day, 18, 29, 59));
+        const clockIn = rec.clockInTime ? new Date(rec.clockInTime) : new Date(Date.UTC(year, month - 1, day, 3, 30, 0));
+        const diffMs = midnightClockOut.getTime() - clockIn.getTime();
+        const duration = Math.max(0, Math.round(diffMs / 60000));
+
+        rec.clockOutTime = midnightClockOut;
+        rec.durationMinutes = duration;
+        rec.status = "completed";
+        rec.isAutoClockOut = true;
+        rec.autoClockOutNote = "Auto clocked out at 12:00 AM midnight";
+        await rec.save();
+      }
+    }
+  } catch (err) {
+    console.error("Error in performAutoClockOut:", err);
+  }
+};
+
 // @desc    Employee login
 // @route   POST /api/attendance/login
 // @access  Public
@@ -70,6 +103,7 @@ const employeeLogin = async (req, res) => {
 // @access  Private/Employee
 const getEmployeeMe = async (req, res) => {
   try {
+    await performAutoClockOut();
     const employee = req.employee;
     const todayStr = getTodayDateString();
 
@@ -117,6 +151,7 @@ const getEmployeeHistory = async (req, res) => {
 // @access  Private/Employee
 const clockIn = async (req, res) => {
   try {
+    await performAutoClockOut();
     const employee = req.employee;
     const { lat, lng, address } = req.body;
 
@@ -149,7 +184,7 @@ const clockIn = async (req, res) => {
       }
     }
 
-    const selfiePath = req.file.path.replace(/\\/g, "/").replace(/^.*uploads\//, "uploads/");
+    const selfiePath = 'uploads/' + req.file.filename;
     const serverTime = new Date();
 
     const attendance = new Attendance({
@@ -234,6 +269,7 @@ const clockOut = async (req, res) => {
 // @access  Private/Admin
 const getAdminAttendance = async (req, res) => {
   try {
+    await performAutoClockOut();
     const { employeeId, employee, date, startDate, endDate, status, search } = req.query;
     let query = {};
 
@@ -278,6 +314,7 @@ const getAdminAttendance = async (req, res) => {
 // @access  Private/Admin
 const getAttendanceStats = async (req, res) => {
   try {
+    await performAutoClockOut();
     const { date } = req.query;
     const targetDate = date || getTodayDateString();
 
@@ -385,5 +422,6 @@ module.exports = {
   clockOut,
   getAdminAttendance,
   getAttendanceStats,
-  correctAttendance
+  correctAttendance,
+  performAutoClockOut
 };

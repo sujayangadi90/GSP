@@ -49,6 +49,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -83,4 +84,15 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5050;
 app.listen(PORT, () => {
   console.log(`Backend Server running on port ${PORT}`);
+
+  // Schedule auto clock-out check every 5 minutes (for midnight 12:00 AM auto-closure)
+  try {
+    const { performAutoClockOut } = require('./controllers/attendanceController');
+    performAutoClockOut(); // Initial run on startup
+    setInterval(() => {
+      performAutoClockOut();
+    }, 5 * 60 * 1000);
+  } catch (cronErr) {
+    console.error('Error starting auto clock-out scheduler:', cronErr);
+  }
 });
