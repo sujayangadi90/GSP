@@ -270,12 +270,28 @@ export default function EditTicketModal({
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                   City
                 </label>
-                <input
-                  type="text"
-                  className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                <select
+                  className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
                   value={formData.customerCity}
                   onChange={(e) => setFormData({ ...formData, customerCity: e.target.value })}
-                />
+                >
+                  <option value="">-- Choose City --</option>
+                  {cities.filter((c) => c.isActive !== false).map((c) => (
+                    <option key={c._id || c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                  {formData.customerCity &&
+                    !cities.some(
+                      (c) =>
+                        c.name &&
+                        c.name.trim().toLowerCase() === formData.customerCity.trim().toLowerCase()
+                    ) && (
+                      <option value={formData.customerCity}>
+                        {formData.customerCity}
+                      </option>
+                    )}
+                </select>
               </div>
 
               <div>
