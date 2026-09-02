@@ -1529,7 +1529,7 @@ const sendCustomAdminMessage = async (req, res) => {
 
 const getReports = async (req, res) => {
   try {
-    const { reportType, fromDate, toDate, dealer, ticketType, category, brand, page, limit } = req.query;
+    const { reportType, fromDate, toDate, dealer, technician, ticketType, category, brand, page, limit } = req.query;
 
     if (!fromDate || !toDate) {
       return res.status(400).json({ message: 'fromDate and toDate are required' });
@@ -1547,8 +1547,14 @@ const getReports = async (req, res) => {
       ]
     };
 
-    if (dealer && dealer !== 'ALL') {
-      query.dealer = dealer;
+    if (reportType === 'technician') {
+      if (technician && technician !== 'ALL') {
+        query.assignedTechnician = technician;
+      }
+    } else {
+      if (dealer && dealer !== 'ALL') {
+        query.dealer = dealer;
+      }
     }
 
     if (ticketType && ticketType !== 'ALL') {
@@ -1577,31 +1583,52 @@ const getReports = async (req, res) => {
     let completedCount = 0;
 
     allTicketsWithFees.forEach(t => {
-      const sType = t.serviceType || (t.serviceDetails && t.serviceDetails.serviceType) || 'In Warranty';
-      const iType = t.installationType || (t.installationDetails && t.installationDetails.installationType) || 'Free Installation';
-      const isPaidByDealer = (t.type === 'service' && sType === 'Paid by Dealer') || (t.type === 'installation' && iType === 'Paid by Dealer');
-
-      let dealerAmt = 0;
-      if (isPaidByDealer) {
-        if (typeof t.dealerExpense === 'number' && t.dealerExpense > 0) {
-          dealerAmt = t.dealerExpense;
+      if (reportType === 'technician') {
+        let techEarning = 0;
+        if (typeof t.technicianEarning === 'number' && t.technicianEarning > 0) {
+          techEarning = t.technicianEarning;
         } else {
           const baseFee = t.type === 'installation'
-            ? (t.dealerInstallationFee !== undefined ? t.dealerInstallationFee : (t.installationFee || 0))
-            : (t.dealerServiceFee !== undefined ? t.dealerServiceFee : (t.serviceFee || 0));
-          dealerAmt = (Number(baseFee) || 0) + (Number(t.totalPartsPrice) || 0);
+            ? (t.technicianInstallationFee !== undefined ? t.technicianInstallationFee : (t.installationFee || 0))
+            : (t.technicianServiceFee !== undefined ? t.technicianServiceFee : (t.serviceFee || 0));
+          techEarning = Number(baseFee) || 0;
         }
-      }
 
-      t.dealerExpense = dealerAmt;
-      t.dealerAmount = dealerAmt;
+        t.technicianEarning = techEarning;
+        totalAmount += techEarning;
+        completedCount++;
+        if (t.type === 'service') {
+          serviceAmount += techEarning;
+        } else if (t.type === 'installation') {
+          installationAmount += techEarning;
+        }
+      } else {
+        const sType = t.serviceType || (t.serviceDetails && t.serviceDetails.serviceType) || 'In Warranty';
+        const iType = t.installationType || (t.installationDetails && t.installationDetails.installationType) || 'Free Installation';
+        const isPaidByDealer = (t.type === 'service' && sType === 'Paid by Dealer') || (t.type === 'installation' && iType === 'Paid by Dealer');
 
-      totalAmount += dealerAmt;
-      completedCount++;
-      if (t.type === 'service') {
-        serviceAmount += dealerAmt;
-      } else if (t.type === 'installation') {
-        installationAmount += dealerAmt;
+        let dealerAmt = 0;
+        if (isPaidByDealer) {
+          if (typeof t.dealerExpense === 'number' && t.dealerExpense > 0) {
+            dealerAmt = t.dealerExpense;
+          } else {
+            const baseFee = t.type === 'installation'
+              ? (t.dealerInstallationFee !== undefined ? t.dealerInstallationFee : (t.installationFee || 0))
+              : (t.dealerServiceFee !== undefined ? t.dealerServiceFee : (t.serviceFee || 0));
+            dealerAmt = (Number(baseFee) || 0) + (Number(t.totalPartsPrice) || 0);
+          }
+        }
+
+        t.dealerExpense = dealerAmt;
+        t.dealerAmount = dealerAmt;
+
+        totalAmount += dealerAmt;
+        completedCount++;
+        if (t.type === 'service') {
+          serviceAmount += dealerAmt;
+        } else if (t.type === 'installation') {
+          installationAmount += dealerAmt;
+        }
       }
     });
 
