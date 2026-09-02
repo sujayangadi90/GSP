@@ -1577,16 +1577,23 @@ const getReports = async (req, res) => {
     let completedCount = 0;
 
     allTicketsWithFees.forEach(t => {
+      const sType = t.serviceType || (t.serviceDetails && t.serviceDetails.serviceType) || 'In Warranty';
+      const iType = t.installationType || (t.installationDetails && t.installationDetails.installationType) || 'Free Installation';
+      const isPaidByDealer = (t.type === 'service' && sType === 'Paid by Dealer') || (t.type === 'installation' && iType === 'Paid by Dealer');
+
       let dealerAmt = 0;
-      if (typeof t.dealerExpense === 'number' && t.dealerExpense > 0) {
-        dealerAmt = t.dealerExpense;
-      } else {
-        const baseFee = t.type === 'installation'
-          ? (t.dealerInstallationFee !== undefined ? t.dealerInstallationFee : (t.installationFee || 0))
-          : (t.dealerServiceFee !== undefined ? t.dealerServiceFee : (t.serviceFee || 0));
-        dealerAmt = (Number(baseFee) || 0) + (Number(t.totalPartsPrice) || 0);
+      if (isPaidByDealer) {
+        if (typeof t.dealerExpense === 'number' && t.dealerExpense > 0) {
+          dealerAmt = t.dealerExpense;
+        } else {
+          const baseFee = t.type === 'installation'
+            ? (t.dealerInstallationFee !== undefined ? t.dealerInstallationFee : (t.installationFee || 0))
+            : (t.dealerServiceFee !== undefined ? t.dealerServiceFee : (t.serviceFee || 0));
+          dealerAmt = (Number(baseFee) || 0) + (Number(t.totalPartsPrice) || 0);
+        }
       }
 
+      t.dealerExpense = dealerAmt;
       t.dealerAmount = dealerAmt;
 
       totalAmount += dealerAmt;

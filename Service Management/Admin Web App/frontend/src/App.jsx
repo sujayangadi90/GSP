@@ -1378,7 +1378,7 @@ export default function App() {
       return;
     }
 
-    const headers = ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Amount'];
+    const headers = ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense'];
 
     const rows = reportsData.map(t => {
       const completedDate = t.adminVerification?.verifiedAt 
@@ -1387,7 +1387,7 @@ export default function App() {
           ? new Date(t.closedAt).toLocaleDateString('en-GB') 
           : new Date(t.updatedAt).toLocaleDateString('en-GB');
 
-      const amtVal = t.dealerAmount !== undefined ? t.dealerAmount : t.dealerExpense;
+      const amtVal = t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount;
       const amountStr = typeof amtVal === 'number' ? `₹${amtVal}` : (amtVal || '0');
 
       return [
@@ -1403,7 +1403,7 @@ export default function App() {
       ];
     });
 
-    const totalRow = ['TOTAL DEALER AMOUNT', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`];
+    const totalRow = ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`];
     rows.push(totalRow);
 
     const csvContent = [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
@@ -1423,7 +1423,7 @@ export default function App() {
       return;
     }
 
-    const headers = ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Amount'];
+    const headers = ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense'];
 
     const rows = reportsData.map(t => {
       const completedDate = t.adminVerification?.verifiedAt 
@@ -1432,7 +1432,7 @@ export default function App() {
           ? new Date(t.closedAt).toLocaleDateString('en-GB') 
           : new Date(t.updatedAt).toLocaleDateString('en-GB');
 
-      const amtVal = t.dealerAmount !== undefined ? t.dealerAmount : t.dealerExpense;
+      const amtVal = t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount;
       const amountStr = typeof amtVal === 'number' ? `₹${amtVal}` : (amtVal || '0');
 
       return [
@@ -1448,7 +1448,7 @@ export default function App() {
       ];
     });
 
-    const totalRow = ['TOTAL DEALER AMOUNT', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`];
+    const totalRow = ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`];
     rows.push(totalRow);
 
     const xlsContent = [headers.join('\t'), ...rows.map(e => e.join('\t'))].join('\n');
@@ -6886,7 +6886,7 @@ export default function App() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
                       <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        TOTAL DEALER AMOUNT
+                        TOTAL DEALER EXPENSE
                       </span>
                       <span className="text-2xl font-black text-white mt-2">
                         ₹ {reportsSummary.totalAmount.toLocaleString('en-IN')}
@@ -6900,7 +6900,7 @@ export default function App() {
 
                     <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
                       <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        SERVICE AMOUNT
+                        SERVICE EXPENSE
                       </span>
                       <span className="text-2xl font-black text-violet-400 mt-2">
                         ₹ {reportsSummary.serviceAmount.toLocaleString('en-IN')}
@@ -6909,7 +6909,7 @@ export default function App() {
 
                     <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
                       <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        INSTALLATION AMOUNT
+                        INSTALLATION EXPENSE
                       </span>
                       <span className="text-2xl font-black text-indigo-400 mt-2">
                         ₹ {reportsSummary.installationAmount.toLocaleString('en-IN')}
@@ -6960,7 +6960,7 @@ export default function App() {
                             <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Brand</th>
                             <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</th>
                             <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Technician</th>
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Dealer Amount</th>
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Dealer Expense</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
@@ -6978,7 +6978,7 @@ export default function App() {
                                   ? new Date(t.closedAt).toLocaleDateString('en-GB') 
                                   : new Date(t.updatedAt).toLocaleDateString('en-GB');
 
-                              const amtVal = t.dealerAmount !== undefined ? t.dealerAmount : t.dealerExpense;
+                              const amtVal = t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount;
                               const amountText = typeof amtVal === 'number' ? `₹ ${amtVal.toLocaleString('en-IN')}` : (amtVal || '₹ 0');
 
                               return (
@@ -7018,7 +7018,7 @@ export default function App() {
                       <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 space-y-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-slate-300">
-                            TOTAL DEALER AMOUNT:
+                            TOTAL DEALER EXPENSE:
                           </span>
                           <span className="text-lg font-black text-white">
                             ₹ {reportsSummary.totalAmount.toLocaleString('en-IN')}
