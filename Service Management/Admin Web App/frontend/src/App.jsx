@@ -549,6 +549,7 @@ export default function App() {
   const [reportsPage, setReportsPage] = useState(1);
   const [reportsTotalCount, setReportsTotalCount] = useState(0);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [exportingReport, setExportingReport] = useState(false);
   const getLocalDateString = (date = new Date()) => {
     const offset = date.getTimezoneOffset();
     const localDate = new Date(date.getTime() - (offset * 60 * 1000));
@@ -1375,126 +1376,190 @@ export default function App() {
     setCreateRequestOpen(true);
   };
 
-  const exportToCSV = () => {
-    if (reportsData.length === 0) {
-      alert('No data to export');
-      return;
-    }
-
-    const headers = reportTab === 'dealer'
-      ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense']
-      : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Dealer', 'Technician Earning'];
-
-    const rows = reportsData.map(t => {
-      const completedDate = t.adminVerification?.verifiedAt 
-        ? new Date(t.adminVerification.verifiedAt).toLocaleDateString('en-GB') 
-        : t.closedAt 
-          ? new Date(t.closedAt).toLocaleDateString('en-GB') 
-          : new Date(t.updatedAt).toLocaleDateString('en-GB');
-
-      const amtVal = reportTab === 'dealer'
-        ? (t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount)
-        : t.technicianEarning;
-      const amountStr = typeof amtVal === 'number' ? `₹${amtVal}` : (amtVal || '0');
-
-      return reportTab === 'dealer' ? [
-        t.ticketNumber || '—',
-        completedDate,
-        t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
-        (t.type || '—').toUpperCase(),
-        t.product?.category || '—',
-        t.product?.name || '—',
-        t.customer?.name || '—',
-        t.assignedTechnician?.name || '—',
-        amountStr
-      ] : [
-        t.ticketNumber || '—',
-        completedDate,
-        t.assignedTechnician?.name || '—',
-        (t.type || '—').toUpperCase(),
-        t.product?.category || '—',
-        t.product?.name || '—',
-        t.customer?.name || '—',
-        t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
-        amountStr
-      ];
+  const fetchAllReportData = async () => {
+    const filtersToUse = appliedFiltersSummary || reportFilters;
+    const params = new URLSearchParams({
+      reportType: reportTab,
+      fromDate: filtersToUse.fromDate,
+      toDate: filtersToUse.toDate,
+      dealer: filtersToUse.dealer,
+      technician: filtersToUse.technician,
+      ticketType: filtersToUse.ticketType,
+      category: filtersToUse.category,
+      brand: filtersToUse.brand,
+      limit: 0
     });
 
-    const totalRow = reportTab === 'dealer'
-      ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`]
-      : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`];
-    rows.push(totalRow);
+    const res = await fetch(`${API_BASE}/tickets/reports?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
 
-    const csvContent = [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${reportTab === 'dealer' ? 'dealer_report' : 'technician_report'}_${reportFilters.fromDate}_to_${reportFilters.toDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to fetch report data for export');
+    }
+
+    return await res.json();
   };
 
-  const exportToExcel = () => {
+  const exportToCSV = async () => {
     if (reportsData.length === 0) {
       alert('No data to export');
       return;
     }
 
-    const headers = reportTab === 'dealer'
-      ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense']
-      : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Dealer', 'Technician Earning'];
+    try {
+      setExportingReport(true);
+      const fullReport = await fetchAllReportData();
+      const exportData = fullReport.data || [];
+      const summary = fullReport.summary || reportsSummary;
 
-    const rows = reportsData.map(t => {
-      const completedDate = t.adminVerification?.verifiedAt 
-        ? new Date(t.adminVerification.verifiedAt).toLocaleDateString('en-GB') 
-        : t.closedAt 
-          ? new Date(t.closedAt).toLocaleDateString('en-GB') 
-          : new Date(t.updatedAt).toLocaleDateString('en-GB');
+      if (exportData.length === 0) {
+        alert('No data to export');
+        return;
+      }
 
-      const amtVal = reportTab === 'dealer'
-        ? (t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount)
-        : t.technicianEarning;
-      const amountStr = typeof amtVal === 'number' ? `₹${amtVal}` : (amtVal || '0');
+      const headers = reportTab === 'dealer'
+        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense']
+        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Dealer', 'Technician Earning'];
 
-      return reportTab === 'dealer' ? [
-        t.ticketNumber || '—',
-        completedDate,
-        t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
-        (t.type || '—').toUpperCase(),
-        t.product?.category || '—',
-        t.product?.name || '—',
-        t.customer?.name || '—',
-        t.assignedTechnician?.name || '—',
-        amountStr
-      ] : [
-        t.ticketNumber || '—',
-        completedDate,
-        t.assignedTechnician?.name || '—',
-        (t.type || '—').toUpperCase(),
-        t.product?.category || '—',
-        t.product?.name || '—',
-        t.customer?.name || '—',
-        t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
-        amountStr
-      ];
-    });
+      const rows = exportData.map(t => {
+        const completedDate = t.adminVerification?.verifiedAt 
+          ? new Date(t.adminVerification.verifiedAt).toLocaleDateString('en-GB') 
+          : t.closedAt 
+            ? new Date(t.closedAt).toLocaleDateString('en-GB') 
+            : new Date(t.updatedAt).toLocaleDateString('en-GB');
 
-    const totalRow = reportTab === 'dealer'
-      ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`]
-      : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', `₹${reportsSummary.totalAmount}`];
-    rows.push(totalRow);
+        const amtVal = reportTab === 'dealer'
+          ? (t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount)
+          : t.technicianEarning;
+        const amountStr = typeof amtVal === 'number' ? `₹${amtVal}` : (amtVal || '0');
 
-    const xlsContent = [headers.join('\t'), ...rows.map(e => e.join('\t'))].join('\n');
-    const blob = new Blob([xlsContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${reportTab === 'dealer' ? 'dealer_report' : 'technician_report'}_${reportFilters.fromDate}_to_${reportFilters.toDate}.xls`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        return reportTab === 'dealer' ? [
+          t.ticketNumber || '—',
+          completedDate,
+          t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
+          (t.type || '—').toUpperCase(),
+          t.product?.category || '—',
+          t.product?.name || '—',
+          t.customer?.name || '—',
+          t.assignedTechnician?.name || '—',
+          amountStr
+        ] : [
+          t.ticketNumber || '—',
+          completedDate,
+          t.assignedTechnician?.name || '—',
+          (t.type || '—').toUpperCase(),
+          t.product?.category || '—',
+          t.product?.name || '—',
+          t.customer?.name || '—',
+          t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
+          amountStr
+        ];
+      });
+
+      const totalRow = reportTab === 'dealer'
+        ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', `₹${summary.totalAmount}`]
+        : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', `₹${summary.totalAmount}`];
+      rows.push(totalRow);
+
+      const csvContent = [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      const dateFilters = appliedFiltersSummary || reportFilters;
+      link.setAttribute('download', `${reportTab === 'dealer' ? 'dealer_report' : 'technician_report'}_${dateFilters.fromDate}_to_${dateFilters.toDate}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Export CSV error:', err);
+      alert(err.message || 'Failed to export CSV');
+    } finally {
+      setExportingReport(false);
+    }
+  };
+
+  const exportToExcel = async () => {
+    if (reportsData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    try {
+      setExportingReport(true);
+      const fullReport = await fetchAllReportData();
+      const exportData = fullReport.data || [];
+      const summary = fullReport.summary || reportsSummary;
+
+      if (exportData.length === 0) {
+        alert('No data to export');
+        return;
+      }
+
+      const headers = reportTab === 'dealer'
+        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense']
+        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Dealer', 'Technician Earning'];
+
+      const rows = exportData.map(t => {
+        const completedDate = t.adminVerification?.verifiedAt 
+          ? new Date(t.adminVerification.verifiedAt).toLocaleDateString('en-GB') 
+          : t.closedAt 
+            ? new Date(t.closedAt).toLocaleDateString('en-GB') 
+            : new Date(t.updatedAt).toLocaleDateString('en-GB');
+
+        const amtVal = reportTab === 'dealer'
+          ? (t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount)
+          : t.technicianEarning;
+        const amountStr = typeof amtVal === 'number' ? `₹${amtVal}` : (amtVal || '0');
+
+        return reportTab === 'dealer' ? [
+          t.ticketNumber || '—',
+          completedDate,
+          t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
+          (t.type || '—').toUpperCase(),
+          t.product?.category || '—',
+          t.product?.name || '—',
+          t.customer?.name || '—',
+          t.assignedTechnician?.name || '—',
+          amountStr
+        ] : [
+          t.ticketNumber || '—',
+          completedDate,
+          t.assignedTechnician?.name || '—',
+          (t.type || '—').toUpperCase(),
+          t.product?.category || '—',
+          t.product?.name || '—',
+          t.customer?.name || '—',
+          t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
+          amountStr
+        ];
+      });
+
+      const totalRow = reportTab === 'dealer'
+        ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', `₹${summary.totalAmount}`]
+        : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', `₹${summary.totalAmount}`];
+      rows.push(totalRow);
+
+      const xlsContent = [headers.join('\t'), ...rows.map(e => e.join('\t'))].join('\n');
+      const blob = new Blob([xlsContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      const dateFilters = appliedFiltersSummary || reportFilters;
+      link.setAttribute('download', `${reportTab === 'dealer' ? 'dealer_report' : 'technician_report'}_${dateFilters.fromDate}_to_${dateFilters.toDate}.xls`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Export Excel error:', err);
+      alert(err.message || 'Failed to export Excel');
+    } finally {
+      setExportingReport(false);
+    }
   };
 
   useEffect(() => {
@@ -7013,15 +7078,17 @@ export default function App() {
                     <div className="flex gap-2">
                       <button
                         onClick={exportToCSV}
-                        className="bg-slate-800 hover:bg-slate-700 text-white text-xs px-4 py-2.5 rounded-lg font-bold transition cursor-pointer"
+                        disabled={exportingReport}
+                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs px-4 py-2.5 rounded-lg font-bold transition cursor-pointer"
                       >
-                        EXPORT CSV
+                        {exportingReport ? 'EXPORTING...' : 'EXPORT CSV'}
                       </button>
                       <button
                         onClick={exportToExcel}
-                        className="bg-slate-800 hover:bg-slate-700 text-white text-xs px-4 py-2.5 rounded-lg font-bold transition cursor-pointer"
+                        disabled={exportingReport}
+                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs px-4 py-2.5 rounded-lg font-bold transition cursor-pointer"
                       >
-                        EXPORT EXCEL
+                        {exportingReport ? 'EXPORTING...' : 'EXPORT EXCEL'}
                       </button>
                     </div>
                   </div>

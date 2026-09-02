@@ -1632,11 +1632,20 @@ const getReports = async (req, res) => {
       }
     });
 
+    const isAll = limit === '0' || limit === 0 || limit === 'all';
     const p = parseInt(page, 10) || 1;
-    const l = parseInt(limit, 10) || 25;
-    const skip = (p - 1) * l;
+    let paginatedTickets;
+    let skip = 0;
+    let l = 25;
 
-    const paginatedTickets = allTicketsWithFees.slice(skip, skip + l);
+    if (isAll) {
+      paginatedTickets = allTicketsWithFees;
+      l = allTicketsWithFees.length;
+    } else {
+      l = parseInt(limit, 10) || 25;
+      skip = (p - 1) * l;
+      paginatedTickets = allTicketsWithFees.slice(skip, skip + l);
+    }
 
     res.json({
       data: paginatedTickets,
@@ -1646,10 +1655,10 @@ const getReports = async (req, res) => {
         serviceAmount,
         installationAmount
       },
-      page: p,
+      page: isAll ? 1 : p,
       limit: l,
       totalCount: allMatchingTickets.length,
-      hasMore: (skip + paginatedTickets.length) < allMatchingTickets.length
+      hasMore: isAll ? false : (skip + paginatedTickets.length) < allMatchingTickets.length
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
