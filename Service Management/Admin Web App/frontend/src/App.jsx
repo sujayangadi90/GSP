@@ -1422,8 +1422,8 @@ export default function App() {
       }
 
       const headers = reportTab === 'dealer'
-        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense']
-        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Dealer', 'Technician Earning'];
+        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense (₹)']
+        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Dealer', 'Technician Earning (₹)'];
 
       const rows = exportData.map(t => {
         const completedDate = t.adminVerification?.verifiedAt 
@@ -1435,7 +1435,7 @@ export default function App() {
         const amtVal = reportTab === 'dealer'
           ? (t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount)
           : t.technicianEarning;
-        const amountStr = typeof amtVal === 'number' ? `₹${amtVal}` : (amtVal || '0');
+        const amountVal = typeof amtVal === 'number' ? amtVal : (Number(amtVal) || 0);
 
         return reportTab === 'dealer' ? [
           t.ticketNumber || '—',
@@ -1446,7 +1446,7 @@ export default function App() {
           t.product?.name || '—',
           t.customer?.name || '—',
           t.assignedTechnician?.name || '—',
-          amountStr
+          amountVal
         ] : [
           t.ticketNumber || '—',
           completedDate,
@@ -1456,17 +1456,17 @@ export default function App() {
           t.product?.name || '—',
           t.customer?.name || '—',
           t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
-          amountStr
+          amountVal
         ];
       });
 
       const totalRow = reportTab === 'dealer'
-        ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', `₹${summary.totalAmount}`]
-        : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', `₹${summary.totalAmount}`];
+        ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', summary.totalAmount]
+        : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', summary.totalAmount];
       rows.push(totalRow);
 
       const csvContent = [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
@@ -1501,8 +1501,8 @@ export default function App() {
       }
 
       const headers = reportTab === 'dealer'
-        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense']
-        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Dealer', 'Technician Earning'];
+        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense (₹)']
+        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Dealer', 'Technician Earning (₹)'];
 
       const rows = exportData.map(t => {
         const completedDate = t.adminVerification?.verifiedAt 
@@ -1514,7 +1514,7 @@ export default function App() {
         const amtVal = reportTab === 'dealer'
           ? (t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount)
           : t.technicianEarning;
-        const amountStr = typeof amtVal === 'number' ? `₹${amtVal}` : (amtVal || '0');
+        const amountVal = typeof amtVal === 'number' ? amtVal : (Number(amtVal) || 0);
 
         return reportTab === 'dealer' ? [
           t.ticketNumber || '—',
@@ -1525,7 +1525,7 @@ export default function App() {
           t.product?.name || '—',
           t.customer?.name || '—',
           t.assignedTechnician?.name || '—',
-          amountStr
+          amountVal
         ] : [
           t.ticketNumber || '—',
           completedDate,
@@ -1535,17 +1535,17 @@ export default function App() {
           t.product?.name || '—',
           t.customer?.name || '—',
           t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
-          amountStr
+          amountVal
         ];
       });
 
       const totalRow = reportTab === 'dealer'
-        ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', `₹${summary.totalAmount}`]
-        : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', `₹${summary.totalAmount}`];
+        ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', summary.totalAmount]
+        : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', summary.totalAmount];
       rows.push(totalRow);
 
       const xlsContent = [headers.join('\t'), ...rows.map(e => e.join('\t'))].join('\n');
-      const blob = new Blob([xlsContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const blob = new Blob(['\uFEFF' + xlsContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
