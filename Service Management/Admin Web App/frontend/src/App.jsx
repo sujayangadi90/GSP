@@ -5340,17 +5340,27 @@ export default function App() {
                                   {(amc.status === 'expired' || amc.status === 'cancelled' || amc.status === 'active') && (
                                     <button
                                       onClick={() => {
-                                        // Set Start Date to day after end date of previous contract
-                                        const end = new Date(amc.endDate);
-                                        end.setDate(end.getDate() + 1);
-                                        const startStr = end.toISOString().split('T')[0];
-                                        
-                                        const newEnd = new Date(end);
+                                        const prevEnd = new Date(amc.endDate);
+                                        const now = new Date();
+                                        let startStr;
+
+                                        if (prevEnd < now) {
+                                          startStr = now.toISOString().split('T')[0];
+                                        } else {
+                                          const nextDay = new Date(prevEnd);
+                                          nextDay.setDate(nextDay.getDate() + 1);
+                                          startStr = nextDay.toISOString().split('T')[0];
+                                        }
+
+                                        const startDateObj = new Date(startStr);
+                                        const newEnd = new Date(startDateObj);
                                         newEnd.setFullYear(newEnd.getFullYear() + 1);
                                         newEnd.setDate(newEnd.getDate() - 1);
                                         const endStr = newEnd.toISOString().split('T')[0];
 
                                         setAmcForm({
+                                          id: amc._id,
+                                          isRenew: true,
                                           customer: amc.customer?._id,
                                           customerName: amc.customer?.name,
                                           appliance: amc.appliance?._id,
@@ -5647,7 +5657,7 @@ export default function App() {
                       type="submit" 
                       className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-6 rounded-xl text-sm cursor-pointer shadow-lg hover:shadow-violet-600/20 transition duration-150"
                     >
-                      Save Contract
+                      {activeTab === 'renew-amc' ? 'Renew Contract' : activeTab === 'edit-amc' ? 'Update Contract' : 'Create Contract'}
                     </button>
                   </div>
                 </form>

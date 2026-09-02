@@ -164,6 +164,10 @@ const updateAmc = async (req, res) => {
       return res.status(404).json({ message: 'AMC Contract not found' });
     }
 
+    const isRenew = req.body.isRenew || false;
+    const oldStartDate = amc.startDate;
+    const oldEndDate = amc.endDate;
+
     amc.customer = req.body.customer || amc.customer;
     amc.appliance = req.body.appliance || amc.appliance;
     amc.startDate = req.body.startDate || amc.startDate;
@@ -182,6 +186,49 @@ const updateAmc = async (req, res) => {
     }
 
     const updated = await amc.save();
+
+    // If renewed or contract dates changed, re-schedule followups
+    const datesChanged = (req.body.startDate && new Date(req.body.startDate).getTime() !== new Date(oldStartDate).getTime()) ||
+                         (req.body.endDate && new Date(req.body.endDate).getTime() !== new Date(oldEndDate).getTime());
+
+    if (isRenew || datesChanged) {
+      try {
+        await FollowUp.deleteMany({ amc: amc._id, status: 'new' });
+
+        const start = new Date(amc.startDate);
+        const end = new Date(amc.endDate);
+        const diffTime = end.getTime() - start.getTime();
+        const count = Number(amc.visitsIncluded) || 4;
+        for (let i = 1; i <= count; i++) {
+          const dueTime = start.getTime() + (diffTime * i) / (count + 1);
+          await FollowUp.create({
+            amc: amc._id,
+            category: 'amc',
+            dueAt: new Date(dueTime),
+            status: 'new',
+            notes: [{
+              text: `Scheduled maintenance checkup visit #${i} under AMC contract.`,
+              author: 'System'
+            }]
+          });
+        }
+
+        // Schedule Expiry Follow-up
+        await FollowUp.create({
+          amc: amc._id,
+          category: 'amc',
+          dueAt: end,
+          status: 'new',
+          notes: [{
+            text: 'AMC Contract Expiry Follow-up. Contact customer to pitch AMC renewal.',
+            author: 'System'
+          }]
+        });
+      } catch (followUpErr) {
+        console.error('Failed to auto-reschedule AMC follow-ups:', followUpErr.message);
+      }
+    }
+
     const populated = await Amc.findById(updated._id).populate('customer').populate('appliance');
     res.json(populated);
   } catch (error) {
