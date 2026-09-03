@@ -1210,8 +1210,10 @@ const updateCustomer = async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
 
+    const oldMobile = customer.mobile;
+
     if (mobile && mobile !== customer.mobile) {
-      const exists = await Customer.findOne({ mobile });
+      const exists = await Customer.findOne({ mobile, _id: { $ne: req.params.id } });
       if (exists) {
         return res.status(400).json({ message: 'Mobile number already registered to another customer' });
       }
@@ -1226,6 +1228,24 @@ const updateCustomer = async (req, res) => {
     customer.appliances = appliances !== undefined ? appliances : customer.appliances;
 
     const updated = await customer.save();
+
+    // Sync updated customer info across tickets
+    if (oldMobile) {
+      await Ticket.updateMany(
+        { 'customer.mobile': oldMobile },
+        {
+          $set: {
+            'customer.name': customer.name,
+            'customer.mobile': customer.mobile,
+            'customer.alternateMobile': customer.alternateMobile,
+            'customer.address': customer.address,
+            'customer.city': customer.city,
+            'customer.pincode': customer.pincode
+          }
+        }
+      );
+    }
+
     res.json(updated);
   } catch (error) {
     res.status(500).json({ message: error.message });

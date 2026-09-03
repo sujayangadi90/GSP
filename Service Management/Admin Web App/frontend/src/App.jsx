@@ -1748,8 +1748,10 @@ export default function App() {
         fetchCities();
       } else if (activeTab === 'user_management') {
         fetchAdmins();
-      } else if (activeTab === 'customers') {
+      } else if (activeTab === 'customers' || activeTab === 'add-customer' || activeTab === 'edit-customer') {
         fetchCustomers();
+        fetchCities();
+        fetchAppliances();
       } else if (activeTab === 'amcs') {
         fetchAmcs();
         fetchAppliances();
@@ -5033,6 +5035,26 @@ export default function App() {
                             <td className="py-4 px-6 text-center">
                               <div className="flex justify-center items-center gap-2">
                                 <button
+                                  onClick={() => {
+                                    fetchCities();
+                                    fetchAppliances();
+                                    setCustomerForm({
+                                      id: cust._id || cust.id,
+                                      name: cust.name || '',
+                                      mobile: cust.mobile || '',
+                                      alternateMobile: cust.alternateMobile || '',
+                                      address: cust.address || '',
+                                      city: cust.city || '',
+                                      pincode: cust.pincode || '',
+                                      appliances: (cust.appliances || []).map(a => typeof a === 'object' ? (a._id || a.id) : a)
+                                    });
+                                    setActiveTab('edit-customer');
+                                  }}
+                                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1.5 cursor-pointer transition shadow-sm"
+                                >
+                                  <Edit className="w-4 h-4" /> Edit
+                                </button>
+                                <button
                                   onClick={() => viewHistory('customer', cust, 'customers')}
                                   className="bg-violet-600/20 hover:bg-violet-600 border border-violet-700/30 hover:border-violet-600 text-violet-300 hover:text-white text-xs px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1.5 cursor-pointer transition shadow-sm"
                                 >
@@ -8178,15 +8200,17 @@ export default function App() {
             <div className="bg-slate-850 px-6 py-4 flex items-center justify-end gap-3 border-t border-slate-800">
               <button 
                 onClick={() => {
+                  fetchCities();
+                  fetchAppliances();
                   setCustomerForm({
-                    id: selectedCustomerDetails._id,
-                    name: selectedCustomerDetails.name,
-                    mobile: selectedCustomerDetails.mobile,
+                    id: selectedCustomerDetails._id || selectedCustomerDetails.id,
+                    name: selectedCustomerDetails.name || '',
+                    mobile: selectedCustomerDetails.mobile || '',
                     alternateMobile: selectedCustomerDetails.alternateMobile || '',
-                    address: selectedCustomerDetails.address,
-                    city: selectedCustomerDetails.city,
-                    pincode: selectedCustomerDetails.pincode,
-                    appliances: (selectedCustomerDetails.appliances || []).map(a => typeof a === 'object' ? a._id : a)
+                    address: selectedCustomerDetails.address || '',
+                    city: selectedCustomerDetails.city || '',
+                    pincode: selectedCustomerDetails.pincode || '',
+                    appliances: (selectedCustomerDetails.appliances || []).map(a => typeof a === 'object' ? (a._id || a.id) : a)
                   });
                   setSelectedCustomerDetails(null);
                   setActiveTab('edit-customer');
