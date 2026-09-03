@@ -79,6 +79,11 @@ const addAdmin = async (req, res) => {
         manageDealers: true,
         manageTechnicians: true,
         followups: true,
+        amcs: true,
+        inventory: true,
+        performance: true,
+        reports: true,
+        videoLibrary: true,
         settings: true
       }
     });
@@ -125,6 +130,11 @@ const updateAdmin = async (req, res) => {
         manageDealers: permissions.manageDealers !== undefined ? permissions.manageDealers : admin.permissions.manageDealers,
         manageTechnicians: permissions.manageTechnicians !== undefined ? permissions.manageTechnicians : admin.permissions.manageTechnicians,
         followups: permissions.followups !== undefined ? permissions.followups : admin.permissions.followups,
+        amcs: permissions.amcs !== undefined ? permissions.amcs : (admin.permissions.amcs !== undefined ? admin.permissions.amcs : true),
+        inventory: permissions.inventory !== undefined ? permissions.inventory : (admin.permissions.inventory !== undefined ? admin.permissions.inventory : true),
+        performance: permissions.performance !== undefined ? permissions.performance : (admin.permissions.performance !== undefined ? admin.permissions.performance : true),
+        reports: permissions.reports !== undefined ? permissions.reports : (admin.permissions.reports !== undefined ? admin.permissions.reports : true),
+        videoLibrary: permissions.videoLibrary !== undefined ? permissions.videoLibrary : (admin.permissions.videoLibrary !== undefined ? admin.permissions.videoLibrary : true),
         settings: permissions.settings !== undefined ? permissions.settings : admin.permissions.settings,
       };
     }

@@ -41,6 +41,11 @@ const UserSchema = new mongoose.Schema({
     manageDealers: { type: Boolean, default: true },
     manageTechnicians: { type: Boolean, default: true },
     followups: { type: Boolean, default: true },
+    amcs: { type: Boolean, default: true },
+    inventory: { type: Boolean, default: true },
+    performance: { type: Boolean, default: true },
+    reports: { type: Boolean, default: true },
+    videoLibrary: { type: Boolean, default: true },
     settings: { type: Boolean, default: true }
   },
   appliances: [{

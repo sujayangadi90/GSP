@@ -54,6 +54,11 @@ const loginUser = async (req, res) => {
         manageDealers: true,
         manageTechnicians: true,
         followups: true,
+        amcs: true,
+        inventory: true,
+        performance: true,
+        reports: true,
+        videoLibrary: true,
         settings: true
       },
       token: generateToken(user._id)

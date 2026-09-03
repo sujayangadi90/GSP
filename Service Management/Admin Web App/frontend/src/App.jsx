@@ -1822,31 +1822,45 @@ export default function App() {
         manageDealers: true,
         manageTechnicians: true,
         followups: true,
+        amcs: true,
+        inventory: true,
+        performance: true,
+        reports: true,
+        videoLibrary: true,
         settings: true
       };
       
       const isAllowed = (tab) => {
-        if (tab === 'dashboard' && !perms.dashboard) return false;
-        if (tab === 'tickets' && !perms.tickets) return false;
-        if ((tab === 'customers' || tab === 'add-customer' || tab === 'edit-customer') && !perms.customers) return false;
-        if ((tab === 'amcs' || tab === 'add-amc' || tab === 'edit-amc' || tab === 'renew-amc') && !perms.customers) return false;
-        if (tab === 'dealers' && !perms.manageDealers) return false;
-        if ((tab === 'technicians' || tab === 'add-technician' || tab === 'edit-technician') && !perms.manageTechnicians) return false;
-        if (tab === 'followups' && !perms.followups) return false;
-        if (tab === 'appliances_brands' && !perms.settings) return false;
-        if (tab === 'cities' && !perms.settings) return false;
-        if (tab === 'user_management' && !perms.settings) return false;
+        if (tab === 'dashboard' && perms.dashboard === false) return false;
+        if (tab === 'tickets' && perms.tickets === false) return false;
+        if ((tab === 'customers' || tab === 'add-customer' || tab === 'edit-customer') && perms.customers === false) return false;
+        if ((tab === 'amcs' || tab === 'add-amc' || tab === 'edit-amc' || tab === 'renew-amc') && perms.amcs === false) return false;
+        if (tab === 'inventory' && perms.inventory === false) return false;
+        if (tab === 'dealers' && perms.manageDealers === false) return false;
+        if ((tab === 'technicians' || tab === 'add-technician' || tab === 'edit-technician') && perms.manageTechnicians === false) return false;
+        if (tab === 'performance' && perms.performance === false) return false;
+        if (tab === 'followups' && perms.followups === false) return false;
+        if (tab === 'reports' && perms.reports === false) return false;
+        if (tab === 'video_library' && perms.videoLibrary === false) return false;
+        if (tab === 'appliances_brands' && perms.settings === false) return false;
+        if (tab === 'cities' && perms.settings === false) return false;
+        if (tab === 'user_management' && perms.settings === false) return false;
         return true;
       };
 
       if (!isAllowed(activeTab)) {
-        if (perms.dashboard) setActiveTab('dashboard');
-        else if (perms.tickets) setActiveTab('tickets');
-        else if (perms.customers) setActiveTab('customers');
-        else if (perms.manageDealers) setActiveTab('dealers');
-        else if (perms.manageTechnicians) setActiveTab('technicians');
-        else if (perms.followups) setActiveTab('followups');
-        else if (perms.settings) setActiveTab('appliances_brands');
+        if (perms.dashboard !== false) setActiveTab('dashboard');
+        else if (perms.tickets !== false) setActiveTab('tickets');
+        else if (perms.customers !== false) setActiveTab('customers');
+        else if (perms.amcs !== false) setActiveTab('amcs');
+        else if (perms.inventory !== false) setActiveTab('inventory');
+        else if (perms.manageDealers !== false) setActiveTab('dealers');
+        else if (perms.manageTechnicians !== false) setActiveTab('technicians');
+        else if (perms.performance !== false) setActiveTab('performance');
+        else if (perms.followups !== false) setActiveTab('followups');
+        else if (perms.reports !== false) setActiveTab('reports');
+        else if (perms.videoLibrary !== false) setActiveTab('video_library');
+        else if (perms.settings !== false) setActiveTab('appliances_brands');
       }
     }
   }, [user, activeTab]);
@@ -2919,7 +2933,7 @@ export default function App() {
               Customers
             </button>
           )}
-          {(!user || user.permissions?.customers !== false) && (
+          {(!user || user.permissions?.amcs !== false) && (
             <button
               onClick={() => { setActiveTab('amcs'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${(activeTab === 'amcs' || activeTab === 'add-amc' || activeTab === 'edit-amc' || activeTab === 'renew-amc') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
@@ -2928,7 +2942,7 @@ export default function App() {
               AMC Contracts
             </button>
           )}
-          {(!user || user.permissions?.customers !== false) && (
+          {(!user || user.permissions?.inventory !== false) && (
             <button
               onClick={() => { setActiveTab('inventory'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'inventory' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
@@ -2955,7 +2969,7 @@ export default function App() {
               Manage Technicians
             </button>
           )}
-          {(!user || user.permissions?.manageTechnicians !== false) && (
+          {(!user || user.permissions?.performance !== false) && (
             <button
               onClick={() => { setActiveTab('performance'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'performance' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
@@ -2973,7 +2987,7 @@ export default function App() {
               Follow-ups
             </button>
           )}
-          {(!user || user.role === 'admin') && (
+          {(!user || user.permissions?.reports !== false) && (
             <button
               onClick={() => { setActiveTab('reports'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'reports' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
@@ -2982,7 +2996,7 @@ export default function App() {
               Reports
             </button>
           )}
-          {(!user || user.role === 'admin') && (
+          {(!user || user.permissions?.videoLibrary !== false) && (
             <button
               onClick={() => { setActiveTab('video_library'); setMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'video_library' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
@@ -4841,6 +4855,11 @@ export default function App() {
                         manageDealers: true,
                         manageTechnicians: true,
                         followups: true,
+                        amcs: true,
+                        inventory: true,
+                        performance: true,
+                        reports: true,
+                        videoLibrary: true,
                         settings: true
                       }
                     })}
@@ -4877,7 +4896,7 @@ export default function App() {
                               {Object.entries(admin.permissions || {}).map(([key, val]) => (
                                 val && (
                                   <span key={key} className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded-md font-medium uppercase tracking-wider">
-                                    {key.replace('manage', '').replace('followups', 'follow-ups')}
+                                    {key === 'manageDealers' ? 'DEALERS' : key === 'manageTechnicians' ? 'TECHNICIANS' : key === 'followups' ? 'FOLLOW-UPS' : key === 'videoLibrary' ? 'VIDEO LIBRARY' : key === 'amcs' ? 'AMC CONTRACTS' : key.toUpperCase()}
                                   </span>
                                 )
                               ))}
@@ -4898,14 +4917,19 @@ export default function App() {
                                     email: admin.email,
                                     password: '', // blank for edits
                                     status: admin.status,
-                                    permissions: admin.permissions || {
-                                      dashboard: true,
-                                      tickets: true,
-                                      customers: true,
-                                      manageDealers: true,
-                                      manageTechnicians: true,
-                                      followups: true,
-                                      settings: true
+                                    permissions: {
+                                      dashboard: admin.permissions?.dashboard !== undefined ? admin.permissions.dashboard : true,
+                                      tickets: admin.permissions?.tickets !== undefined ? admin.permissions.tickets : true,
+                                      customers: admin.permissions?.customers !== undefined ? admin.permissions.customers : true,
+                                      manageDealers: admin.permissions?.manageDealers !== undefined ? admin.permissions.manageDealers : true,
+                                      manageTechnicians: admin.permissions?.manageTechnicians !== undefined ? admin.permissions.manageTechnicians : true,
+                                      followups: admin.permissions?.followups !== undefined ? admin.permissions.followups : true,
+                                      amcs: admin.permissions?.amcs !== undefined ? admin.permissions.amcs : true,
+                                      inventory: admin.permissions?.inventory !== undefined ? admin.permissions.inventory : true,
+                                      performance: admin.permissions?.performance !== undefined ? admin.permissions.performance : true,
+                                      reports: admin.permissions?.reports !== undefined ? admin.permissions.reports : true,
+                                      videoLibrary: admin.permissions?.videoLibrary !== undefined ? admin.permissions.videoLibrary : true,
+                                      settings: admin.permissions?.settings !== undefined ? admin.permissions.settings : true
                                     }
                                   })}
                                   className="p-1.5 hover:bg-slate-850 rounded-lg text-slate-400 hover:text-slate-200 transition cursor-pointer"
@@ -9790,7 +9814,19 @@ export default function App() {
                           }
                         })}
                       />
-                      <span className="capitalize">{permKey.replace('manage', '').replace('followups', 'follow-ups')}</span>
+                      <span>
+                        {
+                          permKey === 'manageDealers' ? 'Dealers' :
+                          permKey === 'manageTechnicians' ? 'Technicians' :
+                          permKey === 'followups' ? 'Follow-Ups' :
+                          permKey === 'amcs' ? 'AMC Contracts' :
+                          permKey === 'inventory' ? 'Inventory' :
+                          permKey === 'performance' ? 'Performance' :
+                          permKey === 'reports' ? 'Reports' :
+                          permKey === 'videoLibrary' ? 'Video Library' :
+                          permKey.charAt(0).toUpperCase() + permKey.slice(1)
+                        }
+                      </span>
                     </label>
                   ))}
                 </div>
