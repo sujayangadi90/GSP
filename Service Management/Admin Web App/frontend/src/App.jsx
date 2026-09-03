@@ -357,6 +357,7 @@ export default function App() {
   const [editingTicket, setEditingTicket] = useState(null); // null or ticket to edit
   const [editTicketSaving, setEditTicketSaving] = useState(false);
   const [selectedCustomerDetails, setSelectedCustomerDetails] = useState(null); // null or customer object
+  const [customerForm, setCustomerForm] = useState(null); // null or customer form object
   const [amcs, setAmcs] = useState([]);
   const [amcFilters, setAmcFilters] = useState({
     search: '',
