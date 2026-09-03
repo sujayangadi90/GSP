@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const SystemConfig = require('../models/SystemConfig');
 const jwt = require('jsonwebtoken');
 
 // Generate JWT
@@ -8,24 +9,77 @@ const generateToken = (id) => {
   });
 };
 
+// Ensure Software Owner User & System Config on Startup
+const ensureSoftwareOwnerAndConfig = async () => {
+  try {
+    // 1. Ensure SystemConfig default
+    const configExists = await SystemConfig.findOne({ key: 'adminAccessEnabled' });
+    if (!configExists) {
+      await SystemConfig.create({
+        key: 'adminAccessEnabled',
+        value: true,
+        updatedBy: 'system'
+      });
+      console.log('Initialized SystemConfig: adminAccessEnabled = true');
+    }
+
+    // 2. Ensure Software Owner User sujay / 54321
+    let owner = await User.findOne({
+      $or: [
+        { code: 'sujay' },
+        { email: 'sujay@gsp.com' },
+        { role: 'owner' }
+      ]
+    });
+
+    if (!owner) {
+      owner = await User.create({
+        name: 'Sujay (Software Owner)',
+        email: 'sujay@gsp.com',
+        code: 'sujay',
+        password: '54321', // Pre-save hook will hash this securely
+        role: 'owner',
+        status: 'active'
+      });
+      console.log('Seeded Software Owner account (sujay / 54321)');
+    } else {
+      // Ensure role & password match software owner requirement
+      owner.role = 'owner';
+      owner.code = 'sujay';
+      owner.email = owner.email || 'sujay@gsp.com';
+      owner.status = 'active';
+      // Verify or update password if changed
+      const isMatch = await owner.comparePassword('54321');
+      if (!isMatch) {
+        owner.password = '54321';
+      }
+      await owner.save();
+    }
+  } catch (error) {
+    console.error('Error initializing Software Owner or SystemConfig:', error.message);
+  }
+};
+
 // @desc    Auth user & get token (Unified login endpoint)
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = async (req, res) => {
-  const { username, password } = req.body; // username can be email or dealer/technician code
+  const { username, password } = req.body;
 
   try {
     if (!username || !password) {
       return res.status(400).json({ message: 'Please provide credentials' });
     }
 
-    // Check if the username looks like an email or a code
-    let user;
-    if (username.includes('@')) {
-      user = await User.findOne({ email: username.trim().toLowerCase() });
-    } else {
-      user = await User.findOne({ code: username.trim().toUpperCase() });
-    }
+    const cleanUsername = username.trim();
+    const user = await User.findOne({
+      $or: [
+        { email: cleanUsername.toLowerCase() },
+        { code: cleanUsername },
+        { code: cleanUsername.toUpperCase() },
+        { code: cleanUsername.toLowerCase() }
+      ]
+    });
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -33,6 +87,14 @@ const loginUser = async (req, res) => {
 
     if (user.status === 'inactive') {
       return res.status(403).json({ message: 'Account is deactivated' });
+    }
+
+    // Software Owner Access Control check for Admin users
+    if (user.role === 'admin') {
+      const config = await SystemConfig.findOne({ key: 'adminAccessEnabled' });
+      if (config && config.value === false) {
+        return res.status(403).json({ message: 'Software Fee is pending. Kindly pay the fees to continue to use the software.' });
+      }
     }
 
     // Check password
@@ -68,6 +130,61 @@ const loginUser = async (req, res) => {
   }
 };
 
+// @desc    Get system status (adminAccessEnabled)
+// @route   GET /api/auth/system-status
+// @access  Public / Authenticated
+const getSystemStatus = async (req, res) => {
+  try {
+    const config = await SystemConfig.findOne({ key: 'adminAccessEnabled' });
+    res.json({
+      adminAccessEnabled: config ? Boolean(config.value) : true
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get access control status for software owner
+// @route   GET /api/auth/access-control
+// @access  Private / Owner
+const getAccessControlStatus = async (req, res) => {
+  try {
+    const config = await SystemConfig.findOne({ key: 'adminAccessEnabled' });
+    res.json({
+      adminAccessEnabled: config ? Boolean(config.value) : true
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update access control status (ON/OFF) for software owner
+// @route   PUT /api/auth/access-control
+// @access  Private / Owner
+const updateAccessControlStatus = async (req, res) => {
+  const { adminAccessEnabled } = req.body;
+
+  try {
+    if (adminAccessEnabled === undefined) {
+      return res.status(400).json({ message: 'adminAccessEnabled boolean state is required' });
+    }
+
+    const val = Boolean(adminAccessEnabled);
+    const config = await SystemConfig.findOneAndUpdate(
+      { key: 'adminAccessEnabled' },
+      { value: val, updatedBy: req.user.email },
+      { new: true, upsert: true }
+    );
+
+    res.json({
+      adminAccessEnabled: Boolean(config.value),
+      message: `Admin Panel Access successfully turned ${val ? 'ON' : 'OFF'}`
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get user profile
 // @route   GET /api/auth/profile
 // @access  Private
@@ -95,13 +212,11 @@ const registerFcmToken = async (req, res) => {
       return res.status(400).json({ message: 'Token is required' });
     }
 
-    // Pull this token from any other users to prevent multiple delivery of same message to one token
     await User.updateMany(
       { fcmTokens: token },
       { $pull: { fcmTokens: token } }
     );
 
-    // Push token to current logged-in user if it doesn't already exist
     const user = await User.findById(req.user._id);
     if (!user.fcmTokens.includes(token)) {
       user.fcmTokens.push(token);
@@ -114,4 +229,12 @@ const registerFcmToken = async (req, res) => {
   }
 };
 
-module.exports = { loginUser, getUserProfile, registerFcmToken };
+module.exports = {
+  loginUser,
+  getSystemStatus,
+  getAccessControlStatus,
+  updateAccessControlStatus,
+  getUserProfile,
+  registerFcmToken,
+  ensureSoftwareOwnerAndConfig
+};

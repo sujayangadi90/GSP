@@ -35,6 +35,7 @@ import {
   Star,
   Lock,
   Unlock,
+  ShieldAlert,
   BarChart2,
   Sparkles,
   ChevronLeft,
@@ -540,6 +541,8 @@ export default function App() {
     brand: 'ALL'
   });
   const [appliedFiltersSummary, setAppliedFiltersSummary] = useState(null);
+  const [adminAccessEnabled, setAdminAccessEnabled] = useState(true);
+  const [accessControlLoading, setAccessControlLoading] = useState(false);
   const [reportsData, setReportsData] = useState([]);
   const [reportsSummary, setReportsSummary] = useState({
     totalAmount: 0,
@@ -765,8 +768,13 @@ export default function App() {
     }
     const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
     if (res.status === 401 || res.status === 403) {
-      handleLogout();
-      throw new Error('Session expired');
+      const errorData = await res.json().catch(() => ({}));
+      const msg = errorData.message || 'Session expired';
+      if (endpoint !== '/auth/login') {
+        alert(msg);
+        handleLogout();
+      }
+      throw new Error(msg);
     }
     if (!res.ok) {
       const data = await res.json();
@@ -784,11 +792,14 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify(loginForm)
       });
-      if (data.role !== 'admin') {
+      if (data.role !== 'admin' && data.role !== 'owner') {
         throw new Error('Access denied. Admin portal only.');
       }
       setToken(data.token);
       setUser(data);
+      if (data.role === 'owner') {
+        setActiveTab('access_control');
+      }
     } catch (err) {
       setLoginError(err.message);
     } finally {
@@ -833,6 +844,65 @@ export default function App() {
       });
     };
   }, [user, token]);
+
+  // Real-Time System Access Check for Active Admin Sessions
+  useEffect(() => {
+    if (!user || user.role !== 'admin' || !token) return;
+
+    const checkSystemAccess = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/system-status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.adminAccessEnabled === false) {
+            alert('Software Fee is pending. Kindly pay the fees to continue to use the software.');
+            handleLogout();
+          }
+        }
+      } catch (err) {
+        console.error('System access check error:', err);
+      }
+    };
+
+    checkSystemAccess();
+    const intervalId = setInterval(checkSystemAccess, 5000);
+    return () => clearInterval(intervalId);
+  }, [user, token]);
+
+  const fetchAccessControlStatus = async () => {
+    try {
+      setAccessControlLoading(true);
+      const data = await apiFetch('/auth/access-control');
+      setAdminAccessEnabled(data.adminAccessEnabled);
+    } catch (err) {
+      console.error('Error fetching access control status:', err);
+    } finally {
+      setAccessControlLoading(false);
+    }
+  };
+
+  const toggleAdminAccessControl = async (newState) => {
+    const confirmMsg = newState
+      ? 'Are you sure you want to turn ON Admin Panel access for all Super Admin and Admin users?'
+      : 'WARNING: Disabling Admin Panel access will immediately log out all currently active Admin & Super Admin users and block all Admin logins. Proceed?';
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setAccessControlLoading(true);
+      const data = await apiFetch('/auth/access-control', {
+        method: 'PUT',
+        body: JSON.stringify({ adminAccessEnabled: newState })
+      });
+      setAdminAccessEnabled(data.adminAccessEnabled);
+      alert(data.message || `Admin Panel Access turned ${newState ? 'ON' : 'OFF'}`);
+    } catch (err) {
+      alert(err.message || 'Failed to update access control setting');
+    } finally {
+      setAccessControlLoading(false);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -1808,6 +1878,8 @@ export default function App() {
         fetchEmployees();
       } else if (activeTab === 'dashboard') {
         fetchDashboardData();
+      } else if (activeTab === 'access_control' && user?.role === 'owner') {
+        fetchAccessControlStatus();
       } else {
         fetchData();
         fetchCities();
@@ -3084,8 +3156,17 @@ export default function App() {
                   {settingsOpen ? '▲' : '▼'}
                 </span>
               </button>
-              {(settingsOpen || activeTab === 'appliances_brands' || activeTab === 'cities' || activeTab === 'user_management' || activeTab === 'fees_config') && (
+              {(settingsOpen || activeTab === 'appliances_brands' || activeTab === 'cities' || activeTab === 'user_management' || activeTab === 'fees_config' || activeTab === 'access_control') && (
                 <div className="pl-6 mt-1 space-y-1">
+                  {user && user.role === 'owner' && (
+                    <button
+                      onClick={() => { setActiveTab('access_control'); setMenuOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'access_control' ? 'bg-violet-600 text-white shadow-md' : 'text-amber-400 hover:bg-slate-800/50 hover:text-amber-300'}`}
+                    >
+                      <ShieldAlert className="w-4 h-4 text-amber-400" />
+                      Access Control
+                    </button>
+                  )}
                   <button
                     onClick={() => { setActiveTab('appliances_brands'); setMenuOpen(false); }}
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'appliances_brands' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
@@ -4983,6 +5064,88 @@ export default function App() {
                       );
                     })
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Software Owner Access Control Tab */}
+          {activeTab === 'access_control' && user?.role === 'owner' && (
+            <div className="max-w-4xl mx-auto space-y-8">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
+                    <ShieldAlert className="w-8 h-8 text-amber-400" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-extrabold text-white tracking-tight">Access Control</h1>
+                    <p className="text-slate-400 mt-1">Software Owner System Control Panel</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Control Card */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-bold text-white">Admin Panel Access</h2>
+                      <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider ${adminAccessEnabled ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50' : 'bg-red-950/80 text-red-400 border border-red-800/50'}`}>
+                        {adminAccessEnabled ? '● ACCESS ON' : '● ACCESS OFF'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-400">
+                      {adminAccessEnabled
+                        ? 'Admin Panel is functioning normally. Super Admin and Admin users can log in.'
+                        : 'Admin Panel access is currently OFF. Super Admin and Admin users are restricted.'}
+                    </p>
+                  </div>
+
+                  {/* Toggle Button */}
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className={`text-base font-extrabold uppercase tracking-wider ${adminAccessEnabled ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {adminAccessEnabled ? 'ON' : 'OFF'}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={accessControlLoading}
+                      onClick={() => toggleAdminAccessControl(!adminAccessEnabled)}
+                      className={`relative inline-flex h-10 w-20 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${adminAccessEnabled ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-red-600 hover:bg-red-500'}`}
+                      title="Toggle Admin Panel Access ON/OFF"
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-9 w-9 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${adminAccessEnabled ? 'translate-x-10' : 'translate-x-0'}`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Info Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className={`p-5 rounded-2xl border transition duration-200 ${adminAccessEnabled ? 'bg-emerald-950/20 border-emerald-800/30' : 'bg-slate-950/40 border-slate-800'}`}>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${adminAccessEnabled ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                      <h3 className="font-bold text-white text-base">When Access is ON</h3>
+                    </div>
+                    <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside">
+                      <li>Admin Panel works normally.</li>
+                      <li>Super Admin and Admin users can log in and access all features.</li>
+                      <li>Existing functionality remains unchanged.</li>
+                    </ul>
+                  </div>
+
+                  <div className={`p-5 rounded-2xl border transition duration-200 ${!adminAccessEnabled ? 'bg-red-950/20 border-red-800/30' : 'bg-slate-950/40 border-slate-800'}`}>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${!adminAccessEnabled ? 'bg-red-400' : 'bg-slate-600'}`} />
+                      <h3 className="font-bold text-white text-base">When Access is OFF</h3>
+                    </div>
+                    <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside">
+                      <li>All currently active Admin / Super Admin sessions are immediately logged out & invalidated.</li>
+                      <li>Admin login attempts show message: <span className="font-mono text-amber-300 text-[11px] block mt-1 bg-slate-950 p-2 rounded border border-slate-800">"Software Fee is pending. Kindly pay the fees to continue to use the software."</span></li>
+                      <li>Software Owner (<span className="font-mono text-violet-400 font-bold">sujay</span>) can still log in and switch access back ON.</li>
+                      <li>Technician App & Dealer App continue functioning normally without interruption.</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>

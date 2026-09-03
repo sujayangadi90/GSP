@@ -10,6 +10,9 @@ dotenv.config();
 // Connect to Database
 connectDB().then(async () => {
   try {
+    const { ensureSoftwareOwnerAndConfig } = require('./controllers/authController');
+    await ensureSoftwareOwnerAndConfig();
+
     const Ticket = require('./models/Ticket');
     const Customer = require('./models/Customer');
     const uniqueMobiles = await Ticket.distinct('customer.mobile');
@@ -33,7 +36,7 @@ connectDB().then(async () => {
     }
     console.log('Customer database migration checks completed.');
   } catch (err) {
-    console.error('Customer migration failed:', err);
+    console.error('Startup initialization failed:', err);
   }
 });
 

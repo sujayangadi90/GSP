@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const SystemConfig = require('../models/SystemConfig');
 
 const protect = async (req, res, next) => {
   let token;
@@ -14,15 +15,24 @@ const protect = async (req, res, next) => {
       if (req.user.status === 'inactive') {
         return res.status(403).json({ message: 'User account is deactivated' });
       }
-      next();
+
+      // Software Owner Access Control Enforcement for Admin Users
+      if (req.user.role === 'admin') {
+        const config = await SystemConfig.findOne({ key: 'adminAccessEnabled' });
+        if (config && config.value === false) {
+          return res.status(403).json({ message: 'Software Fee is pending. Kindly pay the fees to continue to use the software.' });
+        }
+      }
+
+      return next();
     } catch (error) {
       console.error(error);
-      res.status(401).json({ message: 'Not authorized, token failed' });
+      return res.status(401).json({ message: 'Not authorized, token failed' });
     }
   }
 
   if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+    return res.status(401).json({ message: 'Not authorized, no token' });
   }
 };
 
