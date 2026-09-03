@@ -803,6 +803,37 @@ export default function App() {
     localStorage.removeItem('gsp_token');
   };
 
+  // 30-minute Inactivity Auto-Logout Logic
+  useEffect(() => {
+    if (!user || !token) return;
+
+    const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
+    let timeoutId;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        alert('You have been automatically logged out due to 30 minutes of inactivity.');
+        handleLogout();
+      }, INACTIVITY_LIMIT);
+    };
+
+    const activityEvents = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click'];
+
+    resetTimer();
+
+    activityEvents.forEach((evt) => {
+      window.addEventListener(evt, resetTimer, { passive: true });
+    });
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      activityEvents.forEach((evt) => {
+        window.removeEventListener(evt, resetTimer);
+      });
+    };
+  }, [user, token]);
+
   const fetchDashboardData = async () => {
     try {
       setDashboardLoading(true);
