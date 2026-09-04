@@ -189,16 +189,99 @@ export default function AttendancePortal() {
     );
   };
 
-  // Handle Selfie selection
-  const handleSelfieChange = (e) => {
+  const [compressingSelfie, setCompressingSelfie] = useState(false);
+  const [selfieSizeInfo, setSelfieSizeInfo] = useState('');
+
+  // Helper: Compress selfie image file using Canvas
+  const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
+    return new Promise((resolve) => {
+      if (!file || !file.type.startsWith('image/') || file.size < 80 * 1024) {
+        resolve(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth || height > maxHeight) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                resolve(file);
+                return;
+              }
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        img.onerror = () => resolve(file);
+      };
+      reader.onerror = () => resolve(file);
+    });
+  };
+
+  // Handle Selfie selection & automatic compression
+  const handleSelfieChange = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
-      setSelfieFile(file);
-      const reader = new FileReader();
-      reader.onload = () => setSelfiePreview(reader.result);
-      reader.readAsDataURL(file);
+      setCompressingSelfie(true);
+      setSelfieSizeInfo('');
+      const origKB = (file.size / 1024).toFixed(0);
+
+      try {
+        const compressed = await compressImage(file, 800, 800, 0.7);
+        const compKB = (compressed.size / 1024).toFixed(0);
+        setSelfieFile(compressed);
+
+        if (file.size > compressed.size) {
+          const percentSaved = (((file.size - compressed.size) / file.size) * 100).toFixed(0);
+          setSelfieSizeInfo(`Compressed: ${origKB} KB ➔ ${compKB} KB (Saved ${percentSaved}%)`);
+        } else {
+          setSelfieSizeInfo(`Size: ${compKB} KB`);
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => setSelfiePreview(reader.result);
+        reader.readAsDataURL(compressed);
+      } catch (err) {
+        setSelfieFile(file);
+        const reader = new FileReader();
+        reader.onload = () => setSelfiePreview(reader.result);
+        reader.readAsDataURL(file);
+      } finally {
+        setCompressingSelfie(false);
+      }
     }
   };
+
 
   // Clock In Action
   const handleClockIn = async () => {
@@ -598,14 +681,24 @@ export default function AttendancePortal() {
                     onChange={handleSelfieChange}
                   />
 
-                  {selfiePreview ? (
+                  {compressingSelfie ? (
+                    <div className="flex items-center gap-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800 text-cyan-400">
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      <span className="text-xs font-bold">Compressing photo for faster upload...</span>
+                    </div>
+                  ) : selfiePreview ? (
                     <div className="flex items-center gap-4 bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
                       <img src={selfiePreview} alt="Selfie preview" className="w-20 h-20 rounded-xl object-cover border border-violet-500/50" />
                       <div className="space-y-1.5 flex-1">
                         <div className="text-xs font-bold text-emerald-400 flex items-center gap-1">
                           <CheckCircle2 className="w-4 h-4" />
-                          <span>Selfie Captured</span>
+                          <span>Selfie Captured & Compressed</span>
                         </div>
+                        {selfieSizeInfo && (
+                          <div className="text-[11px] font-mono text-cyan-400 font-semibold">
+                            {selfieSizeInfo}
+                          </div>
+                        )}
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
@@ -627,6 +720,7 @@ export default function AttendancePortal() {
                       <span className="text-xs font-bold">Tap to Open Camera & Take Selfie</span>
                     </button>
                   )}
+
                 </div>
 
                 {/* Step 2: GPS Location */}
