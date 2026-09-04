@@ -189,9 +189,106 @@ const toggleAdminStatus = async (req, res) => {
   }
 };
 
+// @desc    Get system memory and storage usage for uploads
+// @route   GET /api/admins/memory-usage
+// @access  Private/Admin
+const getMemoryUsage = async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const uploadDir = path.join(__dirname, '..', 'uploads');
+
+    let totalBytes = 0;
+    let totalFiles = 0;
+
+    const breakdown = {
+      ticketPhotos: { label: 'Ticket Completion Photos', count: 0, bytes: 0 },
+      attendanceSelfies: { label: 'Attendance Selfies', count: 0, bytes: 0 },
+      employeeDocs: { label: 'Employee & Identity Documents', count: 0, bytes: 0 },
+      dealerVideos: { label: 'Dealer & Training Videos', count: 0, bytes: 0 },
+      otherFiles: { label: 'Other Attachments', count: 0, bytes: 0 }
+    };
+
+    function scanDir(directory) {
+      if (!fs.existsSync(directory)) return;
+      const files = fs.readdirSync(directory);
+      files.forEach(file => {
+        const fullPath = path.join(directory, file);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+          scanDir(fullPath);
+        } else {
+          const size = stat.size;
+          totalBytes += size;
+          totalFiles += 1;
+          const lowerName = file.toLowerCase();
+
+          if (lowerName.startsWith('photos-') || lowerName.startsWith('ticket-')) {
+            breakdown.ticketPhotos.count += 1;
+            breakdown.ticketPhotos.bytes += size;
+          } else if (lowerName.startsWith('selfie-') || lowerName.includes('selfie')) {
+            breakdown.attendanceSelfies.count += 1;
+            breakdown.attendanceSelfies.bytes += size;
+          } else if (
+            lowerName.startsWith('aadhar-') ||
+            lowerName.startsWith('license-') ||
+            lowerName.startsWith('insurance-') ||
+            lowerName.startsWith('profile-')
+          ) {
+            breakdown.employeeDocs.count += 1;
+            breakdown.employeeDocs.bytes += size;
+          } else if (
+            lowerName.endsWith('.mp4') ||
+            lowerName.endsWith('.mov') ||
+            lowerName.endsWith('.avi') ||
+            lowerName.includes('video')
+          ) {
+            breakdown.dealerVideos.count += 1;
+            breakdown.dealerVideos.bytes += size;
+          } else {
+            breakdown.otherFiles.count += 1;
+            breakdown.otherFiles.bytes += size;
+          }
+        }
+      });
+    }
+
+    scanDir(uploadDir);
+
+    const formatBytes = (bytes) => {
+      if (!bytes || bytes === 0) return '0 KB';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    const formattedBreakdown = {};
+    Object.keys(breakdown).forEach(key => {
+      formattedBreakdown[key] = {
+        ...breakdown[key],
+        formattedSize: formatBytes(breakdown[key].bytes),
+        percentage: totalBytes > 0 ? parseFloat(((breakdown[key].bytes / totalBytes) * 100).toFixed(1)) : 0
+      };
+    });
+
+    res.json({
+      totalBytes,
+      totalFiles,
+      formattedTotalSize: formatBytes(totalBytes),
+      breakdown: formattedBreakdown,
+      lastChecked: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getAdmins,
   addAdmin,
   updateAdmin,
-  toggleAdminStatus
+  toggleAdminStatus,
+  getMemoryUsage
 };
+

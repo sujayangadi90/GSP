@@ -1,9 +1,11 @@
 const express = require('express');
-const { getAdmins, addAdmin, updateAdmin, toggleAdminStatus } = require('../controllers/adminController');
+const { getAdmins, addAdmin, updateAdmin, toggleAdminStatus, getMemoryUsage } = require('../controllers/adminController');
 const { protect, authorize } = require('../middleware/auth');
 const router = express.Router();
 
 router.use(protect);
+
+router.get('/memory-usage', authorize('admin'), getMemoryUsage);
 
 router.route('/')
   .get(authorize('admin'), getAdmins)
@@ -16,3 +18,4 @@ router.route('/:id/toggle')
   .patch(authorize('admin'), toggleAdminStatus);
 
 module.exports = router;
+

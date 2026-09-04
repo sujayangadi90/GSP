@@ -42,8 +42,14 @@ import {
   ChevronRight,
   Sliders,
   Filter,
-  RotateCcw
+  RotateCcw,
+  HardDrive,
+  Database,
+  Image as ImageIcon,
+  FileText,
+  RefreshCw
 } from 'lucide-react';
+
 
 import AttendancePortal from './AttendancePortal.jsx';
 import LocationMapModal from './components/LocationMapModal.jsx';
@@ -477,6 +483,12 @@ export default function App() {
   const [feeApplianceFilter, setFeeApplianceFilter] = useState('ALL');
   const [feeBrandFilter, setFeeBrandFilter] = useState('ALL');
   const [feeSearchQuery, setFeeSearchQuery] = useState('');
+
+  // Memory & Storage Usage states
+  const [memoryData, setMemoryData] = useState(null);
+  const [memoryLoading, setMemoryLoading] = useState(false);
+  const [memoryError, setMemoryError] = useState(null);
+
 
   // Available brands for Fee Configuration dropdown
   const availableFeeBrands = useMemo(() => {
@@ -998,6 +1010,21 @@ export default function App() {
       console.error('Error fetching admins:', err);
     }
   };
+
+  const fetchMemoryUsage = async () => {
+    setMemoryLoading(true);
+    setMemoryError(null);
+    try {
+      const data = await apiFetch('/admins/memory-usage');
+      setMemoryData(data);
+    } catch (err) {
+      console.error('Error fetching memory usage:', err);
+      setMemoryError(err.message || 'Failed to fetch storage usage');
+    } finally {
+      setMemoryLoading(false);
+    }
+  };
+
 
   const handleSaveAdmin = async (e) => {
     e.preventDefault();
@@ -1880,7 +1907,10 @@ export default function App() {
         fetchDashboardData();
       } else if (activeTab === 'access_control' && user?.role === 'owner') {
         fetchAccessControlStatus();
+      } else if (activeTab === 'memory') {
+        fetchMemoryUsage();
       } else {
+
         fetchData();
         fetchCities();
         fetchAppliances();
@@ -3156,7 +3186,7 @@ export default function App() {
                   {settingsOpen ? '▲' : '▼'}
                 </span>
               </button>
-              {(settingsOpen || activeTab === 'appliances_brands' || activeTab === 'cities' || activeTab === 'user_management' || activeTab === 'fees_config' || activeTab === 'access_control') && (
+              {(settingsOpen || activeTab === 'appliances_brands' || activeTab === 'cities' || activeTab === 'user_management' || activeTab === 'fees_config' || activeTab === 'access_control' || activeTab === 'memory') && (
                 <div className="pl-6 mt-1 space-y-1">
                   {user && user.role === 'owner' && (
                     <button
@@ -3195,8 +3225,16 @@ export default function App() {
                     <ClipboardList className="w-4 h-4" />
                     Fees Configuration
                   </button>
+                  <button
+                    onClick={() => { setActiveTab('memory'); setMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'memory' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <HardDrive className="w-4 h-4 text-cyan-400" />
+                    Memory
+                  </button>
                 </div>
               )}
+
             </div>
           )}
         </aside>
@@ -5151,7 +5189,175 @@ export default function App() {
             </div>
           )}
 
+          {/* Memory & Storage Tab */}
+          {activeTab === 'memory' && (
+            <div className="space-y-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                    <HardDrive className="w-8 h-8 text-cyan-400" />
+                    Memory & Storage
+                  </h1>
+                  <p className="text-slate-400 mt-1">
+                    Monitor server disk usage occupied by uploaded ticket photos, selfies, and documents
+                  </p>
+                </div>
+                <button
+                  onClick={fetchMemoryUsage}
+                  disabled={memoryLoading}
+                  className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 px-5 rounded-xl border border-slate-700 text-sm shadow-md transition duration-150 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 text-cyan-400 ${memoryLoading ? 'animate-spin' : ''}`} />
+                  {memoryLoading ? 'Recalculating...' : 'Refresh Storage Data'}
+                </button>
+              </div>
+
+              {memoryLoading && !memoryData && (
+                <div className="flex flex-col items-center justify-center py-16 bg-slate-900/60 border border-slate-800 rounded-3xl space-y-4">
+                  <RefreshCw className="w-10 h-10 text-cyan-400 animate-spin" />
+                  <p className="text-slate-400 text-sm font-semibold">Calculating storage space and scanning uploads folder...</p>
+                </div>
+              )}
+
+              {memoryError && (
+                <div className="p-4 bg-red-950/60 border border-red-800/80 rounded-2xl text-red-300 text-sm flex items-center gap-3">
+                  <ShieldAlert className="w-5 h-5 text-red-400 shrink-0" />
+                  <span>{memoryError}</span>
+                </div>
+              )}
+
+              {memoryData && (
+                <div className="space-y-8">
+                  {/* Top Stats Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Total Storage */}
+                    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <HardDrive className="w-24 h-24 text-cyan-400" />
+                      </div>
+                      <div className="relative z-10 space-y-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                          <HardDrive className="w-4 h-4" />
+                          Total Photo Memory
+                        </span>
+                        <div className="text-3xl font-black text-white tracking-tight">
+                          {memoryData.formattedTotalSize}
+                        </div>
+                        <p className="text-xs text-slate-400 font-medium">
+                          Occupied by all uploaded photos & media files
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Total Files Count */}
+                    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <ImageIcon className="w-24 h-24 text-violet-400" />
+                      </div>
+                      <div className="relative z-10 space-y-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-violet-400 flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4" />
+                          Total Files Uploaded
+                        </span>
+                        <div className="text-3xl font-black text-white tracking-tight">
+                          {memoryData.totalFiles} <span className="text-lg font-normal text-slate-400">files</span>
+                        </div>
+                        <p className="text-xs text-slate-400 font-medium">
+                          Across ticket photos, selfies, and attachments
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Server Storage Location */}
+                    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <Database className="w-24 h-24 text-emerald-400" />
+                      </div>
+                      <div className="relative z-10 space-y-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                          <Database className="w-4 h-4" />
+                          Server Path
+                        </span>
+                        <div className="text-lg font-bold text-white truncate font-mono bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
+                          ./backend/uploads/
+                        </div>
+                        <p className="text-xs text-slate-400 font-medium">
+                          Last scanned: {new Date(memoryData.lastChecked).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Memory Breakdown by Category */}
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                      <div>
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                          <BarChart2 className="w-5 h-5 text-cyan-400" />
+                          Storage Memory Breakdown
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-0.5">Categorized distribution of photo and media files stored on backend server</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {memoryData.breakdown && Object.entries(memoryData.breakdown).map(([key, item]) => {
+                        const colors = {
+                          ticketPhotos: { border: 'border-violet-800/40', text: 'text-violet-400', bar: 'bg-violet-500', icon: ImageIcon },
+                          attendanceSelfies: { border: 'border-emerald-800/40', text: 'text-emerald-400', bar: 'bg-emerald-500', icon: Clock },
+                          employeeDocs: { border: 'border-amber-800/40', text: 'text-amber-400', bar: 'bg-amber-500', icon: FileText },
+                          dealerVideos: { border: 'border-cyan-800/40', text: 'text-cyan-400', bar: 'bg-cyan-500', icon: Video },
+                          otherFiles: { border: 'border-slate-700/40', text: 'text-slate-400', bar: 'bg-slate-500', icon: HardDrive }
+                        };
+                        const config = colors[key] || colors.otherFiles;
+                        const CategoryIcon = config.icon;
+
+                        return (
+                          <div key={key} className={`bg-slate-950/70 border ${config.border} rounded-2xl p-5 shadow-md space-y-4 flex flex-col justify-between`}>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className={`p-2 rounded-xl bg-slate-900 border border-slate-800 ${config.text}`}>
+                                    <CategoryIcon className="w-4 h-4" />
+                                  </div>
+                                  <span className="text-sm font-bold text-white truncate max-w-[160px]" title={item.label}>
+                                    {item.label}
+                                  </span>
+                                </div>
+                                <span className={`text-xs font-mono font-extrabold px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 ${config.text}`}>
+                                  {item.percentage}%
+                                </span>
+                              </div>
+
+                              <div className="flex items-baseline justify-between pt-1">
+                                <span className="text-2xl font-black text-white font-mono">
+                                  {item.formattedSize}
+                                </span>
+                                <span className="text-xs text-slate-400 font-semibold">
+                                  {item.count} {item.count === 1 ? 'file' : 'files'}
+                                </span>
+                              </div>
+
+                              {/* Progress bar */}
+                              <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                                <div
+                                  className={`h-full ${config.bar} transition-all duration-500 rounded-full`}
+                                  style={{ width: `${Math.max(item.percentage, item.count > 0 ? 3 : 0)}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Customers Tab */}
+
           {activeTab === 'customers' && (
             <div className="space-y-8">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
