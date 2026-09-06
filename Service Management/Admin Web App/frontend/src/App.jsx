@@ -3694,9 +3694,9 @@ export default function App() {
                 </div>
 
                 {/* Row 2: Date, City, Request Type, Status */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   {/* DATE */}
-                  <div>
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">DATE</label>
                     <div className="flex items-center gap-2">
                       <input 
