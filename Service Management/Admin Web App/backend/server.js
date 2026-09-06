@@ -98,4 +98,12 @@ app.listen(PORT, () => {
   } catch (cronErr) {
     console.error('Error starting auto clock-out scheduler:', cronErr);
   }
+
+  // Initialize scheduled cron jobs (e.g. Daily 10 AM technician assigned ticket notifications)
+  try {
+    const { initCronJobs } = require('./utils/cronService');
+    initCronJobs();
+  } catch (cronErr) {
+    console.error('Error starting daily cron service:', cronErr);
+  }
 });

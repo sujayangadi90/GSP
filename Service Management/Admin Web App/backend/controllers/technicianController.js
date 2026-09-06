@@ -198,4 +198,18 @@ const toggleTechnicianStatus = async (req, res) => {
   }
 };
 
-module.exports = { getTechnicians, addTechnician, getTechnicianById, updateTechnician, toggleTechnicianStatus };
+// Manually trigger 10 AM daily assigned ticket notifications
+const triggerDailyAssignedNotifications = async (req, res) => {
+  try {
+    const { sendDailyAssignedTicketNotifications } = require('../utils/cronService');
+    const result = await sendDailyAssignedTicketNotifications();
+    res.json({
+      message: 'Daily assigned ticket notifications trigger executed successfully',
+      result
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getTechnicians, addTechnician, getTechnicianById, updateTechnician, toggleTechnicianStatus, triggerDailyAssignedNotifications };

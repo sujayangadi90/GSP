@@ -1,10 +1,13 @@
 const express = require('express');
-const { getTechnicians, addTechnician, getTechnicianById, updateTechnician, toggleTechnicianStatus } = require('../controllers/technicianController');
+const { getTechnicians, addTechnician, getTechnicianById, updateTechnician, toggleTechnicianStatus, triggerDailyAssignedNotifications } = require('../controllers/technicianController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const router = express.Router();
 
 router.use(protect);
+
+router.route('/trigger-daily-assigned-notifications')
+  .post(authorize('admin'), triggerDailyAssignedNotifications);
 
 router.route('/upload')
   .post(authorize('admin'), upload.single('file'), (req, res) => {
