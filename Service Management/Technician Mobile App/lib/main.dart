@@ -3572,6 +3572,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   final _prodSerial = TextEditingController();
   final _prodInvoice = TextEditingController();
   final _prodDate = TextEditingController();
+  final _prodNotes = TextEditingController();
 
   final _serviceDesc = TextEditingController();
   final _visitDateController = TextEditingController();
@@ -3785,6 +3786,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
       request.fields['product[modelNumber]'] = _prodModel.text.trim();
       request.fields['product[serialNumber]'] = _prodSerial.text.trim();
       request.fields['product[invoiceNumber]'] = _prodInvoice.text.trim();
+      request.fields['product[notes]'] = _prodNotes.text.trim();
       
       if (_prodDate.text.isNotEmpty) {
         request.fields['product[purchaseDate]'] = _prodDate.text;
@@ -3977,6 +3979,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                   _buildTextField(_prodSerial, 'Serial Number', required: false),
                   _buildTextField(_prodInvoice, 'Invoice Number', required: false),
                   _buildDateField(_prodDate, 'Purchase Date', required: false),
+                  _buildTextField(_prodNotes, 'Product Notes / Remarks', required: false, maxLines: 2),
                   
                   if (widget.type == 'service') ...[
                     const SizedBox(height: 24),

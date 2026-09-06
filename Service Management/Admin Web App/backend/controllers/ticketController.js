@@ -1749,7 +1749,8 @@ const updateTicketByAdmin = async (req, res) => {
         modelNumber: product.modelNumber !== undefined ? product.modelNumber : ticket.product?.modelNumber,
         serialNumber: product.serialNumber !== undefined ? product.serialNumber : ticket.product?.serialNumber,
         invoiceNumber: product.invoiceNumber !== undefined ? product.invoiceNumber : ticket.product?.invoiceNumber,
-        purchaseDate: product.purchaseDate !== undefined ? product.purchaseDate : ticket.product?.purchaseDate
+        purchaseDate: product.purchaseDate !== undefined ? product.purchaseDate : ticket.product?.purchaseDate,
+        notes: product.notes !== undefined ? product.notes : ticket.product?.notes
       };
     }
 

@@ -39,7 +39,8 @@ const TicketSchema = new mongoose.Schema({
     modelNumber: String,
     serialNumber: String,
     purchaseDate: Date,
-    invoiceNumber: String
+    invoiceNumber: String,
+    notes: String
   },
   serviceDetails: {
     description: String,

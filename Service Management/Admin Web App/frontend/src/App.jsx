@@ -461,7 +461,8 @@ export default function App() {
       modelNumber: '',
       serialNumber: '',
       purchaseDate: '',
-      invoiceNumber: ''
+      invoiceNumber: '',
+      notes: ''
     },
     serviceDetails: {
       description: '',
@@ -2981,7 +2982,8 @@ export default function App() {
           modelNumber: newRequestForm.product.modelNumber || undefined,
           serialNumber: newRequestForm.product.serialNumber || undefined,
           purchaseDate: newRequestForm.product.purchaseDate || undefined,
-          invoiceNumber: newRequestForm.product.invoiceNumber || undefined
+          invoiceNumber: newRequestForm.product.invoiceNumber || undefined,
+          notes: newRequestForm.product.notes || undefined
         },
         invoiceImage: uploadedInvoicePath || undefined
       };
@@ -11013,6 +11015,19 @@ export default function App() {
                       })}
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Product Notes / Remarks</label>
+                  <textarea 
+                    rows="2"
+                    placeholder="Enter any additional product notes, specifications, or details..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none"
+                    value={newRequestForm.product.notes || ''}
+                    onChange={e => setNewRequestForm({ 
+                      ...newRequestForm, 
+                      product: { ...newRequestForm.product, notes: e.target.value } 
+                    })}
+                  />
                 </div>
               </div>
 
