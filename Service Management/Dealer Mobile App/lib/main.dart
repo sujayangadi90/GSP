@@ -1104,7 +1104,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                     child: DropdownButtonFormField<String>(
                       value: _selectedBrandName,
                       decoration: const InputDecoration(
-                        labelText: 'Select Brand',
+                        labelText: 'Select Size/Module',
                         border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
                       ),
                       items: _brands.map<DropdownMenuItem<String>>((brand) {
@@ -1118,7 +1118,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                           _selectedBrandName = val;
                         });
                       },
-                      validator: (val) => val == null ? 'Please select a brand' : null,
+                      validator: (val) => val == null ? 'Please select a size/module' : null,
                     ),
                   ),
                   _buildTextField(_prodModel, 'Model Number', required: false),

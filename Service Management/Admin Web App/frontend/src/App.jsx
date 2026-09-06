@@ -1384,9 +1384,10 @@ export default function App() {
   const handleSaveVideoLibraryItem = async (e) => {
     e.preventDefault();
     if (!videoLibraryForm.title || !videoLibraryForm.appliance || !videoLibraryForm.brand || !videoLibraryForm.videoUrl) {
-      alert('Please fill all required fields: Title, Appliance, Brand, and Video link');
+      alert('Please fill all required fields: Title, Appliance, Size/Module, and Video link');
       return;
     }
+
 
     try {
       if (videoLibraryForm.id) {
@@ -1565,8 +1566,9 @@ export default function App() {
       }
 
       const headers = reportTab === 'dealer'
-        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense (₹)']
-        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Dealer', 'Technician Earning (₹)'];
+        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
+        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
+
 
       const rows = exportData.map(t => {
         const completedDate = t.adminVerification?.verifiedAt 
@@ -1644,8 +1646,9 @@ export default function App() {
       }
 
       const headers = reportTab === 'dealer'
-        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Technician', 'Dealer Expense (₹)']
-        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Brand', 'Customer', 'Dealer', 'Technician Earning (₹)'];
+        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
+        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
+
 
       const rows = exportData.map(t => {
         const completedDate = t.adminVerification?.verifiedAt 
@@ -2086,7 +2089,7 @@ export default function App() {
   };
 
   const deleteAppliance = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this appliance? This will fail if brands are linked.')) return;
+    if (!window.confirm('Are you sure you want to delete this appliance? This will fail if sizes/modules are linked.')) return;
     try {
       await apiFetch(`/appliances/${id}`, { method: 'DELETE' });
       fetchAppliances();
@@ -2131,7 +2134,8 @@ export default function App() {
   };
 
   const deleteBrand = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this brand?')) return;
+    if (!window.confirm('Are you sure you want to delete this size/module?')) return;
+
     try {
       await apiFetch(`/brands/${id}`, { method: 'DELETE' });
       fetchBrands();
@@ -3317,8 +3321,9 @@ export default function App() {
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'appliances_brands' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
                   >
                     <Layers className="w-4 h-4" />
-                    Appliances & Brands
+                    Appliances & Size/Module
                   </button>
+
                   <button
                     onClick={() => { setActiveTab('cities'); setMenuOpen(false); }}
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'cities' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
@@ -4842,14 +4847,14 @@ export default function App() {
             <div className="space-y-8">
               <div>
                 <h1 className="text-3xl font-extrabold text-white tracking-tight">Fees Configuration</h1>
-                <p className="text-slate-400 mt-1">Configure Customer, Dealer, and Technician service & installation fees for each appliance category and brand</p>
+                <p className="text-slate-400 mt-1">Configure Customer, Dealer, and Technician service & installation fees for each appliance category and size/module</p>
               </div>
 
               <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     <ClipboardList className="w-5 h-5 text-violet-400" />
-                    Appliance & Brand Fee Matrix
+                    Appliance & Size/Module Fee Matrix
                   </h3>
                   <div className="flex items-center gap-2 text-xs text-slate-400">
                     <span>Showing <strong className="text-white">{filteredFeeBrands.length}</strong> of {brands.length} fee configurations</span>
@@ -4884,7 +4889,7 @@ export default function App() {
                   <div className="lg:col-span-4">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1.5">
                       <Filter className="w-3 h-3 text-amber-400" />
-                      Brand
+                      Size/Module
                     </label>
                     <select
                       value={feeBrandFilter}
@@ -4894,7 +4899,7 @@ export default function App() {
                       }}
                       className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
                     >
-                      <option value="ALL">All Brands ({availableFeeBrands.length})</option>
+                      <option value="ALL">All Sizes/Modules ({availableFeeBrands.length})</option>
                       {availableFeeBrands.map(bName => (
                         <option key={bName} value={bName}>{bName}</option>
                       ))}
@@ -4910,7 +4915,7 @@ export default function App() {
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="Search appliance or brand..."
+                        placeholder="Search appliance or size/module..."
                         value={feeSearchQuery}
                         onChange={(e) => {
                           setFeeSearchQuery(e.target.value);
@@ -4957,7 +4962,7 @@ export default function App() {
                     <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase font-semibold">
                       <tr>
                         <th className="px-5 py-3.5 rounded-l-lg">Appliance Category</th>
-                        <th className="px-5 py-3.5">Brand</th>
+                        <th className="px-5 py-3.5">Size/Module</th>
                         <th className="px-5 py-3.5">
                           <span className="text-violet-400 font-bold">1. Customer Fee</span>
                           <div className="text-[10px] text-slate-500 font-normal uppercase">Service / Install</div>
@@ -4978,7 +4983,7 @@ export default function App() {
                         <tr>
                           <td colSpan="6" className="text-slate-500 py-10 text-center">
                             {brands.length === 0 
-                              ? 'No brands configured yet. Please configure appliances and brands first.'
+                              ? 'No sizes/modules configured yet. Please configure appliances and sizes/modules first.'
                               : 'No fee configurations match the selected filters.'}
                           </td>
                         </tr>
@@ -8424,7 +8429,7 @@ export default function App() {
                     value={videoLibraryBrandFilter}
                     onChange={e => setVideoLibraryBrandFilter(e.target.value)}
                   >
-                    <option value="">All Brands</option>
+                    <option value="">All Sizes/Modules</option>
                     {brands
                       .filter(b => !videoLibraryApplianceFilter || (b.appliance?._id || b.appliance) === videoLibraryApplianceFilter)
                       .map(b => (
@@ -10368,12 +10373,12 @@ export default function App() {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
             <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
-              <h3 className="font-bold text-white">{brandForm.id ? 'Edit Brand Config' : 'Add Brand Configuration'}</h3>
+              <h3 className="font-bold text-white">{brandForm.id ? 'Edit Size/Module Config' : 'Add Size/Module Configuration'}</h3>
               <button onClick={() => setBrandForm(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={saveBrand} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Brand Name</label>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Size/Module Name</label>
                 <input
                   required
                   type="text"
@@ -10915,7 +10920,7 @@ export default function App() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Product (Brand) *</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Product (Size/Module) *</label>
                     <select 
                       required 
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer"
@@ -10926,7 +10931,7 @@ export default function App() {
                       })}
                       disabled={!newRequestForm.product.category}
                     >
-                      <option value="">-- Choose Brand --</option>
+                      <option value="">-- Choose Size/Module --</option>
                       {brands
                         .filter(b => {
                           const appObj = appliances.find(a => a.name === newRequestForm.product.category);
@@ -11440,7 +11445,7 @@ export default function App() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
-                    Select Brand *
+                    Select Size/Module *
                   </label>
                   <select
                     required
@@ -11448,7 +11453,7 @@ export default function App() {
                     value={videoLibraryForm.brand}
                     onChange={e => setVideoLibraryForm({ ...videoLibraryForm, brand: e.target.value })}
                   >
-                    <option value="">-- Choose Brand --</option>
+                    <option value="">-- Choose Size/Module --</option>
                     {brands
                       .filter(b => !videoLibraryForm.appliance || (b.appliance?._id || b.appliance) === videoLibraryForm.appliance)
                       .map(b => (

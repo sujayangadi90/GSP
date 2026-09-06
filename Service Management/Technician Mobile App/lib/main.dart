@@ -3679,16 +3679,16 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
     if (isService) {
       if (_serviceType == 'In Warranty') {
         subtitle = _selectedBrandObject != null 
-            ? 'Configured Service Fee for ${_selectedBrandObject['name'] ?? 'brand'}' 
-            : 'Select appliance & brand to view configured fee';
+            ? 'Configured Service Fee for ${_selectedBrandObject['name'] ?? 'size/module'}' 
+            : 'Select appliance & size/module to view configured fee';
       } else {
         subtitle = 'Out of warranty service (Price: ₹ 0)';
       }
     } else {
       if (_installationType == 'Paid Installation') {
         subtitle = _selectedBrandObject != null 
-            ? 'Configured Installation Fee for ${_selectedBrandObject['name'] ?? 'brand'}' 
-            : 'Select appliance & brand to view configured fee';
+            ? 'Configured Installation Fee for ${_selectedBrandObject['name'] ?? 'size/module'}' 
+            : 'Select appliance & size/module to view configured fee';
       } else {
         subtitle = 'Free installation covered (Price: ₹ 0)';
       }
@@ -3955,7 +3955,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                       value: _selectedBrandName,
                       isExpanded: true,
                       decoration: const InputDecoration(
-                        labelText: 'Brand *',
+                        labelText: 'Size/Module *',
                         border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
                       ),
                       items: _brands.map<DropdownMenuItem<String>>((brand) {
@@ -3970,7 +3970,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                           _selectedBrandObject = _brands.firstWhere((b) => b['name'] == val, orElse: () => null);
                         });
                       },
-                      validator: (val) => val == null ? 'Please select a brand' : null,
+                      validator: (val) => val == null ? 'Please select a size/module' : null,
                     ),
                   ),
                   _buildTextField(_prodModel, 'Model Number', required: false),
@@ -4457,12 +4457,12 @@ class _VideoLibraryScreenState extends State<VideoLibraryScreen> {
                             isExpanded: true,
                             value: _selectedBrandId,
                             dropdownColor: const Color(0xFF1E2422),
-                            hint: const Text('All Brands', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                            hint: const Text('All Sizes/Modules', style: TextStyle(color: Colors.grey, fontSize: 12)),
                             style: const TextStyle(color: Colors.white, fontSize: 12),
                             items: [
                               const DropdownMenuItem<String?>(
                                 value: null,
-                                child: Text('All Brands', style: TextStyle(fontSize: 12)),
+                                child: Text('All Sizes/Modules', style: TextStyle(fontSize: 12)),
                               ),
                               ...filteredBrands.map((b) {
                                 return DropdownMenuItem<String?>(
