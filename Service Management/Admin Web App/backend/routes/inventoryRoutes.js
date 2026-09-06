@@ -26,29 +26,30 @@ router.route('/upload')
   });
 
 router.route('/scan-excel')
-  .post(authorize('admin'), excelUpload.single('file'), scanImportFile);
+  .post(authorize('admin', 'owner'), excelUpload.single('file'), scanImportFile);
 
 router.route('/export-unsuitable')
-  .post(authorize('admin'), downloadUnsuitableFile);
+  .post(authorize('admin', 'owner'), downloadUnsuitableFile);
 
 router.route('/confirm-import')
-  .post(authorize('admin'), confirmImport);
+  .post(authorize('admin', 'owner'), confirmImport);
 
 router.route('/export-template')
-  .get(authorize('admin'), downloadTemplate);
+  .get(downloadTemplate);
 
 router.route('/')
   .get(getItems)
-  .post(authorize('admin'), createItem);
+  .post(authorize('admin', 'owner'), createItem);
 
 router.route('/:id')
-  .put(authorize('admin'), updateItem);
+  .put(authorize('admin', 'owner'), updateItem);
 
 router.route('/:id/stock-in')
-  .post(authorize('admin'), stockIn);
+  .post(authorize('admin', 'owner'), stockIn);
 
 router.route('/:id/stock-out')
-  .post(authorize('admin'), stockOut);
+  .post(authorize('admin', 'owner'), stockOut);
+
 
 module.exports = router;
 

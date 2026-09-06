@@ -2485,7 +2485,10 @@ export default function App() {
       const res = await fetch(`${API_BASE}/inventory/export-template`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-      if (!res.ok) throw new Error('Failed to download template');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to download template (${res.status})`);
+      }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2499,6 +2502,7 @@ export default function App() {
       alert(err.message || 'Failed to download template');
     }
   };
+
 
   const handleScanFile = async () => {
     if (!importFile) return;
