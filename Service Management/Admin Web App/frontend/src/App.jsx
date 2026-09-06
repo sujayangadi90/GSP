@@ -2480,28 +2480,7 @@ export default function App() {
     }
   };
 
-  const handleDownloadTemplate = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/inventory/export-template`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'inventory_import_template.xlsx';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        return;
-      }
-    } catch (err) {
-      console.warn('Backend template route unavailable, using client-side generator', err);
-    }
-
-    // Client-side fallback CSV download
+  const handleDownloadTemplate = () => {
     try {
       const csvHeader = "SKU,Item Name,Available Stock,Min Stock Level,Selling Price,Image URL\n";
       const sampleRows = [
@@ -2517,10 +2496,11 @@ export default function App() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (fallbackErr) {
-      alert('Failed to download template: ' + fallbackErr.message);
+    } catch (err) {
+      alert('Failed to download template: ' + err.message);
     }
   };
+
 
 
 
