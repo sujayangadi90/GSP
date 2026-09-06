@@ -4660,8 +4660,8 @@ export default function App() {
           {activeTab === 'appliances_brands' && (
             <div className="space-y-8">
               <div>
-                <h1 className="text-3xl font-extrabold text-white tracking-tight">Appliances & Brands Master</h1>
-                <p className="text-slate-400 mt-1">Manage categories of appliances and their associated brands & follow-up policies</p>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight">Appliances & Size/Module Master</h1>
+                <p className="text-slate-400 mt-1">Manage categories of appliances and their associated sizes/modules & follow-up policies</p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -4723,20 +4723,20 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
                       <SlidersHorizontal className="w-5 h-5 text-indigo-400" />
-                      Brand Configurations
+                      Size/Module Configurations
                     </h3>
                     <button
                       disabled={appliances.length === 0}
                       onClick={() => setBrandForm({ name: '', applianceId: appliances[0]?._id, followUpDays: 90 })}
                       className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
                     >
-                      <Plus className="w-4 h-4" /> Add Brand
+                      <Plus className="w-4 h-4" /> Add Size/Module
                     </button>
                   </div>
 
                   <div className="divide-y divide-slate-800 max-h-[500px] overflow-y-auto">
                     {brands.length === 0 ? (
-                      <p className="text-slate-500 py-6 text-center text-sm">No brands added yet</p>
+                      <p className="text-slate-500 py-6 text-center text-sm">No sizes/modules added yet</p>
                     ) : (
                       brands.map(b => (
                         <div key={b._id} className="py-3 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition duration-150">
