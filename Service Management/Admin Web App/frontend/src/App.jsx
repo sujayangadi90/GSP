@@ -491,6 +491,7 @@ export default function App() {
   const [brands, setBrands] = useState([]);
   const [applianceForm, setApplianceForm] = useState(null); // null or { id?, name }
   const [brandForm, setBrandForm] = useState(null); // null or { id?, name, applianceId, followUpDays }
+  const [brandApplianceFilter, setBrandApplianceFilter] = useState('ALL');
   const [cities, setCities] = useState([]);
   const [cityForm, setCityForm] = useState(null); // null or { id?, name }
   const [feeForm, setFeeForm] = useState(null); // null or { id, brandName, applianceName, serviceFee, installationFee }
@@ -4720,7 +4721,7 @@ export default function App() {
 
                 {/* Brands Panel */}
                 <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
                       <SlidersHorizontal className="w-5 h-5 text-indigo-400" />
                       Size/Module Configurations
@@ -4728,17 +4729,37 @@ export default function App() {
                     <button
                       disabled={appliances.length === 0}
                       onClick={() => setBrandForm({ name: '', applianceId: appliances[0]?._id, followUpDays: 90 })}
-                      className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50 self-start sm:self-auto"
                     >
                       <Plus className="w-4 h-4" /> Add Size/Module
                     </button>
                   </div>
 
-                  <div className="divide-y divide-slate-800 max-h-[500px] overflow-y-auto">
+                  {/* Filter by Appliance Category */}
+                  <div className="flex items-center gap-2 bg-slate-800/40 p-2.5 rounded-xl border border-slate-700/50">
+                    <Filter className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                    <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">Filter by Appliance:</span>
+                    <select
+                      value={brandApplianceFilter}
+                      onChange={(e) => setBrandApplianceFilter(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:border-violet-500 cursor-pointer"
+                    >
+                      <option value="ALL">All Appliances ({appliances.length})</option>
+                      {appliances.map(a => (
+                        <option key={a._id} value={a._id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="divide-y divide-slate-800 max-h-[440px] overflow-y-auto">
                     {brands.length === 0 ? (
                       <p className="text-slate-500 py-6 text-center text-sm">No sizes/modules added yet</p>
+                    ) : brands.filter(b => brandApplianceFilter === 'ALL' || (b.appliance?._id || b.appliance) === brandApplianceFilter).length === 0 ? (
+                      <p className="text-slate-500 py-6 text-center text-sm">No sizes/modules found for selected appliance</p>
                     ) : (
-                      brands.map(b => (
+                      brands
+                        .filter(b => brandApplianceFilter === 'ALL' || (b.appliance?._id || b.appliance) === brandApplianceFilter)
+                        .map(b => (
                         <div key={b._id} className="py-3 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition duration-150">
                           <div>
                             <p className="text-sm font-bold text-white">{b.name}</p>
