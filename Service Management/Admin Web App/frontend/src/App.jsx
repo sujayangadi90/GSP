@@ -47,8 +47,12 @@ import {
   Database,
   Image as ImageIcon,
   FileText,
-  RefreshCw
+  RefreshCw,
+  Download,
+  FileSpreadsheet,
+  AlertTriangle
 } from 'lucide-react';
+
 
 
 import AttendancePortal from './AttendancePortal.jsx';
@@ -411,6 +415,16 @@ export default function App() {
   const [showStockAdjustment, setShowStockAdjustment] = useState(null); // null or { id, name, sku, mode, quantity, technicianId, technicianName }
   const [selectedItemTransactions, setSelectedItemTransactions] = useState(null); // null or item object
   const [inventoryPage, setInventoryPage] = useState(1);
+  
+  // Inventory Excel import states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importStep, setImportStep] = useState('upload'); // 'upload' | 'scanning' | 'preview' | 'importing' | 'complete'
+  const [importFile, setImportFile] = useState(null);
+  const [scanResult, setScanResult] = useState(null);
+  const [importError, setImportError] = useState('');
+  const [isDownloadingUnsuitable, setIsDownloadingUnsuitable] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importSummary, setImportSummary] = useState(null);
   
   // Performance states
   const [evaluations, setEvaluations] = useState([]);
@@ -2465,6 +2479,103 @@ export default function App() {
       alert(err.message);
     }
   };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/inventory/export-template`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error('Failed to download template');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'inventory_import_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message || 'Failed to download template');
+    }
+  };
+
+  const handleScanFile = async () => {
+    if (!importFile) return;
+    setImportStep('scanning');
+    setImportError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      const res = await fetch(`${API_BASE}/inventory/scan-excel`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to scan file');
+      }
+
+      setScanResult(data);
+      setImportStep('preview');
+    } catch (err) {
+      setImportError(err.message || 'Error scanning file');
+      setImportStep('upload');
+    }
+  };
+
+  const handleDownloadUnsuitable = async () => {
+    if (!scanResult || !scanResult.unsuitableRecords || scanResult.unsuitableRecords.length === 0) return;
+    setIsDownloadingUnsuitable(true);
+    try {
+      const res = await fetch(`${API_BASE}/inventory/export-unsuitable`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ unsuitableRecords: scanResult.unsuitableRecords })
+      });
+      if (!res.ok) throw new Error('Failed to download unsuitable records');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'unsuitable_inventory_records.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message || 'Failed to download unsuitable records');
+    } finally {
+      setIsDownloadingUnsuitable(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!scanResult || !scanResult.validRecords || scanResult.validRecords.length === 0) return;
+    setImportStep('importing');
+    setIsImporting(true);
+    try {
+      const data = await apiFetch('/inventory/confirm-import', {
+        method: 'POST',
+        body: JSON.stringify({ validRecords: scanResult.validRecords })
+      });
+      setImportSummary(data);
+      setImportStep('complete');
+      fetchInventory();
+    } catch (err) {
+      alert(err.message || 'Failed to confirm import');
+      setImportStep('preview');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
 
   const toggleTech = async (id) => {
     try {
@@ -7112,23 +7223,40 @@ export default function App() {
                   <h1 className="text-3xl font-extrabold text-white tracking-tight">Inventory Management</h1>
                   <p className="text-slate-400 mt-1">Manage, edit, and track parts stock</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setInventoryForm({
-                      name: '',
-                      sku: '',
-                      image: '',
-                      quantity: 0,
-                      minStockLevel: 5,
-                      sellingPrice: 0
-                    });
-                  }}
-                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150 shrink-0"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Inventory Item
-                </button>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => {
+                      setShowImportModal(true);
+                      setImportStep('upload');
+                      setImportFile(null);
+                      setScanResult(null);
+                      setImportError('');
+                      setImportSummary(null);
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-emerald-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150 shrink-0"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Import Excel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setInventoryForm({
+                        name: '',
+                        sku: '',
+                        image: '',
+                        quantity: 0,
+                        minStockLevel: 5,
+                        sellingPrice: 0
+                      });
+                    }}
+                    className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150 shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Inventory Item
+                  </button>
+                </div>
               </div>
+
 
               {/* Filters */}
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-wrap gap-4 items-end shadow-xl">
@@ -8798,6 +8926,273 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Inventory Excel Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-lg">Bulk Import Inventory</h3>
+                  <p className="text-xs text-slate-400">Upload Excel or CSV file to add or update stock items</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="text-slate-400 hover:text-slate-200 cursor-pointer p-1"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {/* Step 1: Upload File */}
+              {importStep === 'upload' && (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between p-4 bg-slate-800/60 border border-slate-700/70 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5 text-violet-400" />
+                      <div>
+                        <h4 className="text-sm font-semibold text-white">Need a template?</h4>
+                        <p className="text-xs text-slate-400">Download sample Excel file with required columns</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadTemplate}
+                      className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-650 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download Template
+                    </button>
+                  </div>
+
+                  <div className="border-2 border-dashed border-slate-700 hover:border-violet-500/50 bg-slate-800/30 hover:bg-slate-800/50 rounded-2xl p-8 text-center transition cursor-pointer relative">
+                    <input
+                      type="file"
+                      accept=".xlsx, .xls, .csv"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setImportFile(e.target.files[0]);
+                          setImportError('');
+                        }
+                      }}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-violet-500/10 text-violet-400 flex items-center justify-center">
+                        <Upload className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white">
+                          {importFile ? importFile.name : 'Click or drag and drop file here'}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">Supports .xlsx, .xls, and .csv formats</p>
+                      </div>
+                      {importFile && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                          <CheckCircle className="w-3.5 h-3.5" /> Ready for scanning
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {importError && (
+                    <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{importError}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 2: Scanning Loading */}
+              {importStep === 'scanning' && (
+                <div className="py-12 flex flex-col items-center justify-center space-y-4 text-center">
+                  <RefreshCw className="w-10 h-10 text-violet-400 animate-spin" />
+                  <div>
+                    <h4 className="text-base font-bold text-white">Scanning & Validating Content...</h4>
+                    <p className="text-xs text-slate-400 mt-1">Analyzing records and detecting formatting errors</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Scan Preview */}
+              {importStep === 'preview' && scanResult && (
+                <div className="space-y-6">
+                  {/* Summary Statistics Badges */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
+                      <span className="text-xs font-semibold text-slate-400 block uppercase tracking-wider">Total Scanned</span>
+                      <span className="text-2xl font-black text-white">{scanResult.totalRecords}</span>
+                    </div>
+                    <div className="bg-emerald-950/40 border border-emerald-500/30 p-4 rounded-xl text-center">
+                      <span className="text-xs font-semibold text-emerald-400 block uppercase tracking-wider">Ready to Insert</span>
+                      <span className="text-2xl font-black text-emerald-400">{scanResult.validCount}</span>
+                    </div>
+                    <div className="bg-rose-950/40 border border-rose-500/30 p-4 rounded-xl text-center">
+                      <span className="text-xs font-semibold text-rose-400 block uppercase tracking-wider">Unsuitable Records</span>
+                      <span className="text-2xl font-black text-rose-400">{scanResult.unsuitableCount}</span>
+                    </div>
+                  </div>
+
+                  {/* Unsuitable Records Section */}
+                  {scanResult.unsuitableCount > 0 && (
+                    <div className="space-y-3 bg-rose-950/20 border border-rose-500/20 p-4 rounded-xl">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div className="flex items-center gap-2 text-rose-400">
+                          <AlertTriangle className="w-5 h-5 shrink-0" />
+                          <h4 className="text-sm font-bold text-white">
+                            {scanResult.unsuitableCount} Unsuitable Record{scanResult.unsuitableCount > 1 ? 's' : ''} Found
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleDownloadUnsuitable}
+                          disabled={isDownloadingUnsuitable}
+                          className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          {isDownloadingUnsuitable ? 'Exporting...' : 'Download Unsuitable Records (.xlsx)'}
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        These records will be skipped during import. You can download the file, fix errors, and re-upload.
+                      </p>
+
+                      {/* Table of Unsuitable Records */}
+                      <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-800 text-slate-400 uppercase font-semibold sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2">Row</th>
+                              <th className="px-3 py-2">SKU</th>
+                              <th className="px-3 py-2">Item Name</th>
+                              <th className="px-3 py-2">Error Reason</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800 text-slate-300 font-mono">
+                            {scanResult.unsuitableRecords.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-slate-800/50">
+                                <td className="px-3 py-2 font-bold text-slate-400">{item.rowNum}</td>
+                                <td className="px-3 py-2 text-white">{item.sku || '-'}</td>
+                                <td className="px-3 py-2 truncate max-w-[150px]">{item.name || '-'}</td>
+                                <td className="px-3 py-2 text-rose-400 font-sans">{item.reason}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Valid Records Info */}
+                  {scanResult.validCount > 0 ? (
+                    <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl text-xs text-emerald-300 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>{scanResult.validCount} valid record(s) ready to be imported/updated into inventory.</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-amber-950/20 border border-amber-500/20 rounded-xl text-xs text-amber-300 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>No valid records available to import. Please correct the file and re-upload.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 4: Importing Spinner */}
+              {importStep === 'importing' && (
+                <div className="py-12 flex flex-col items-center justify-center space-y-4 text-center">
+                  <RefreshCw className="w-10 h-10 text-emerald-400 animate-spin" />
+                  <div>
+                    <h4 className="text-base font-bold text-white">Importing Inventory Items...</h4>
+                    <p className="text-xs text-slate-400 mt-1">Saving items and recording stock transactions</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 5: Complete */}
+              {importStep === 'complete' && importSummary && (
+                <div className="py-8 flex flex-col items-center justify-center space-y-4 text-center">
+                  <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <CheckCircle className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-extrabold text-white">Import Completed Successfully!</h4>
+                    <p className="text-sm text-slate-300 mt-1">{importSummary.message}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-end gap-3 border-t border-slate-800 shrink-0">
+              {importStep === 'upload' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowImportModal(false)}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!importFile}
+                    onClick={handleScanFile}
+                    className="px-5 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer transition shadow-lg"
+                  >
+                    Scan & Validate File
+                  </button>
+                </>
+              )}
+
+              {importStep === 'preview' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImportStep('upload');
+                      setScanResult(null);
+                    }}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-semibold cursor-pointer"
+                  >
+                    Re-upload File
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!scanResult || scanResult.validCount === 0 || isImporting}
+                    onClick={handleConfirmImport}
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer transition shadow-lg"
+                  >
+                    <Check className="w-4 h-4" />
+                    Confirm & Import ({scanResult?.validCount || 0} Valid Records)
+                  </button>
+                </>
+              )}
+
+              {importStep === 'complete' && (
+                <button
+                  type="button"
+                  onClick={() => setShowImportModal(false)}
+                  className="px-5 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-sm font-bold cursor-pointer"
+                >
+                  Done
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

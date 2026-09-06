@@ -36,4 +36,11 @@ const upload = multer({
   limits: { fileSize: 200 * 1024 * 1024 } // 200MB limit for media/videos
 });
 
+const excelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+});
+
 module.exports = upload;
+module.exports.excelUpload = excelUpload;
+
