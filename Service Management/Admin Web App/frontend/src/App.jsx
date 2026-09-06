@@ -9042,12 +9042,56 @@ export default function App() {
                     <div className="bg-emerald-950/40 border border-emerald-500/30 p-4 rounded-xl text-center">
                       <span className="text-xs font-semibold text-emerald-400 block uppercase tracking-wider">Ready to Insert</span>
                       <span className="text-2xl font-black text-emerald-400">{scanResult.validCount}</span>
+                      {scanResult.existingCount > 0 && (
+                        <span className="block text-[10px] text-emerald-300 font-semibold mt-0.5">
+                          {scanResult.newCount || 0} New · {scanResult.existingCount} Update
+                        </span>
+                      )}
                     </div>
                     <div className="bg-rose-950/40 border border-rose-500/30 p-4 rounded-xl text-center">
                       <span className="text-xs font-semibold text-rose-400 block uppercase tracking-wider">Unsuitable Records</span>
                       <span className="text-2xl font-black text-rose-400">{scanResult.unsuitableCount}</span>
                     </div>
                   </div>
+
+                  {/* Existing SKUs Warning / Update Info */}
+                  {scanResult.existingCount > 0 && (
+                    <div className="space-y-3 bg-violet-950/30 border border-violet-500/30 p-4 rounded-xl">
+                      <div className="flex items-center gap-2 text-violet-400">
+                        <RefreshCw className="w-5 h-5 shrink-0" />
+                        <h4 className="text-sm font-bold text-white">
+                          {scanResult.existingCount} Existing Item{scanResult.existingCount > 1 ? 's' : ''} Will Be Updated
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-300">
+                        The following SKU(s) already exist in your inventory. Importing will update their details and add any specified stock:
+                      </p>
+                      <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-800 text-slate-400 uppercase font-semibold sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2">Row</th>
+                              <th className="px-3 py-2">SKU</th>
+                              <th className="px-3 py-2">Current Item Name</th>
+                              <th className="px-3 py-2">Import Name</th>
+                              <th className="px-3 py-2">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800 text-slate-300 font-mono">
+                            {scanResult.existingRecords.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-slate-800/50">
+                                <td className="px-3 py-2 font-bold text-slate-400">{item.rowNum}</td>
+                                <td className="px-3 py-2 font-bold text-violet-400">{item.sku}</td>
+                                <td className="px-3 py-2 text-slate-400 truncate max-w-[140px]">{item.existingName || '-'}</td>
+                                <td className="px-3 py-2 text-white truncate max-w-[140px]">{item.name}</td>
+                                <td className="px-3 py-2 text-emerald-400 font-sans font-semibold">Will Update</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Unsuitable Records Section */}
                   {scanResult.unsuitableCount > 0 && (
@@ -9104,10 +9148,13 @@ export default function App() {
                     <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl text-xs text-emerald-300 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>{scanResult.validCount} valid record(s) ready to be imported/updated into inventory.</span>
+                        <span>
+                          {scanResult.validCount} valid record(s) ready to be imported ({scanResult.newCount || 0} new, {scanResult.existingCount || 0} existing item(s) will be updated).
+                        </span>
                       </div>
                     </div>
                   ) : (
+
                     <div className="p-4 bg-amber-950/20 border border-amber-500/20 rounded-xl text-xs text-amber-300 flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
                       <span>No valid records available to import. Please correct the file and re-upload.</span>

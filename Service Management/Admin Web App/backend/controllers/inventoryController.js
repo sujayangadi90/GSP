@@ -328,17 +328,46 @@ const scanImportFile = async (req, res) => {
       }
     });
 
+    // Query database to detect existing SKUs that will be updated
+    const validSkus = validRecords.map(r => r.sku);
+    const existingDbItems = await InventoryItem.find({ sku: { $in: validSkus } }).select('sku name quantity');
+    const existingSkuMap = new Map();
+    existingDbItems.forEach(item => {
+      existingSkuMap.set(item.sku.toLowerCase(), item);
+    });
+
+    const existingRecords = [];
+    const newRecords = [];
+
+    validRecords.forEach(record => {
+      const existingInDb = existingSkuMap.get(record.sku.toLowerCase());
+      if (existingInDb) {
+        existingRecords.push({
+          ...record,
+          existingName: existingInDb.name,
+          currentQuantity: existingInDb.quantity
+        });
+      } else {
+        newRecords.push(record);
+      }
+    });
+
     res.json({
       totalRecords: rows.length,
       validCount: validRecords.length,
       unsuitableCount: unsuitableRecords.length,
+      newCount: newRecords.length,
+      existingCount: existingRecords.length,
       validRecords,
-      unsuitableRecords
+      unsuitableRecords,
+      existingRecords,
+      newRecords
     });
   } catch (error) {
     res.status(500).json({ message: error.message || 'Failed to scan file' });
   }
 };
+
 
 // @desc    Export unsuitable records as an Excel file
 // @route   POST /api/inventory/export-unsuitable
