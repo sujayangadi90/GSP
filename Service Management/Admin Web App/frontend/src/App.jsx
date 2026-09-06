@@ -4128,6 +4128,8 @@ export default function App() {
                       drivingLicense: '',
                       aadhar: '',
                       insurance: '',
+                      bikeInsurance: '',
+                      bikePhoto: '',
                       pincodes: []
                     });
                     setPincodeInput('');
@@ -4232,6 +4234,20 @@ export default function App() {
                                 ) : (
                                   <span className="text-slate-600">Insurance ✗</span>
                                 )}
+                                {tech.bikeInsurance ? (
+                                  <a href={`${API_BASE}/${tech.bikeInsurance}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
+                                    Bike Ins ✓
+                                  </a>
+                                ) : (
+                                  <span className="text-slate-600">Bike Ins ✗</span>
+                                )}
+                                {tech.bikePhoto ? (
+                                  <a href={`${API_BASE}/${tech.bikePhoto}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline flex items-center gap-1 font-semibold">
+                                    Bike Photo ✓
+                                  </a>
+                                ) : (
+                                  <span className="text-slate-600">Bike Photo ✗</span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -4251,6 +4267,8 @@ export default function App() {
                                 drivingLicense: tech.drivingLicense || '',
                                 aadhar: tech.aadhar || '',
                                 insurance: tech.insurance || '',
+                                bikeInsurance: tech.bikeInsurance || '',
+                                bikePhoto: tech.bikePhoto || '',
                                 pincodes: tech.pincodes || []
                               });
                               setPincodeInput('');
@@ -4544,6 +4562,58 @@ export default function App() {
                             accept=".jpeg,.jpg,.png,.pdf"
                             required={activeTab === 'add-technician'}
                             onChange={(e) => handleTechDocUpload(e, 'insurance')}
+                            className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
+                          />
+                        )}
+                      </div>
+
+                      {/* Bike Insurance */}
+                      <div className="bg-slate-850 border border-slate-800 p-4 rounded-xl space-y-3">
+                        <label className="block text-xs font-semibold text-slate-400 uppercase">Bike Insurance</label>
+                        {techForm.bikeInsurance ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs bg-slate-800 p-2 rounded-lg">
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1">✓ Uploaded</span>
+                              <a href={`${API_BASE}/${techForm.bikeInsurance}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline">View</a>
+                            </div>
+                            <input 
+                              type="file" 
+                              accept=".jpeg,.jpg,.png,.pdf"
+                              onChange={(e) => handleTechDocUpload(e, 'bikeInsurance')}
+                              className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
+                            />
+                          </div>
+                        ) : (
+                          <input 
+                            type="file" 
+                            accept=".jpeg,.jpg,.png,.pdf"
+                            onChange={(e) => handleTechDocUpload(e, 'bikeInsurance')}
+                            className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
+                          />
+                        )}
+                      </div>
+
+                      {/* Bike Photo */}
+                      <div className="bg-slate-850 border border-slate-800 p-4 rounded-xl space-y-3">
+                        <label className="block text-xs font-semibold text-slate-400 uppercase">Bike Photo</label>
+                        {techForm.bikePhoto ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs bg-slate-800 p-2 rounded-lg">
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1">✓ Uploaded</span>
+                              <a href={`${API_BASE}/${techForm.bikePhoto}`} target="_blank" rel="noreferrer" className="text-violet-400 hover:underline">View</a>
+                            </div>
+                            <input 
+                              type="file" 
+                              accept=".jpeg,.jpg,.png,.pdf"
+                              onChange={(e) => handleTechDocUpload(e, 'bikePhoto')}
+                              className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
+                            />
+                          </div>
+                        ) : (
+                          <input 
+                            type="file" 
+                            accept=".jpeg,.jpg,.png,.pdf"
+                            onChange={(e) => handleTechDocUpload(e, 'bikePhoto')}
                             className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-950/40 file:text-violet-400 hover:file:bg-violet-900/40 cursor-pointer"
                           />
                         )}

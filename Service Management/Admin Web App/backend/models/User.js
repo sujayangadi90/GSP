@@ -56,6 +56,8 @@ const UserSchema = new mongoose.Schema({
   drivingLicense: String,
   aadhar: String,
   insurance: String,
+  bikeInsurance: String,
+  bikePhoto: String,
   pincodes: [String],
   fcmTokens: [String]
 }, { timestamps: true });

@@ -31,7 +31,7 @@ const getTechnicians = async (req, res) => {
 // @route   POST /api/technicians
 // @access  Private/Admin
 const addTechnician = async (req, res) => {
-  const { name, mobile, email, password, appliances, profilePic, drivingLicense, aadhar, insurance, pincodes } = req.body;
+  const { name, mobile, email, password, appliances, profilePic, drivingLicense, aadhar, insurance, bikeInsurance, bikePhoto, pincodes } = req.body;
 
   try {
     const techExists = await User.findOne({ email });
@@ -66,6 +66,8 @@ const addTechnician = async (req, res) => {
       drivingLicense: drivingLicense || '',
       aadhar: aadhar || '',
       insurance: insurance || '',
+      bikeInsurance: bikeInsurance || '',
+      bikePhoto: bikePhoto || '',
       pincodes: cleanPincodes
     });
 
@@ -80,6 +82,8 @@ const addTechnician = async (req, res) => {
       drivingLicense: technician.drivingLicense,
       aadhar: technician.aadhar,
       insurance: technician.insurance,
+      bikeInsurance: technician.bikeInsurance,
+      bikePhoto: technician.bikePhoto,
       pincodes: technician.pincodes
     });
   } catch (error) {
@@ -139,6 +143,14 @@ const updateTechnician = async (req, res) => {
       technician.insurance = req.body.insurance;
     }
 
+    if (req.body.bikeInsurance !== undefined) {
+      technician.bikeInsurance = req.body.bikeInsurance;
+    }
+
+    if (req.body.bikePhoto !== undefined) {
+      technician.bikePhoto = req.body.bikePhoto;
+    }
+
     if (req.body.pincodes !== undefined) {
       technician.pincodes = Array.isArray(req.body.pincodes)
         ? req.body.pincodes.map(p => String(p).trim()).filter(Boolean)
@@ -158,6 +170,8 @@ const updateTechnician = async (req, res) => {
       drivingLicense: updatedTech.drivingLicense,
       aadhar: updatedTech.aadhar,
       insurance: updatedTech.insurance,
+      bikeInsurance: updatedTech.bikeInsurance,
+      bikePhoto: updatedTech.bikePhoto,
       pincodes: updatedTech.pincodes
     });
   } catch (error) {
