@@ -453,6 +453,7 @@ export default function App() {
       alternateMobile: '',
       address: '',
       city: '',
+      taluk: '',
       pincode: ''
     },
     product: {
@@ -3018,6 +3019,7 @@ export default function App() {
           alternateMobile: newRequestForm.customer.alternateMobile || undefined,
           address: newRequestForm.customer.address,
           city: newRequestForm.customer.city,
+          taluk: newRequestForm.customer.taluk || undefined,
           pincode: newRequestForm.customer.pincode
         },
         product: {
@@ -11128,10 +11130,13 @@ export default function App() {
                       required 
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer"
                       value={newRequestForm.customer.city}
-                      onChange={e => setNewRequestForm({ 
-                        ...newRequestForm, 
-                        customer: { ...newRequestForm.customer, city: e.target.value } 
-                      })}
+                      onChange={e => {
+                        const cityName = e.target.value;
+                        setNewRequestForm({ 
+                          ...newRequestForm, 
+                          customer: { ...newRequestForm.customer, city: cityName, taluk: '' } 
+                        });
+                      }}
                     >
                       <option value="">-- Choose City --</option>
                       {cities.filter(c => c.isActive).map(c => (
@@ -11140,7 +11145,28 @@ export default function App() {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Taluk (Optional)</label>
+                    <select 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white cursor-pointer disabled:opacity-50"
+                      value={newRequestForm.customer.taluk || ''}
+                      onChange={e => setNewRequestForm({ 
+                        ...newRequestForm, 
+                        customer: { ...newRequestForm.customer, taluk: e.target.value } 
+                      })}
+                      disabled={!newRequestForm.customer.city}
+                    >
+                      <option value="">-- Choose Taluk --</option>
+                      {(() => {
+                        const selectedCityObj = cities.find(c => c.name.toLowerCase() === (newRequestForm.customer.city || '').toLowerCase());
+                        const activeTaluks = selectedCityObj?.taluks ? selectedCityObj.taluks.filter(t => t.isActive) : [];
+                        return activeTaluks.map(t => (
+                          <option key={t._id} value={t.name}>{t.name}</option>
+                        ));
+                      })()}
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Pincode *</label>
                     <input 

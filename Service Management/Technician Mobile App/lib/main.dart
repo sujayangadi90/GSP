@@ -3590,6 +3590,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   String? _selectedBrandName;
   dynamic _selectedBrandObject;
   String? _selectedCity;
+  String? _selectedTaluk;
   String _serviceType = 'In Warranty';
   String _installationType = 'Free Installation';
 
@@ -3779,6 +3780,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
       request.fields['customer[alternateMobile]'] = _custAlt.text.trim();
       request.fields['customer[address]'] = _custAddress.text.trim();
       request.fields['customer[city]'] = _selectedCity ?? '';
+      request.fields['customer[taluk]'] = _selectedTaluk ?? '';
       request.fields['customer[pincode]'] = _custPincode.text.trim();
 
       request.fields['product[category]'] = _selectedApplianceName ?? '';
@@ -3901,9 +3903,44 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                       onChanged: (val) {
                         setState(() {
                           _selectedCity = val;
+                          _selectedTaluk = null;
                         });
                       },
                       validator: (val) => val == null ? 'Please select a city' : null,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Builder(
+                      builder: (context) {
+                        final selectedCityObj = _cities.firstWhere(
+                          (c) => (c['name'] as String).toLowerCase() == (_selectedCity ?? '').toLowerCase(),
+                          orElse: () => null,
+                        );
+                        final List<dynamic> taluksList = (selectedCityObj != null && selectedCityObj['taluks'] is List)
+                            ? (selectedCityObj['taluks'] as List).where((t) => t['isActive'] == true).toList()
+                            : [];
+
+                        return DropdownButtonFormField<String>(
+                          value: _selectedTaluk,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Select Taluk (Optional)',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                          ),
+                          items: taluksList.map<DropdownMenuItem<String>>((t) {
+                            return DropdownMenuItem<String>(
+                              value: t['name'] as String,
+                              child: Text(t['name'] as String),
+                            );
+                          }).toList(),
+                          onChanged: _selectedCity == null || taluksList.isEmpty ? null : (val) {
+                            setState(() {
+                              _selectedTaluk = val;
+                            });
+                          },
+                        );
+                      },
                     ),
                   ),
                   _buildTextField(

@@ -1736,6 +1736,7 @@ const updateTicketByAdmin = async (req, res) => {
         alternateMobile: customer.alternateMobile !== undefined ? customer.alternateMobile : ticket.customer?.alternateMobile,
         address: customer.address !== undefined ? customer.address : ticket.customer?.address,
         city: customer.city !== undefined ? customer.city : ticket.customer?.city,
+        taluk: customer.taluk !== undefined ? customer.taluk : ticket.customer?.taluk,
         pincode: customer.pincode !== undefined ? customer.pincode : ticket.customer?.pincode
       };
     }

@@ -31,6 +31,7 @@ const TicketSchema = new mongoose.Schema({
     alternateMobile: String,
     address: { type: String, required: true },
     city: { type: String, required: true },
+    taluk: String,
     pincode: { type: String, required: true }
   },
   product: {
