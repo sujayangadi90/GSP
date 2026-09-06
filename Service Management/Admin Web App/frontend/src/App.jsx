@@ -352,6 +352,7 @@ export default function App() {
 
   // States for lists
   const [dealers, setDealers] = useState([]);
+  const [allDealers, setAllDealers] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [activeTechniciansForAssign, setActiveTechniciansForAssign] = useState([]);
   const [tickets, setTickets] = useState([]);
@@ -960,10 +961,12 @@ export default function App() {
       setLoading(true);
       // Load dealers, technicians, and tickets
       const dealersData = await apiFetch(`/dealers?search=${dealerSearch}`);
+      const allDealersData = await apiFetch('/dealers');
       const techsData = await apiFetch(`/technicians?search=${techSearch}`);
       const ticketsData = await apiFetch(`/tickets?status=${ticketFilters.status}&type=${ticketFilters.type}&city=${ticketFilters.city}&search=${ticketFilters.search}&fromDate=${ticketFilters.fromDate || ''}&toDate=${ticketFilters.toDate || ''}&dashboardFilter=${ticketFilters.dashboardFilter || ''}`);
 
       setDealers(dealersData);
+      setAllDealers(allDealersData);
       setTechnicians(techsData);
       setTickets(ticketsData);
     } catch (err) {
@@ -977,6 +980,7 @@ export default function App() {
     try {
       const data = await apiFetch('/dealers');
       setDealers(data);
+      setAllDealers(data);
     } catch (err) {
       console.error('Error fetching dealers:', err);
     }
@@ -7786,7 +7790,7 @@ export default function App() {
                         onChange={e => setReportFilters({ ...reportFilters, dealer: e.target.value })}
                       >
                         <option value="ALL">ALL DEALERS</option>
-                        {dealers.map(d => (
+                        {(allDealers.length > 0 ? allDealers : dealers).map(d => (
                           <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
                         ))}
                       </select>
@@ -7930,7 +7934,7 @@ export default function App() {
                       <div className="text-sm text-slate-200 font-semibold space-y-0.5">
                         <div>Period: <span className="text-slate-400">{new Date(appliedFiltersSummary.fromDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – {new Date(appliedFiltersSummary.toDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
                         {reportTab === 'dealer' ? (
-                          <div>Dealer: <span className="text-slate-400">{appliedFiltersSummary.dealer === 'ALL' ? 'All Dealers' : dealers.find(d => d._id === appliedFiltersSummary.dealer)?.name || 'N/A'}</span></div>
+                          <div>Dealer: <span className="text-slate-400">{appliedFiltersSummary.dealer === 'ALL' ? 'All Dealers' : (allDealers.length > 0 ? allDealers : dealers).find(d => d._id === appliedFiltersSummary.dealer)?.name || 'N/A'}</span></div>
                         ) : (
                           <div>Technician: <span className="text-slate-400">{appliedFiltersSummary.technician === 'ALL' ? 'All Technicians' : technicians.find(t => t._id === appliedFiltersSummary.technician)?.name || 'N/A'}</span></div>
                         )}
@@ -10991,7 +10995,7 @@ export default function App() {
                       onChange={e => setNewRequestForm({ ...newRequestForm, dealer: e.target.value })}
                     >
                       <option value="">-- Choose Dealer --</option>
-                      {dealers.map(d => (
+                      {(allDealers.length > 0 ? allDealers : dealers).map(d => (
                         <option key={d._id} value={d._id}>{d.name} ({d.city})</option>
                       ))}
                     </select>
