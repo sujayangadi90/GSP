@@ -4,7 +4,11 @@ const {
   createCity,
   updateCity,
   toggleCity,
-  deleteCity
+  deleteCity,
+  addTaluk,
+  updateTaluk,
+  toggleTaluk,
+  deleteTaluk
 } = require('../controllers/cityController');
 const { protect, authorize } = require('../middleware/auth');
 const router = express.Router();
@@ -21,5 +25,15 @@ router.route('/:id')
 
 router.route('/:id/toggle')
   .patch(authorize('admin'), toggleCity);
+
+router.route('/:id/taluks')
+  .post(authorize('admin'), addTaluk);
+
+router.route('/:id/taluks/:talukId')
+  .put(authorize('admin'), updateTaluk)
+  .delete(authorize('admin'), deleteTaluk);
+
+router.route('/:id/taluks/:talukId/toggle')
+  .patch(authorize('admin'), toggleTaluk);
 
 module.exports = router;

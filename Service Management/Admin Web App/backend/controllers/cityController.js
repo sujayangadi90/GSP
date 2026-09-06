@@ -106,10 +106,118 @@ const deleteCity = async (req, res) => {
   }
 };
 
+// @desc    Add taluk to a city
+// @route   POST /api/cities/:id/taluks
+// @access  Private/Admin
+const addTaluk = async (req, res) => {
+  const { name } = req.body;
+  if (!name) {
+    return res.status(400).json({ message: 'Taluk name is required' });
+  }
+
+  try {
+    const city = await City.findById(req.params.id);
+    if (!city) {
+      return res.status(404).json({ message: 'City not found' });
+    }
+
+    const trimmedName = name.trim();
+    const existing = city.taluks.find(t => t.name.toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      return res.status(400).json({ message: 'Taluk already exists in this city' });
+    }
+
+    city.taluks.push({ name: trimmedName, isActive: true });
+    const updatedCity = await city.save();
+    res.status(201).json(updatedCity);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update taluk in a city
+// @route   PUT /api/cities/:id/taluks/:talukId
+// @access  Private/Admin
+const updateTaluk = async (req, res) => {
+  const { name } = req.body;
+  if (!name) {
+    return res.status(400).json({ message: 'Taluk name is required' });
+  }
+
+  try {
+    const city = await City.findById(req.params.id);
+    if (!city) {
+      return res.status(404).json({ message: 'City not found' });
+    }
+
+    const taluk = city.taluks.id(req.params.talukId);
+    if (!taluk) {
+      return res.status(404).json({ message: 'Taluk not found' });
+    }
+
+    const trimmedName = name.trim();
+    const existing = city.taluks.find(t => t._id.toString() !== req.params.talukId && t.name.toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      return res.status(400).json({ message: 'Taluk name already exists in this city' });
+    }
+
+    taluk.name = trimmedName;
+    const updatedCity = await city.save();
+    res.json(updatedCity);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Toggle taluk active status
+// @route   PATCH /api/cities/:id/taluks/:talukId/toggle
+// @access  Private/Admin
+const toggleTaluk = async (req, res) => {
+  try {
+    const city = await City.findById(req.params.id);
+    if (!city) {
+      return res.status(404).json({ message: 'City not found' });
+    }
+
+    const taluk = city.taluks.id(req.params.talukId);
+    if (!taluk) {
+      return res.status(404).json({ message: 'Taluk not found' });
+    }
+
+    taluk.isActive = !taluk.isActive;
+    const updatedCity = await city.save();
+    res.json(updatedCity);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Delete taluk from a city
+// @route   DELETE /api/cities/:id/taluks/:talukId
+// @access  Private/Admin
+const deleteTaluk = async (req, res) => {
+  try {
+    const city = await City.findById(req.params.id);
+    if (!city) {
+      return res.status(404).json({ message: 'City not found' });
+    }
+
+    city.taluks = city.taluks.filter(t => t._id.toString() !== req.params.talukId);
+    const updatedCity = await city.save();
+    res.json(updatedCity);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getCities,
   createCity,
   updateCity,
   toggleCity,
-  deleteCity
+  deleteCity,
+  addTaluk,
+  updateTaluk,
+  toggleTaluk,
+  deleteTaluk
 };

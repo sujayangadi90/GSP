@@ -7,6 +7,10 @@ const CitySchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
+  taluks: [{
+    name: { type: String, required: true, trim: true },
+    isActive: { type: Boolean, default: true }
+  }],
   isActive: {
     type: Boolean,
     default: true

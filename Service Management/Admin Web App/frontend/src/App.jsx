@@ -494,7 +494,9 @@ export default function App() {
   const [brandForm, setBrandForm] = useState(null); // null or { id?, name, applianceId, followUpDays }
   const [brandApplianceFilter, setBrandApplianceFilter] = useState('ALL');
   const [cities, setCities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState(null);
   const [cityForm, setCityForm] = useState(null); // null or { id?, name }
+  const [talukForm, setTalukForm] = useState(null); // null or { id?, cityId, name }
   const [feeForm, setFeeForm] = useState(null); // null or { id, brandName, applianceName, serviceFee, installationFee }
   const [feeApplianceFilter, setFeeApplianceFilter] = useState('ALL');
   const [feeBrandFilter, setFeeBrandFilter] = useState('ALL');
@@ -2202,6 +2204,48 @@ export default function App() {
     if (!window.confirm('Are you sure you want to delete this city?')) return;
     try {
       await apiFetch(`/cities/${id}`, { method: 'DELETE' });
+      if (selectedCity?._id === id) setSelectedCity(null);
+      fetchCities();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Taluk Actions
+  const saveTaluk = async (e) => {
+    e.preventDefault();
+    try {
+      if (talukForm.id) {
+        await apiFetch(`/cities/${talukForm.cityId}/taluks/${talukForm.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name: talukForm.name })
+        });
+      } else {
+        await apiFetch(`/cities/${talukForm.cityId}/taluks`, {
+          method: 'POST',
+          body: JSON.stringify({ name: talukForm.name })
+        });
+      }
+      setTalukForm(null);
+      fetchCities();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const toggleTalukStatus = async (cityId, talukId) => {
+    try {
+      await apiFetch(`/cities/${cityId}/taluks/${talukId}/toggle`, { method: 'PATCH' });
+      fetchCities();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const deleteTaluk = async (cityId, talukId) => {
+    if (!window.confirm('Are you sure you want to delete this taluk?')) return;
+    try {
+      await apiFetch(`/cities/${cityId}/taluks/${talukId}`, { method: 'DELETE' });
       fetchCities();
     } catch (err) {
       alert(err.message);
@@ -4874,62 +4918,166 @@ export default function App() {
           {activeTab === 'cities' && (
             <div className="space-y-8">
               <div>
-                <h1 className="text-3xl font-extrabold text-white tracking-tight">Cities Master Settings</h1>
-                <p className="text-slate-400 mt-1">Manage target coverage cities for installations & support tickets</p>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight">Cities & Taluks Master Settings</h1>
+                <p className="text-slate-400 mt-1">Manage target coverage cities and their associated taluks for service operations</p>
               </div>
 
-              <div className="max-w-2xl bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-violet-400" />
-                    Coverage Cities
-                  </h3>
-                  <button
-                    onClick={() => setCityForm({ name: '' })}
-                    className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" /> Add City
-                  </button>
+              {/* Grid: Cities & Taluks */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Cities Panel */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-violet-400" />
+                      Coverage Cities
+                    </h3>
+                    <button
+                      onClick={() => setCityForm({ name: '' })}
+                      className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" /> Add City
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                    {cities.length === 0 ? (
+                      <p className="text-slate-500 py-6 text-center text-sm">No cities added yet</p>
+                    ) : (
+                      cities.map(city => {
+                        const isSelected = (selectedCity?._id || cities[0]?._id) === city._id;
+                        const currentSel = selectedCity || cities[0];
+                        return (
+                          <div
+                            key={city._id}
+                            onClick={() => setSelectedCity(city)}
+                            className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'border-violet-500 bg-violet-950/30 shadow-md'
+                                : 'border-slate-800 hover:border-slate-700 bg-slate-800/20'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-bold text-white flex items-center gap-2">
+                                  {city.name}
+                                  <span className="text-[11px] text-slate-400 font-normal">
+                                    ({city.taluks ? city.taluks.length : 0} {city.taluks?.length === 1 ? 'taluk' : 'taluks'})
+                                  </span>
+                                </p>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${city.isActive ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+                                  {city.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                <button
+                                  onClick={() => setCityForm({ id: city._id, name: city.name })}
+                                  className="p-1 text-slate-400 hover:text-violet-400 cursor-pointer"
+                                  title="Edit City"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => toggleCityStatus(city._id)}
+                                  className={`p-1 ${city.isActive ? 'text-emerald-500' : 'text-red-500'} cursor-pointer`}
+                                  title={city.isActive ? 'Deactivate' : 'Activate'}
+                                >
+                                  <Power className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => deleteCity(city._id)}
+                                  className="p-1 text-slate-400 hover:text-red-400 cursor-pointer"
+                                  title="Delete City"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
 
-                <div className="divide-y divide-slate-800 max-h-[500px] overflow-y-auto">
-                  {cities.length === 0 ? (
-                    <p className="text-slate-500 py-6 text-center text-sm">No cities added yet</p>
-                  ) : (
-                    cities.map(city => (
-                      <div key={city._id} className="py-3 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition duration-150">
-                        <div>
-                          <p className="text-sm font-bold text-white">{city.name}</p>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${city.isActive ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
-                            {city.isActive ? 'Active' : 'Inactive'}
-                          </span>
+                {/* Taluks Panel under Selected City */}
+                <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                  {(() => {
+                    const activeCityObj = cities.find(c => c._id === (selectedCity?._id || cities[0]?._id)) || cities[0];
+                    if (!activeCityObj) {
+                      return (
+                        <div className="text-center py-16 text-slate-500">
+                          <MapPin className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                          <p className="text-sm">Please add and select a city to manage its taluks</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                      );
+                    }
+                    const taluksList = activeCityObj.taluks || [];
+                    return (
+                      <>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-3">
+                          <div>
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                              <MapPin className="w-5 h-5 text-indigo-400" />
+                              Taluks in {activeCityObj.name}
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              Configured taluks under {activeCityObj.name} city
+                            </p>
+                          </div>
                           <button
-                            onClick={() => setCityForm({ id: city._id, name: city.name })}
-                            className="p-1.5 hover:bg-slate-850 rounded-lg text-slate-400 hover:text-slate-200 transition"
-                            title="Edit City"
+                            onClick={() => setTalukForm({ cityId: activeCityObj._id, name: '' })}
+                            className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer self-start sm:self-auto"
                           >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => toggleCityStatus(city._id)}
-                            className={`p-1.5 hover:bg-slate-850 rounded-lg transition ${city.isActive ? 'text-amber-500 hover:text-amber-400' : 'text-emerald-500 hover:text-emerald-400'}`}
-                            title={city.isActive ? 'Deactivate' : 'Activate'}
-                          >
-                            <Power className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => deleteCity(city._id)}
-                            className="p-1.5 hover:bg-slate-850 rounded-lg text-red-400 hover:text-red-300 transition"
-                            title="Delete City"
-                          >
-                            <Trash2 className="w-4 h-4" />
+                            <Plus className="w-4 h-4" /> Add Taluk
                           </button>
                         </div>
-                      </div>
-                    ))
-                  )}
+
+                        <div className="divide-y divide-slate-800 max-h-[440px] overflow-y-auto">
+                          {taluksList.length === 0 ? (
+                            <div className="text-center py-12 text-slate-500">
+                              <MapPin className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                              <p className="text-sm">No taluks configured yet for {activeCityObj.name}</p>
+                              <p className="text-xs text-slate-600 mt-1">Click "Add Taluk" to configure sub-regions for this city.</p>
+                            </div>
+                          ) : (
+                            taluksList.map(taluk => (
+                              <div key={taluk._id} className="py-3 flex items-center justify-between hover:bg-slate-800/30 px-3 rounded-xl transition duration-150">
+                                <div>
+                                  <p className="text-sm font-bold text-white">{taluk.name}</p>
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${taluk.isActive ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+                                    {taluk.isActive ? 'Active' : 'Inactive'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => setTalukForm({ id: taluk._id, cityId: activeCityObj._id, name: taluk.name })}
+                                    className="p-1 text-slate-400 hover:text-violet-400 cursor-pointer"
+                                    title="Edit Taluk"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => toggleTalukStatus(activeCityObj._id, taluk._id)}
+                                    className={`p-1 ${taluk.isActive ? 'text-emerald-500' : 'text-red-500'} cursor-pointer`}
+                                    title={taluk.isActive ? 'Deactivate' : 'Activate'}
+                                  >
+                                    <Power className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => deleteTaluk(activeCityObj._id, taluk._id)}
+                                    className="p-1 text-slate-400 hover:text-red-400 cursor-pointer"
+                                    title="Delete Taluk"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -10537,6 +10685,34 @@ export default function App() {
               </div>
               <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 py-2.5 rounded-lg text-sm font-bold text-white transition">
                 {cityForm.id ? 'Save Changes' : 'Create City'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Taluk Form Modal */}
+      {talukForm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+              <h3 className="font-bold text-white">{talukForm.id ? 'Edit Taluk' : 'Add New Taluk'}</h3>
+              <button onClick={() => setTalukForm(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={saveTaluk} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Taluk Name</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Haveli, Hubli Urban"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-violet-500"
+                  value={talukForm.name}
+                  onChange={e => setTalukForm({ ...talukForm, name: e.target.value })}
+                />
+              </div>
+              <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 py-2.5 rounded-lg text-sm font-bold text-white transition">
+                {talukForm.id ? 'Save Changes' : 'Create Taluk'}
               </button>
             </form>
           </div>
