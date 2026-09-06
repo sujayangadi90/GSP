@@ -2485,23 +2485,43 @@ export default function App() {
       const res = await fetch(`${API_BASE}/inventory/export-template`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to download template (${res.status})`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'inventory_import_template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        return;
       }
-      const blob = await res.blob();
+    } catch (err) {
+      console.warn('Backend template route unavailable, using client-side generator', err);
+    }
+
+    // Client-side fallback CSV download
+    try {
+      const csvHeader = "SKU,Item Name,Available Stock,Min Stock Level,Selling Price,Image URL\n";
+      const sampleRows = [
+        "SKU-101,LED Bulb 12W,50,10,150,https://example.com/bulb.jpg",
+        "SKU-102,Thermostat Digital Small,20,5,1200,"
+      ].join("\n");
+      const blob = new Blob([csvHeader + sampleRows], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'inventory_import_template.xlsx';
+      a.download = 'inventory_import_template.csv';
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (err) {
-      alert(err.message || 'Failed to download template');
+    } catch (fallbackErr) {
+      alert('Failed to download template: ' + fallbackErr.message);
     }
   };
+
 
 
   const handleScanFile = async () => {

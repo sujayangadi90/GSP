@@ -1,6 +1,49 @@
 const InventoryItem = require('../models/InventoryItem');
 const User = require('../models/User');
-const XLSX = require('xlsx');
+
+let XLSX;
+try {
+  XLSX = require('xlsx');
+} catch (e) {
+  console.warn('xlsx module not found, fallback CSV handling will be used');
+}
+
+const parseCSVText = (csvString) => {
+  const lines = csvString.split(/\r?\n/).filter(line => line.trim().length > 0);
+  if (lines.length === 0) return [];
+  
+  const parseLine = (line) => {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim().replace(/^"|"$/g, ''));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim().replace(/^"|"$/g, ''));
+    return values;
+  };
+
+  const headers = parseLine(lines[0]);
+  const resultRows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseLine(lines[i]);
+    const rowObj = {};
+    headers.forEach((h, idx) => {
+      rowObj[h] = vals[idx] !== undefined ? vals[idx] : '';
+    });
+    resultRows.push(rowObj);
+  }
+  return resultRows;
+};
+
 
 // @desc    Create new inventory item
 // @route   POST /api/inventory
@@ -181,17 +224,21 @@ const scanImportFile = async (req, res) => {
       return res.status(400).json({ message: 'Please upload an Excel (.xlsx, .xls) or CSV file' });
     }
 
-    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-    const firstSheetName = workbook.SheetNames[0];
-    if (!firstSheetName) {
-      return res.status(400).json({ message: 'The uploaded file is empty or invalid' });
+    let rows = [];
+    if (XLSX) {
+      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const firstSheetName = workbook.SheetNames[0];
+      if (firstSheetName) {
+        const sheet = workbook.Sheets[firstSheetName];
+        rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      }
+    } else {
+      const text = req.file.buffer.toString('utf8');
+      rows = parseCSVText(text);
     }
 
-    const sheet = workbook.Sheets[firstSheetName];
-    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-
     if (!rows || rows.length === 0) {
-      return res.status(400).json({ message: 'No rows found in the uploaded spreadsheet' });
+      return res.status(400).json({ message: 'No rows found in the uploaded file' });
     }
 
     const validRecords = [];
@@ -314,15 +361,24 @@ const downloadUnsuitableFile = async (req, res) => {
       'Error Reason': item.reason || ''
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(exportRows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Unsuitable Records');
+    if (XLSX) {
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Unsuitable Records');
 
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="unsuitable_inventory_records.xlsx"');
-    res.send(buffer);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="unsuitable_inventory_records.xlsx"');
+      return res.send(buffer);
+    } else {
+      const headers = Object.keys(exportRows[0]).join(',');
+      const bodyLines = exportRows.map(r => Object.values(r).map(val => `"${String(val).replace(/"/g, '""')}"`).join(','));
+      const csvStr = headers + '\n' + bodyLines.join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="unsuitable_inventory_records.csv"');
+      return res.send(csvStr);
+    }
   } catch (error) {
     res.status(500).json({ message: error.message || 'Failed to export unsuitable records' });
   }
@@ -420,19 +476,29 @@ const downloadTemplate = async (req, res) => {
       }
     ];
 
-    const worksheet = XLSX.utils.json_to_sheet(templateRows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventory Template');
+    if (XLSX) {
+      const worksheet = XLSX.utils.json_to_sheet(templateRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventory Template');
 
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="inventory_import_template.xlsx"');
-    res.send(buffer);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="inventory_import_template.xlsx"');
+      return res.send(buffer);
+    } else {
+      const csvContent = "SKU,Item Name,Available Stock,Min Stock Level,Selling Price,Image URL\n" +
+        "SKU-101,LED Bulb 12W,50,10,150,https://example.com/bulb.jpg\n" +
+        "SKU-102,Thermostat Digital Small,20,5,1200,\n";
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="inventory_import_template.csv"');
+      return res.send(csvContent);
+    }
   } catch (error) {
     res.status(500).json({ message: error.message || 'Failed to generate template' });
   }
 };
+
 
 module.exports = {
   createItem,
