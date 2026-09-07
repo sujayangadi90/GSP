@@ -12764,9 +12764,10 @@ export default function App() {
 
               {/* Live Fee & Expense Breakdown */}
               {(() => {
+                const appObj = appliances.find(a => a.name === newRequestForm.product.category);
                 const selectedBrand = brands.find(b => {
-                  const appObj = appliances.find(a => a.name === newRequestForm.product.category);
-                  return appObj && (b.appliance === appObj._id || b.appliance?._id === appObj._id) && b.name === newRequestForm.product.name;
+                  if (!appObj) return b.name === newRequestForm.product.name;
+                  return (b.appliance === appObj._id || b.appliance?._id === appObj._id) && b.name === newRequestForm.product.name;
                 });
 
                 let custFee = 0;
