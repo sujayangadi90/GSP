@@ -426,6 +426,11 @@ export default function App() {
   const [isDownloadingUnsuitable, setIsDownloadingUnsuitable] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importSummary, setImportSummary] = useState(null);
+
+  // Admin completion photo upload states
+  const [adminPhotoFiles, setAdminPhotoFiles] = useState({});
+  const [adminPhotoUploading, setAdminPhotoUploading] = useState(false);
+  const [showAdminPhotoUpload, setShowAdminPhotoUpload] = useState(false);
   
   // Performance states
   const [evaluations, setEvaluations] = useState([]);
@@ -2295,6 +2300,41 @@ export default function App() {
       fetchData();
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  const handleAdminPhotoUpload = async (e) => {
+    e.preventDefault();
+    if (!selectedTicket) return;
+    try {
+      setAdminPhotoUploading(true);
+      const formData = new FormData();
+      Object.keys(adminPhotoFiles).forEach(key => {
+        if (adminPhotoFiles[key]) {
+          formData.append(key, adminPhotoFiles[key]);
+        }
+      });
+
+      const res = await fetch(`${API_BASE}/tickets/${selectedTicket._id}/photos`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to upload photos');
+
+      setSelectedTicket(data.ticket);
+      setAdminPhotoFiles({});
+      setShowAdminPhotoUpload(false);
+      fetchData();
+      alert('Completion photos updated successfully!');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAdminPhotoUploading(false);
     }
   };
 
@@ -10223,6 +10263,77 @@ export default function App() {
                             </div>
                           )
                         )}
+
+                        {/* Admin Photo Upload Section */}
+                        <div className="mt-4 pt-3 border-t border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => setShowAdminPhotoUpload(!showAdminPhotoUpload)}
+                            className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1.5 transition"
+                          >
+                            <span>📸</span> {showAdminPhotoUpload ? "Hide Admin Upload Photos Form" : "Upload / Update Completion Photos (Admin)"}
+                          </button>
+
+                          {showAdminPhotoUpload && (
+                            <form onSubmit={handleAdminPhotoUpload} className="mt-3 bg-slate-900/90 rounded-xl p-4 border border-sky-900/50 space-y-3">
+                              <p className="text-xs text-slate-400">
+                                Select new photos to attach to this ticket's completion record:
+                              </p>
+                              
+                              {selectedTicket.type === 'installation' ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                                  {[
+                                    { key: 'bill', label: '1. Bill Photo' },
+                                    { key: 'installation1', label: '2. Installation Photo 1' },
+                                    { key: 'installation2', label: '3. Installation Photo 2' },
+                                    { key: 'serialNumber', label: '4. Serial Number Photo' },
+                                    { key: 'warrantyCard', label: '5. Warranty Card Photo' },
+                                  ].map((slot) => (
+                                    <div key={slot.key} className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                                      <label className="block text-slate-300 font-medium mb-1">{slot.label}</label>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => setAdminPhotoFiles(prev => ({ ...prev, [slot.key]: e.target.files[0] || null }))}
+                                        className="w-full text-slate-400 text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-950 file:text-sky-300 hover:file:bg-sky-900 cursor-pointer"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                                  {[
+                                    { key: 'before', label: '1. Before Photo' },
+                                    { key: 'after', label: '2. After Photo' },
+                                    { key: 'warrantyCard', label: '3. Warranty Card Photo' },
+                                    { key: 'bill', label: '4. Bill Photo' },
+                                  ].map((slot) => (
+                                    <div key={slot.key} className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                                      <label className="block text-slate-300 font-medium mb-1">{slot.label}</label>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => setAdminPhotoFiles(prev => ({ ...prev, [slot.key]: e.target.files[0] || null }))}
+                                        className="w-full text-slate-400 text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-950 file:text-sky-300 hover:file:bg-sky-900 cursor-pointer"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="flex justify-end pt-2">
+                                <button
+                                  type="submit"
+                                  disabled={adminPhotoUploading}
+                                  className="px-4 py-2 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-semibold text-xs rounded-lg shadow-md transition disabled:opacity-50 flex items-center gap-2"
+                                >
+                                  {adminPhotoUploading ? "Uploading..." : "Upload Photos"}
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+
 
                         {/* Parts Used */}
                         {comp.usedParts && comp.usedParts.length > 0 && (

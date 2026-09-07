@@ -7,6 +7,7 @@ const {
   assignTechnician,
   updateTicketStatus,
   submitWorkCompletion,
+  adminUploadCompletionPhotos,
   verifyWork,
   closeTicket,
   cancelTicket,
@@ -54,12 +55,25 @@ router.route('/:id')
   .get(getTicketById)
   .put(authorize('admin'), upload.single('invoiceImage'), updateTicketByAdmin);
 
-// Admin-only assignment, verification, closure, messages
+// Admin-only assignment, verification, closure, messages, photo upload
 router.route('/:id/assign').patch(authorize('admin'), assignTechnician);
 router.route('/:id/verify').patch(authorize('admin'), verifyWork);
 router.route('/:id/close').patch(authorize('admin'), closeTicket);
 router.route('/:id/cancel').patch(authorize('admin'), cancelTicket);
 router.route('/:id/message').post(authorize('admin'), sendCustomAdminMessage);
+router.route('/:id/photos').patch(
+  authorize('admin'),
+  upload.fields([
+    { name: 'bill', maxCount: 1 },
+    { name: 'installation1', maxCount: 1 },
+    { name: 'installation2', maxCount: 1 },
+    { name: 'serialNumber', maxCount: 1 },
+    { name: 'warrantyCard', maxCount: 1 },
+    { name: 'before', maxCount: 1 },
+    { name: 'after', maxCount: 1 }
+  ]),
+  adminUploadCompletionPhotos
+);
 
 // Technician-only updates
 router.route('/:id/status').patch(authorize('technician'), updateTicketStatus);

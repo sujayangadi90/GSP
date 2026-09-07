@@ -1177,10 +1177,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  hasFile ? 'Photo Captured' : 'Required *',
+                  hasFile ? 'Photo Captured' : 'Optional',
                   style: TextStyle(
                     fontSize: 11,
-                    color: hasFile ? Colors.greenAccent : Colors.redAccent,
+                    color: hasFile ? Colors.greenAccent : Colors.grey,
                     fontWeight: hasFile ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
@@ -1543,24 +1543,6 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     if (_workDoneController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please specify work done details')));
       return;
-    }
-
-    final ticketType = (_job?['type'] ?? 'service').toString().toLowerCase();
-
-    if (ticketType == 'installation') {
-      if (_billPhoto == null || _installation1Photo == null || _installation2Photo == null || _serialNumberPhoto == null || _warrantyCardPhoto == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please upload all 5 required installation photos (Bill, Installation 1, Installation 2, Serial Number, Warranty Card)'), backgroundColor: Colors.red),
-        );
-        return;
-      }
-    } else {
-      if (_beforePhoto == null || _afterPhoto == null || _warrantyCardPhoto == null || _billPhoto == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please upload all 4 required service photos (Before, After, Warranty Card, Bill)'), backgroundColor: Colors.red),
-        );
-        return;
-      }
     }
 
     setState(() => _isLoading = true);
@@ -1928,7 +1910,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
             ),
             const SizedBox(height: 16),
             if ((_job?['type'] ?? '').toString().toLowerCase() == 'installation') ...[
-              const Text('REQUIRED INSTALLATION PHOTOS (5)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amberAccent)),
+              const Text('INSTALLATION PHOTOS (OPTIONAL)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amberAccent)),
               const SizedBox(height: 10),
               _buildPhotoSlotCard(label: '1. Bill', key: 'bill', file: _billPhoto, icon: Icons.receipt_long, color: Colors.amberAccent),
               _buildPhotoSlotCard(label: '2. Installation 1', key: 'installation1', file: _installation1Photo, icon: Icons.build, color: Colors.cyanAccent),
@@ -1936,7 +1918,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               _buildPhotoSlotCard(label: '4. Serial Number', key: 'serialNumber', file: _serialNumberPhoto, icon: Icons.qr_code, color: Colors.purpleAccent),
               _buildPhotoSlotCard(label: '5. Warranty Card', key: 'warrantyCard', file: _warrantyCardPhoto, icon: Icons.card_membership, color: Colors.greenAccent),
             ] else ...[
-              const Text('REQUIRED SERVICE PHOTOS (4)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.cyanAccent)),
+              const Text('SERVICE PHOTOS (OPTIONAL)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.cyanAccent)),
               const SizedBox(height: 10),
               _buildPhotoSlotCard(label: '1. Before', key: 'before', file: _beforePhoto, icon: Icons.camera_alt, color: Colors.amberAccent),
               _buildPhotoSlotCard(label: '2. After', key: 'after', file: _afterPhoto, icon: Icons.check_circle, color: Colors.greenAccent),

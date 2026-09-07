@@ -835,7 +835,7 @@ const submitWorkCompletion = async (req, res) => {
       }
     }
 
-    // Fallback/Legacy preservation
+    // Preserve existing arrays if no new files uploaded
     if (completionPhotos.length === 0 && (beforePhotos.length > 0 || afterPhotos.length > 0)) {
       completionPhotos = [...beforePhotos, ...afterPhotos];
     } else if (completionPhotos.length === 0 && ticket.completion && ticket.completion.photos) {
@@ -843,10 +843,6 @@ const submitWorkCompletion = async (req, res) => {
       beforePhotos = ticket.completion.beforePhotos || [];
       afterPhotos = ticket.completion.afterPhotos || [];
       labeledPhotos = ticket.completion.labeledPhotos || [];
-    }
-
-    if (completionPhotos.length === 0 && beforePhotos.length === 0 && afterPhotos.length === 0 && labeledPhotos.length === 0) {
-      return res.status(400).json({ message: 'Please upload the required completion photos' });
     }
 
     let parsedUsedParts = [];
@@ -1901,6 +1897,88 @@ const updateTicketByAdmin = async (req, res) => {
   }
 };
 
+// Admin upload / update completion photos for a ticket
+const adminUploadCompletionPhotos = async (req, res) => {
+  try {
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    if (!ticket.completion) {
+      ticket.completion = {
+        photos: [],
+        beforePhotos: [],
+        afterPhotos: [],
+        labeledPhotos: [],
+        workDone: 'Updated by Admin',
+        submittedAt: new Date()
+      };
+    }
+
+    let labeledPhotos = ticket.completion.labeledPhotos || [];
+    let photos = ticket.completion.photos || [];
+    let beforePhotos = ticket.completion.beforePhotos || [];
+    let afterPhotos = ticket.completion.afterPhotos || [];
+
+    const labelMap = {
+      bill: 'Bill',
+      installation1: 'Installation 1',
+      installation2: 'Installation 2',
+      serialNumber: 'Serial Number',
+      warrantyCard: 'Warranty Card',
+      before: 'Before',
+      after: 'After'
+    };
+
+    if (req.files) {
+      Object.keys(labelMap).forEach(key => {
+        if (req.files[key] && req.files[key].length > 0) {
+          const path = 'uploads/' + req.files[key][0].filename;
+          const label = labelMap[key];
+
+          const existingIdx = labeledPhotos.findIndex(item => item.label === label);
+          if (existingIdx !== -1) {
+            labeledPhotos[existingIdx] = { label, url: path };
+          } else {
+            labeledPhotos.push({ label, url: path });
+          }
+
+          if (!photos.includes(path)) photos.push(path);
+          if (key === 'before' && !beforePhotos.includes(path)) beforePhotos.push(path);
+          if (key === 'after' && !afterPhotos.includes(path)) afterPhotos.push(path);
+        }
+      });
+    }
+
+    ticket.completion.labeledPhotos = labeledPhotos;
+    ticket.completion.photos = photos;
+    ticket.completion.beforePhotos = beforePhotos;
+    ticket.completion.afterPhotos = afterPhotos;
+
+    ticket.timeline.push({
+      status: ticket.status,
+      note: 'Completion photos uploaded/updated by Admin',
+      updatedBy: req.user ? (req.user.name || 'Admin') : 'Admin'
+    });
+
+    await ticket.save();
+
+    const updatedTicket = await Ticket.findById(ticket._id)
+      .populate('dealer', 'name code mobile city address email')
+      .populate('assignedTechnician', 'name code mobile email status profilePic pincodes')
+      .populate('createdBy', 'name role code');
+
+    res.json({
+      message: 'Completion photos updated successfully',
+      ticket: updatedTicket
+    });
+  } catch (error) {
+    console.error('Error uploading admin completion photos:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createTicket,
   getTickets,
@@ -1909,6 +1987,7 @@ module.exports = {
   assignTechnician,
   updateTicketStatus,
   submitWorkCompletion,
+  adminUploadCompletionPhotos,
   verifyWork,
   closeTicket,
   cancelTicket,
