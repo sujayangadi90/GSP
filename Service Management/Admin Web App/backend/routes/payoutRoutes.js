@@ -5,10 +5,10 @@ const {
   createPayout,
   getPayouts
 } = require('../controllers/payoutController');
-const { protect, adminOnly } = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/auth');
 
 router.use(protect);
-router.use(adminOnly);
+router.use(authorize('admin'));
 
 router.get('/calculate', calculateTechnicianPayout);
 router.route('/')

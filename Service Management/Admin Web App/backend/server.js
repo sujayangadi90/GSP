@@ -86,7 +86,7 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5055;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Backend Server running on port ${PORT}`);
 
   // Schedule auto clock-out check every 5 minutes (for midnight 12:00 AM auto-closure)
