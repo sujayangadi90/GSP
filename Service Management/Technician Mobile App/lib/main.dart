@@ -2709,17 +2709,53 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
   int _currentPage = 1;
   bool _hasMore = false;
 
-  late int _selectedMonth;
-  late int _selectedYear;
+  String _selectedFilterType = 'this_month'; // 'this_month', 'last_2_months', 'custom'
+  int _customMonth = DateTime.now().month;
+  int _customYear = DateTime.now().year;
   late String _selectedStatusFilter;
 
   @override
   void initState() {
     super.initState();
-    _selectedMonth = widget.initialMonth ?? DateTime.now().month;
-    _selectedYear = widget.initialYear ?? DateTime.now().year;
     _selectedStatusFilter = widget.initialStatus ?? 'closed';
+    if (widget.initialMonth != null || widget.initialYear != null) {
+      _selectedFilterType = 'custom';
+      _customMonth = widget.initialMonth ?? DateTime.now().month;
+      _customYear = widget.initialYear ?? DateTime.now().year;
+    } else {
+      _selectedFilterType = 'this_month';
+    }
     _fetchJobs();
+  }
+
+  Map<String, String> _getDateRangeForFilter() {
+    final now = DateTime.now();
+    final currentYear = now.year;
+    final currentMonth = now.month;
+
+    if (_selectedFilterType == 'last_2_months') {
+      // Current month + previous calendar month
+      final prevMonthDate = DateTime(currentYear, currentMonth - 1, 1);
+      final startStr = "${prevMonthDate.year}-${prevMonthDate.month.toString().padLeft(2, '0')}-01";
+
+      final lastDayCurrentMonth = DateTime(currentYear, currentMonth + 1, 0);
+      final endStr = "${lastDayCurrentMonth.year}-${lastDayCurrentMonth.month.toString().padLeft(2, '0')}-${lastDayCurrentMonth.day.toString().padLeft(2, '0')}";
+
+      return {'fromDate': startStr, 'toDate': endStr};
+    } else if (_selectedFilterType == 'custom') {
+      final startStr = "$_customYear-${_customMonth.toString().padLeft(2, '0')}-01";
+      final lastDayCustomMonth = DateTime(_customYear, _customMonth + 1, 0);
+      final endStr = "$_customYear-${_customMonth.toString().padLeft(2, '0')}-${lastDayCustomMonth.day.toString().padLeft(2, '0')}";
+
+      return {'fromDate': startStr, 'toDate': endStr};
+    } else {
+      // Default: 'this_month'
+      final startStr = "$currentYear-${currentMonth.toString().padLeft(2, '0')}-01";
+      final lastDayCurrentMonth = DateTime(currentYear, currentMonth + 1, 0);
+      final endStr = "$currentYear-${currentMonth.toString().padLeft(2, '0')}-${lastDayCurrentMonth.day.toString().padLeft(2, '0')}";
+
+      return {'fromDate': startStr, 'toDate': endStr};
+    }
   }
 
   Future<void> _fetchJobs({bool isLoadMore = false}) async {
@@ -2735,7 +2771,8 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
     }
 
     try {
-      final queryParams = 'month=$_selectedMonth&year=$_selectedYear&status=$_selectedStatusFilter&page=$_currentPage&limit=10';
+      final range = _getDateRangeForFilter();
+      final queryParams = 'fromDate=${range['fromDate']}&toDate=${range['toDate']}&status=$_selectedStatusFilter&page=$_currentPage&limit=10';
       final res = await http.get(
         Uri.parse('${widget.apiUrl}/tickets?$queryParams'),
         headers: {
@@ -2799,8 +2836,8 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
   }
 
   Future<void> _selectMonthYear(BuildContext context) async {
-    int tempMonth = _selectedMonth;
-    int tempYear = _selectedYear;
+    int tempMonth = _customMonth;
+    int tempYear = _customYear;
 
     await showDialog(
       context: context,
@@ -2871,8 +2908,9 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                 TextButton(
                   onPressed: () {
                     setState(() {
-                      _selectedMonth = tempMonth;
-                      _selectedYear = tempYear;
+                      _selectedFilterType = 'custom';
+                      _customMonth = tempMonth;
+                      _customYear = tempYear;
                     });
                     Navigator.pop(context);
                     _fetchJobs();
@@ -2943,32 +2981,67 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
       appBar: AppBar(title: const Text('Job History')),
       body: Column(
         children: [
-          // Month & Year Selector Card
-          GestureDetector(
-            onTap: () => _selectMonthYear(context),
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E2422),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.teal.withOpacity(0.3)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today, color: Colors.teal, size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_getMonthName(_selectedMonth)} $_selectedYear',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                    ],
+          // Filter Dropdown Card
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E2422),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.teal.withOpacity(0.3)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedFilterType,
+                isExpanded: true,
+                dropdownColor: const Color(0xFF1E2422),
+                icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: 'this_month',
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today, color: Colors.teal, size: 18),
+                        SizedBox(width: 8),
+                        Text('This Month'),
+                      ],
+                    ),
                   ),
-                  const Icon(Icons.arrow_drop_down, color: Colors.white),
+                  const DropdownMenuItem<String>(
+                    value: 'last_2_months',
+                    child: Row(
+                      children: [
+                        Icon(Icons.date_range, color: Colors.teal, size: 18),
+                        SizedBox(width: 8),
+                        Text('Last 2 Months'),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'custom',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit_calendar, color: Colors.teal, size: 18),
+                        const SizedBox(width: 8),
+                        Text(_selectedFilterType == 'custom' 
+                          ? '${_getMonthName(_customMonth)} $_customYear' 
+                          : 'Custom Month'),
+                      ],
+                    ),
+                  ),
                 ],
+                onChanged: (val) async {
+                  if (val == null) return;
+                  if (val == 'custom') {
+                    await _selectMonthYear(context);
+                  } else {
+                    setState(() {
+                      _selectedFilterType = val;
+                    });
+                    _fetchJobs();
+                  }
+                },
               ),
             ),
           ),
