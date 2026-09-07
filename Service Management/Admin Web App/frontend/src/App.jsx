@@ -431,6 +431,7 @@ export default function App() {
   const [adminPhotoFiles, setAdminPhotoFiles] = useState({});
   const [adminPhotoUploading, setAdminPhotoUploading] = useState(false);
   const [showAdminPhotoUpload, setShowAdminPhotoUpload] = useState(false);
+  const [showAllPhotosModal, setShowAllPhotosModal] = useState(false);
   
   // Performance states
   const [evaluations, setEvaluations] = useState([]);
@@ -1237,6 +1238,52 @@ export default function App() {
     } finally {
       setLoadingPayoutCalc(false);
     }
+  };
+
+  const getAllTicketPhotos = (ticket) => {
+    if (!ticket) return [];
+    const list = [];
+    const addedUrls = new Set();
+
+    const addPhoto = (url, defaultLabel) => {
+      if (!url || typeof url !== 'string') return;
+      const cleanUrl = url.trim();
+      if (!cleanUrl || addedUrls.has(cleanUrl)) return;
+      addedUrls.add(cleanUrl);
+      list.push({ url: cleanUrl, label: defaultLabel || `Photo ${list.length + 1}` });
+    };
+
+    const sources = [
+      ...(ticket.completionHistory || []),
+      ticket.completion,
+      ticket.completionDetails,
+      ticket
+    ].filter(Boolean);
+
+    for (const src of sources) {
+      if (Array.isArray(src.labeledPhotos)) {
+        src.labeledPhotos.forEach(lp => {
+          if (lp && lp.url) addPhoto(lp.url, lp.label);
+        });
+      }
+      if (Array.isArray(src.beforePhotos)) {
+        src.beforePhotos.forEach(p => addPhoto(typeof p === 'string' ? p : p?.url, 'Before Photo'));
+      }
+      if (Array.isArray(src.afterPhotos)) {
+        src.afterPhotos.forEach(p => addPhoto(typeof p === 'string' ? p : p?.url, 'After Photo'));
+      }
+      if (Array.isArray(src.photos)) {
+        src.photos.forEach(p => addPhoto(typeof p === 'string' ? p : (p?.url || p?.path), 'Completion Photo'));
+      }
+      if (Array.isArray(src.completionPhotos)) {
+        src.completionPhotos.forEach(p => addPhoto(typeof p === 'string' ? p : (p?.url || p?.path), 'Completion Photo'));
+      }
+      if (Array.isArray(src.workPhotos)) {
+        src.workPhotos.forEach(p => addPhoto(typeof p === 'string' ? p : (p?.url || p?.path), 'Work Photo'));
+      }
+    }
+
+    return list;
   };
 
   const handleSavePayout = async () => {
@@ -10747,10 +10794,23 @@ export default function App() {
 
                 {/* Technician Completion Uploads */}
                 {(() => {
-                  const completionsList = selectedTicket.completionHistory && selectedTicket.completionHistory.length > 0
+                  let completionsList = selectedTicket.completionHistory && selectedTicket.completionHistory.length > 0
                     ? selectedTicket.completionHistory
                     : (selectedTicket.completion ? [selectedTicket.completion] : []);
                   
+                  const allTicketPhotos = getAllTicketPhotos(selectedTicket);
+
+                  if (completionsList.length === 0 && allTicketPhotos.length > 0) {
+                    completionsList = [{
+                      photos: allTicketPhotos.map(p => p.url),
+                      workDone: selectedTicket.workDone || selectedTicket.completionDetails?.workDone || '',
+                      remarks: selectedTicket.remarks || selectedTicket.completionDetails?.remarks || '',
+                      submittedAt: selectedTicket.completedAt || selectedTicket.updatedAt || null
+                    }];
+                  }
+                  
+                  if (completionsList.length === 0) return null;
+
                   return completionsList.map((comp, idx) => {
                     const submissionLabel = completionsList.length > 1
                       ? `${idx + 1}${idx === 0 ? 'st' : idx === 1 ? 'nd' : idx === 2 ? 'rd' : 'th'} Completion Submission`
@@ -10770,13 +10830,15 @@ export default function App() {
                       { key: 'bill', label: 'Bill' },
                     ];
 
-                    const getPhotoUrlForSlot = (slotKey, slotLabel) => {
-                      const sources = [comp, selectedTicket.completion].filter(Boolean);
+                    const getPhotoUrlForSlot = (slotKey, slotLabel, slotIdx) => {
+                      const sources = [comp, selectedTicket.completion, selectedTicket.completionDetails, selectedTicket].filter(Boolean);
+                      
+                      // 1. Check labeledPhotos or explicit slot keys
                       for (const src of sources) {
                         if (src.labeledPhotos && src.labeledPhotos.length > 0) {
                           const match = src.labeledPhotos.find(lp =>
-                            lp.label?.toLowerCase() === slotLabel.toLowerCase() ||
-                            lp.label?.toLowerCase() === slotKey.toLowerCase()
+                            lp?.label?.toLowerCase() === slotLabel.toLowerCase() ||
+                            lp?.label?.toLowerCase() === slotKey.toLowerCase()
                           );
                           if (match && match.url) return match.url;
                         }
@@ -10787,15 +10849,49 @@ export default function App() {
                           return src.afterPhotos[0];
                         }
                       }
+
+                      // 2. Gather plain photo URLs across all photo array properties
+                      let plainPhotos = [];
+                      for (const src of sources) {
+                        const arrays = [src.photos, src.completionPhotos, src.workPhotos];
+                        if (src.completionDetails && src.completionDetails.photos) {
+                          arrays.push(src.completionDetails.photos);
+                        }
+                        for (const arr of arrays) {
+                          if (Array.isArray(arr)) {
+                            arr.forEach(p => {
+                              const u = typeof p === 'string' ? p : (p?.url || p?.path);
+                              if (u && !plainPhotos.includes(u)) plainPhotos.push(u);
+                            });
+                          }
+                        }
+                      }
+
+                      // 3. Fallback to positional photo by slot index
+                      if (typeof slotIdx === 'number' && plainPhotos[slotIdx]) {
+                        return plainPhotos[slotIdx];
+                      }
+
                       return null;
                     };
 
-                    const uploadedCount = expectedSlots.filter(s => !!getPhotoUrlForSlot(s.key, s.label)).length;
+                    const uploadedCount = expectedSlots.filter((s, sIdx) => !!getPhotoUrlForSlot(s.key, s.label, sIdx)).length;
                     
                     return (
                       <div key={idx} className="bg-slate-800/40 border border-slate-850 p-5 rounded-2xl space-y-4">
                         <h4 className="font-bold text-white text-sm border-b border-slate-700 pb-2 flex items-center justify-between">
-                          <span>{submissionLabel}</span>
+                          <span className="flex items-center gap-2">
+                            <span>{submissionLabel}</span>
+                            {allTicketPhotos.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setShowAllPhotosModal(true)}
+                                className="px-2.5 py-0.5 text-[11px] font-semibold bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/40 rounded-md flex items-center gap-1 transition cursor-pointer"
+                              >
+                                <span>🖼️</span> All Photos ({allTicketPhotos.length})
+                              </button>
+                            )}
+                          </span>
                           <span className="text-xs text-slate-400">{comp.submittedAt ? new Date(comp.submittedAt).toLocaleString() : 'N/A'}</span>
                         </h4>
                         <div className="text-sm text-slate-300 space-y-2">
@@ -10818,13 +10914,22 @@ export default function App() {
                             <p className="text-xs font-bold text-violet-400 flex items-center gap-1.5 uppercase tracking-wider">
                               <span>📷</span> COMPLETION PHOTOS ({uploadedCount}/{expectedSlots.length}):
                             </p>
+                            {allTicketPhotos.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setShowAllPhotosModal(true)}
+                                className="px-2.5 py-1 text-xs font-semibold bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/40 rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                              >
+                                <span>🖼️</span> All Photos ({allTicketPhotos.length})
+                              </button>
+                            )}
                           </div>
 
                           <div className={`grid grid-cols-2 sm:grid-cols-3 ${isInstallationType ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-3`}>
-                            {expectedSlots.map((slot) => {
-                              const photoPath = getPhotoUrlForSlot(slot.key, slot.label);
+                            {expectedSlots.map((slot, sIdx) => {
+                              const photoPath = getPhotoUrlForSlot(slot.key, slot.label, sIdx);
                               const isUploaded = !!photoPath;
-                              const imgUrl = isUploaded ? (photoPath.startsWith('http') ? photoPath : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photoPath}`) : '';
+                              const imgUrl = isUploaded ? (photoPath.startsWith('http') ? photoPath : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photoPath.startsWith('/') ? photoPath.slice(1) : photoPath}`) : '';
 
                               return isUploaded ? (
                                 <div key={slot.key} className="flex flex-col bg-slate-900/80 rounded-xl overflow-hidden border border-slate-700 shadow-sm">
@@ -11303,6 +11408,60 @@ export default function App() {
                 })()}
 
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* All Photos Gallery Modal */}
+      {showAllPhotosModal && selectedTicket && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="bg-slate-800 px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>📷</span> All Completion & Work Photos — {selectedTicket.ticketId || selectedTicket.ticketNumber}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Total photos found in database: {getAllTicketPhotos(selectedTicket).length}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAllPhotosModal(false)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg bg-slate-900/60 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {getAllTicketPhotos(selectedTicket).map((photo, pIdx) => {
+                const imgUrl = photo.url.startsWith('http')
+                  ? photo.url
+                  : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo.url.startsWith('/') ? photo.url.slice(1) : photo.url}`;
+                return (
+                  <div key={pIdx} className="flex flex-col bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-md">
+                    <div className="bg-slate-800/90 px-3 py-1.5 text-xs font-semibold text-slate-200 border-b border-slate-700 truncate">
+                      {photo.label}
+                    </div>
+                    <a href={imgUrl} target="_blank" rel="noreferrer" className="block relative group">
+                      <img src={imgUrl} alt={photo.label} className="object-cover w-full h-36 group-hover:scale-105 transition duration-200" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-xs text-white font-medium">
+                        Open Full Image ↗
+                      </div>
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex justify-end">
+              <button
+                onClick={() => setShowAllPhotosModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                Close Gallery
+              </button>
             </div>
           </div>
         </div>
