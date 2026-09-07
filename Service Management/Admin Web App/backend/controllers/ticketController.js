@@ -1047,7 +1047,7 @@ const verifyWork = async (req, res) => {
 // @route   PATCH /api/tickets/:id/close
 // @access  Private/Admin
 const closeTicket = async (req, res) => {
-  const { closingRemarks } = req.body;
+  const { closingRemarks, paymentMode, amount, referenceNumber } = req.body;
 
   try {
     const ticket = await Ticket.findById(req.params.id);
@@ -1059,9 +1059,29 @@ const closeTicket = async (req, res) => {
     ticket.closingRemarks = closingRemarks;
     ticket.closedAt = Date.now();
 
+    if (paymentMode && amount !== undefined && amount !== null) {
+      ticket.customerPayment = {
+        amount: Number(amount) || 0,
+        paymentMode,
+        referenceNumber: referenceNumber || '',
+        paidAt: Date.now()
+      };
+
+      const CustomerPayment = require('../models/CustomerPayment');
+      await CustomerPayment.create({
+        ticket: ticket._id,
+        technician: ticket.assignedTechnician,
+        amount: Number(amount) || 0,
+        paymentMode,
+        referenceNumber: referenceNumber || '',
+        recordedBy: req.user._id,
+        paidAt: Date.now()
+      });
+    }
+
     ticket.timeline.push({
       status: 'closed',
-      note: `Ticket closed. Remarks: ${closingRemarks || 'None'}`,
+      note: `Ticket closed. Remarks: ${closingRemarks || 'None'}${paymentMode ? ` (Payment Collected: ₹${amount} via ${paymentMode})` : ''}`,
       updatedBy: req.user.name
     });
 

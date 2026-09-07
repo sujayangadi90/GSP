@@ -72,6 +72,7 @@ app.use('/api/employees', require('./routes/employeeRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
 app.use('/api/payouts', require('./routes/payoutRoutes'));
 app.use('/api/dealer-collections', require('./routes/dealerCollectionRoutes'));
+app.use('/api/customer-payments', require('./routes/customerPaymentRoutes'));
 
 // Fallback base route
 app.get('/', (req, res) => {

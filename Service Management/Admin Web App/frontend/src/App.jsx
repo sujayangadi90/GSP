@@ -382,8 +382,9 @@ export default function App() {
   const [amcForm, setAmcForm] = useState(null); // null or form fields object
   const [assignTechId, setAssignTechId] = useState('');
   const [assignNotes, setAssignNotes] = useState('');
-  const [verificationForm, setVerificationForm] = useState({ status: 'approved', reason: '' });
   const [closureRemarks, setClosureRemarks] = useState('');
+  const [closurePaymentMode, setClosurePaymentMode] = useState('Cash');
+  const [closureRefNumber, setClosureRefNumber] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [showCancelForm, setShowCancelForm] = useState(false);
   const [showMessageForm, setShowMessageForm] = useState(false);
@@ -538,6 +539,18 @@ export default function App() {
     referenceNumber: ''
   });
   const [savingDealerCollection, setSavingDealerCollection] = useState(false);
+
+  // Customer Payments states
+  const [customerPayments, setCustomerPayments] = useState([]);
+  const [customerPaymentFilters, setCustomerPaymentFilters] = useState({
+    technicianId: 'ALL',
+    startDate: '',
+    endDate: ''
+  });
+  const [customerPaymentPage, setCustomerPaymentPage] = useState(1);
+  const [customerPaymentTotalPages, setCustomerPaymentTotalPages] = useState(1);
+  const [customerPaymentTotalCount, setCustomerPaymentTotalCount] = useState(0);
+  const [loadingCustomerPayments, setLoadingCustomerPayments] = useState(false);
 
   // Settings: Appliances & Brands states
   const [appliances, setAppliances] = useState([]);
@@ -1348,6 +1361,32 @@ export default function App() {
     }
   };
 
+  const fetchCustomerPayments = async (pageOverride) => {
+    setLoadingCustomerPayments(true);
+    try {
+      const p = pageOverride !== undefined ? pageOverride : customerPaymentPage;
+      let queryStr = `/customer-payments?page=${p}&limit=10`;
+      if (customerPaymentFilters.technicianId && customerPaymentFilters.technicianId !== 'ALL') {
+        queryStr += `&technicianId=${customerPaymentFilters.technicianId}`;
+      }
+      if (customerPaymentFilters.startDate) {
+        queryStr += `&startDate=${customerPaymentFilters.startDate}`;
+      }
+      if (customerPaymentFilters.endDate) {
+        queryStr += `&endDate=${customerPaymentFilters.endDate}`;
+      }
+      const data = await apiFetch(queryStr);
+      setCustomerPayments(data.payments || []);
+      setCustomerPaymentPage(data.page || 1);
+      setCustomerPaymentTotalPages(data.pages || 1);
+      setCustomerPaymentTotalCount(data.total || 0);
+    } catch (err) {
+      console.error('Error fetching customer payments:', err);
+    } finally {
+      setLoadingCustomerPayments(false);
+    }
+  };
+
   const handleCalculateDealerCollection = async () => {
     if (!dealerCollectionSelectedDealer) {
       alert('Please select a dealer.');
@@ -2146,6 +2185,9 @@ export default function App() {
       } else if (activeTab === 'dealer_collection') {
         fetchDealerCollections();
         fetchDealers();
+      } else if (activeTab === 'customer_payments') {
+        fetchCustomerPayments(1);
+        fetchTechnicians();
       } else if (activeTab === 'dashboard') {
         fetchDashboardData();
       } else if (activeTab === 'access_control' && user?.role === 'owner') {
@@ -3086,12 +3128,47 @@ export default function App() {
   const handleClose = async (e) => {
     e.preventDefault();
     try {
+      const type = (selectedTicket?.type || '').toLowerCase();
+      const sType = selectedTicket?.serviceType || selectedTicket?.serviceDetails?.serviceType || 'In Warranty';
+      const iType = selectedTicket?.installationType || selectedTicket?.installationDetails?.installationType || 'Free Installation';
+      const isCustomerPaying = (type === 'service' && sType === 'Out Warranty') || (type === 'installation' && iType === 'Paid Installation');
+
+      let amountToCollect = 0;
+      if (isCustomerPaying) {
+        if (type === 'service') {
+          amountToCollect = selectedTicket?.customerServiceFee ?? selectedTicket?.serviceFee ?? 0;
+        } else {
+          amountToCollect = selectedTicket?.customerInstallationFee ?? selectedTicket?.installationFee ?? 0;
+        }
+        let totalPartsPrice = 0;
+        const compObj = selectedTicket?.completion || (selectedTicket?.completionHistory && selectedTicket.completionHistory.length > 0 ? selectedTicket.completionHistory[selectedTicket.completionHistory.length - 1] : null);
+        if (compObj && Array.isArray(compObj.usedParts)) {
+          compObj.usedParts.forEach(up => {
+            const pPrice = (up.part && typeof up.part === 'object' && up.part.sellingPrice !== undefined)
+              ? up.part.sellingPrice
+              : (up.sellingPrice !== undefined ? up.sellingPrice : 0);
+            const qty = up.quantity || 1;
+            totalPartsPrice += (Number(pPrice) || 0) * (Number(qty) || 0);
+          });
+        }
+        amountToCollect += totalPartsPrice;
+      }
+
+      const bodyPayload = { closingRemarks: closureRemarks };
+      if (isCustomerPaying) {
+        bodyPayload.paymentMode = closurePaymentMode;
+        bodyPayload.amount = amountToCollect;
+        bodyPayload.referenceNumber = closureRefNumber;
+      }
+
       const updated = await apiFetch(`/tickets/${selectedTicket._id}/close`, {
         method: 'PATCH',
-        body: JSON.stringify({ closingRemarks: closureRemarks })
+        body: JSON.stringify(bodyPayload)
       });
       setSelectedTicket(updated);
       setClosureRemarks('');
+      setClosurePaymentMode('Cash');
+      setClosureRefNumber('');
       fetchData();
       fetchDashboardData();
     } catch (err) {
@@ -3581,10 +3658,10 @@ export default function App() {
                   Accounting
                 </span>
                 <span>
-                  {(accountingMenuOpen || activeTab === 'technician_payout' || activeTab === 'dealer_collection') ? '▲' : '▼'}
+                  {(accountingMenuOpen || activeTab === 'technician_payout' || activeTab === 'dealer_collection' || activeTab === 'customer_payments') ? '▲' : '▼'}
                 </span>
               </button>
-              {(accountingMenuOpen || activeTab === 'technician_payout' || activeTab === 'dealer_collection') && (
+              {(accountingMenuOpen || activeTab === 'technician_payout' || activeTab === 'dealer_collection' || activeTab === 'customer_payments') && (
                 <div className="pl-6 mt-1 space-y-1">
                   <button
                     onClick={() => { setActiveTab('technician_payout'); setMenuOpen(false); }}
@@ -3599,6 +3676,13 @@ export default function App() {
                   >
                     <Users className="w-4 h-4 text-blue-400" />
                     Dealer Collection
+                  </button>
+                  <button
+                    onClick={() => { setActiveTab('customer_payments'); setMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'customer_payments' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <DollarSign className="w-4 h-4 text-emerald-400" />
+                    Customer Payments
                   </button>
                 </div>
               )}
@@ -9675,6 +9759,225 @@ export default function App() {
             </div>
           )}
 
+          {/* Customer Payments Main Tab */}
+          {activeTab === 'customer_payments' && (
+            <div className="space-y-8 max-w-full min-w-0">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                    <DollarSign className="w-8 h-8 text-emerald-400" />
+                    Customer Payments
+                  </h1>
+                  <p className="text-slate-400 mt-1">
+                    Track and manage payment collection records for completed/closed tickets from customers.
+                  </p>
+                </div>
+              </div>
+
+              {/* Records Section */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-emerald-400" />
+                    Customer Payment Records ({customerPaymentTotalCount})
+                  </h2>
+                  <button
+                    onClick={() => fetchCustomerPayments(customerPaymentPage)}
+                    className="text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingCustomerPayments ? 'animate-spin' : ''}`} /> Refresh Records
+                  </button>
+                </div>
+
+                {/* Filters bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                      Filter by Technician
+                    </label>
+                    <select
+                      value={customerPaymentFilters.technicianId}
+                      onFocus={() => { if (!technicians || technicians.length === 0) fetchTechnicians(); }}
+                      onChange={(e) => {
+                        const updated = { ...customerPaymentFilters, technicianId: e.target.value };
+                        setCustomerPaymentFilters(updated);
+                        setTimeout(() => fetchCustomerPayments(1), 0);
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                    >
+                      <option value="ALL">All Technicians</option>
+                      {(Array.isArray(technicians) ? technicians : []).map((t) => (
+                        <option key={t._id || t.id} value={t._id || t.id}>{t.name} ({t.code})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={customerPaymentFilters.startDate}
+                      onChange={(e) => {
+                        const updated = { ...customerPaymentFilters, startDate: e.target.value };
+                        setCustomerPaymentFilters(updated);
+                        setTimeout(() => fetchCustomerPayments(1), 0);
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={customerPaymentFilters.endDate}
+                      onChange={(e) => {
+                        const updated = { ...customerPaymentFilters, endDate: e.target.value };
+                        setCustomerPaymentFilters(updated);
+                        setTimeout(() => fetchCustomerPayments(1), 0);
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <button
+                      onClick={() => {
+                        setCustomerPaymentFilters({ technicianId: 'ALL', startDate: '', endDate: '' });
+                        setTimeout(() => fetchCustomerPayments(1), 0);
+                      }}
+                      className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
+                    </button>
+                  </div>
+                </div>
+
+                {/* Records table */}
+                <div className="overflow-x-auto rounded-xl border border-slate-800">
+                  <table className="w-full text-left text-sm text-slate-300">
+                    <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 font-bold tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3">Ticket Number</th>
+                        <th className="px-4 py-3">Appliance Name</th>
+                        <th className="px-4 py-3">Service / Installation</th>
+                        <th className="px-4 py-3">Technician Name</th>
+                        <th className="px-4 py-3">Date of Collection</th>
+                        <th className="px-4 py-3">Payment Mode</th>
+                        <th className="px-4 py-3">Ref Number</th>
+                        <th className="px-4 py-3 text-right">Fee Collected</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {loadingCustomerPayments ? (
+                        <tr>
+                          <td colSpan="8" className="px-4 py-8 text-center text-slate-500 font-medium">
+                            <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-emerald-400" />
+                            Loading customer payment records...
+                          </td>
+                        </tr>
+                      ) : customerPayments.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="px-4 py-8 text-center text-slate-500 font-medium">
+                            No customer payment records found.
+                          </td>
+                        </tr>
+                      ) : (
+                        customerPayments.map((p) => {
+                          const tkt = p.ticket || {};
+                          const tType = (tkt.type || '').toUpperCase();
+                          const applianceName = tkt.product?.category || 'N/A';
+                          const brandName = tkt.product?.name || '';
+                          const techName = p.technician?.name || tkt.assignedTechnician?.name || 'N/A';
+                          const techCode = p.technician?.code || '';
+
+                          return (
+                            <tr key={p._id} className="hover:bg-slate-800/40 transition">
+                              <td className="px-4 py-3 font-semibold text-white font-mono">
+                                <button
+                                  onClick={() => {
+                                    if (tkt._id) {
+                                      setSelectedTicket(tkt);
+                                    }
+                                  }}
+                                  className="text-violet-400 hover:underline font-bold text-xs"
+                                >
+                                  #{tkt.ticketNumber || 'N/A'}
+                                </button>
+                              </td>
+                              <td className="px-4 py-3 font-medium text-white">
+                                {applianceName}
+                                {brandName && <div className="text-xs text-slate-500">{brandName}</div>}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`text-xs px-2.5 py-1 rounded-lg font-semibold border ${
+                                  tkt.type === 'installation' 
+                                    ? 'bg-blue-950/60 border-blue-800/50 text-blue-300' 
+                                    : 'bg-indigo-950/60 border-indigo-800/50 text-indigo-300'
+                                }`}>
+                                  {tType}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-medium text-slate-200">
+                                {techName}
+                                {techCode && <div className="text-xs text-slate-500 font-mono">{techCode}</div>}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-slate-400">
+                                {p.paidAt ? new Date(p.paidAt).toLocaleDateString() + ' ' + new Date(p.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-lg font-medium">
+                                  {p.paymentMode}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs font-mono text-slate-400">
+                                {p.referenceNumber || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-right font-bold text-emerald-400 font-mono text-base">
+                                ₹{p.amount?.toLocaleString('en-IN') || 0}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination bar */}
+                {customerPaymentTotalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                    <div className="text-xs text-slate-400">
+                      Showing page <span className="font-semibold text-white">{customerPaymentPage}</span> of{' '}
+                      <span className="font-semibold text-white">{customerPaymentTotalPages}</span> ({customerPaymentTotalCount} total records)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={customerPaymentPage <= 1 || loadingCustomerPayments}
+                        onClick={() => fetchCustomerPayments(customerPaymentPage - 1)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-slate-200 transition cursor-pointer"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        disabled={customerPaymentPage >= customerPaymentTotalPages || loadingCustomerPayments}
+                        onClick={() => fetchCustomerPayments(customerPaymentPage + 1)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-slate-200 transition cursor-pointer"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Video Library Main Tab */}
           {activeTab === 'video_library' && (
             <div className="space-y-6">
@@ -11694,26 +11997,106 @@ export default function App() {
                   )}
 
                   {/* Closure Form */}
-                  {selectedTicket.status === 'completed' && (
-                    <form onSubmit={handleClose} className="space-y-3">
-                      <label className="block text-xs font-semibold text-slate-400">Close Ticket</label>
-                      <textarea
-                        required
-                        placeholder="Enter final closing remarks..."
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-hidden"
-                        value={closureRemarks}
-                        onChange={e => setClosureRemarks(e.target.value)}
-                      />
-                      <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg text-xs cursor-pointer">
-                        Approve & Close Ticket
-                      </button>
-                    </form>
-                  )}
+                  {selectedTicket.status === 'completed' && (() => {
+                    const type = (selectedTicket?.type || '').toLowerCase();
+                    const sType = selectedTicket?.serviceType || selectedTicket?.serviceDetails?.serviceType || 'In Warranty';
+                    const iType = selectedTicket?.installationType || selectedTicket?.installationDetails?.installationType || 'Free Installation';
+                    const isCustomerPaying = (type === 'service' && sType === 'Out Warranty') || (type === 'installation' && iType === 'Paid Installation');
+
+                    let baseFee = 0;
+                    if (isCustomerPaying) {
+                      if (type === 'service') {
+                        baseFee = selectedTicket?.customerServiceFee ?? selectedTicket?.serviceFee ?? 0;
+                      } else {
+                        baseFee = selectedTicket?.customerInstallationFee ?? selectedTicket?.installationFee ?? 0;
+                      }
+                    }
+
+                    let partsTotal = 0;
+                    const compObj = selectedTicket?.completion || (selectedTicket?.completionHistory && selectedTicket.completionHistory.length > 0 ? selectedTicket.completionHistory[selectedTicket.completionHistory.length - 1] : null);
+                    if (compObj && Array.isArray(compObj.usedParts)) {
+                      compObj.usedParts.forEach(up => {
+                        const pPrice = (up.part && typeof up.part === 'object' && up.part.sellingPrice !== undefined)
+                          ? up.part.sellingPrice
+                          : (up.sellingPrice !== undefined ? up.sellingPrice : 0);
+                        const qty = up.quantity || 1;
+                        partsTotal += (Number(pPrice) || 0) * (Number(qty) || 0);
+                      });
+                    }
+
+                    const grandTotal = baseFee + partsTotal;
+
+                    return (
+                      <form onSubmit={handleClose} className="space-y-3">
+                        <label className="block text-xs font-semibold text-slate-400">Close Ticket & Verify Payment</label>
+                        
+                        {isCustomerPaying ? (
+                          <div className="bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl space-y-3">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-emerald-400">💳 Customer Fee Collected</span>
+                              <span className="text-sm font-extrabold text-emerald-300">₹{grandTotal}</span>
+                            </div>
+                            <div className="space-y-2">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-300 mb-1">Payment Mode *</label>
+                                <select
+                                  required
+                                  value={closurePaymentMode}
+                                  onChange={e => setClosurePaymentMode(e.target.value)}
+                                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white cursor-pointer"
+                                >
+                                  {[
+                                    'Cash', 'UPI', 'Credit Card', 'Debit Card', 'Net Banking',
+                                    'Bank Transfer / NEFT', 'RTGS', 'IMPS', 'Cheque', 'Demand Draft (DD)'
+                                  ].map(mode => (
+                                    <option key={mode} value={mode}>{mode}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-300 mb-1">Ref Number / Transaction ID (Optional)</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. UTR12345678 / CHQ98765"
+                                  value={closureRefNumber}
+                                  onChange={e => setClosureRefNumber(e.target.value)}
+                                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-hidden"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-slate-800/60 border border-slate-700/50 p-2.5 rounded-xl text-[11px] text-slate-400">
+                            ℹ️ No customer payment required for {type === 'service' ? sType : iType}.
+                          </div>
+                        )}
+
+                        <textarea
+                          required
+                          placeholder="Enter final closing remarks..."
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-hidden"
+                          value={closureRemarks}
+                          onChange={e => setClosureRemarks(e.target.value)}
+                        />
+                        <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg text-xs cursor-pointer shadow-md transition">
+                          Approve & Close Ticket
+                        </button>
+                      </form>
+                    );
+                  })()}
 
                   {selectedTicket.status === 'closed' && (
                     <div className="bg-emerald-950/40 border border-emerald-900/30 p-3 rounded-xl text-emerald-400 text-xs font-semibold space-y-1">
-                      <p>Ticket Closed Successfully</p>
+                      <p className="flex items-center gap-1.5 font-bold text-emerald-300">
+                        <span>✓</span> Ticket Closed Successfully
+                      </p>
                       {selectedTicket.closingRemarks && <p className="italic text-slate-300 mt-1">Remarks: {selectedTicket.closingRemarks}</p>}
+                      {selectedTicket.customerPayment && (
+                        <div className="mt-2 pt-2 border-t border-emerald-900/40 text-[11px] text-slate-300 space-y-0.5">
+                          <p><span className="font-semibold text-emerald-400">Payment Recorded:</span> ₹{selectedTicket.customerPayment.amount} via {selectedTicket.customerPayment.paymentMode}</p>
+                          {selectedTicket.customerPayment.referenceNumber && <p><span className="font-semibold text-slate-400">Ref No:</span> {selectedTicket.customerPayment.referenceNumber}</p>}
+                        </div>
+                      )}
                     </div>
                   )}
 

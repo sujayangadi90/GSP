@@ -146,6 +146,26 @@ const TicketSchema = new mongoose.Schema({
     type: Number,
     min: 0
   },
+  customerPayment: {
+    amount: Number,
+    paymentMode: {
+      type: String,
+      enum: [
+        'Cash',
+        'UPI',
+        'Credit Card',
+        'Debit Card',
+        'Net Banking',
+        'Bank Transfer / NEFT',
+        'RTGS',
+        'IMPS',
+        'Cheque',
+        'Demand Draft (DD)'
+      ]
+    },
+    referenceNumber: String,
+    paidAt: Date
+  },
   closingRemarks: String,
   closedAt: Date,
   timeline: [TimelineSchema]
