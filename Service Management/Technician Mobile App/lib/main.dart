@@ -1505,6 +1505,37 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
           _isFeeLoading = false;
           if (_isLoading) _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _updateStatus(String nextStatus, String timelineNote) async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await http.patch(
+        Uri.parse('${widget.apiUrl}/tickets/${widget.jobId}/status'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}'
+        },
+        body: jsonEncode({
+          'status': nextStatus,
+          'note': timelineNote,
+        }),
+      );
+      if (res.statusCode == 200) {
+        if (mounted) {
+          setState(() {
+            _job = jsonDecode(res.body);
+          });
+        }
+      }
+    } catch (e) {
+      print('Status change error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -1896,9 +1927,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            final isInstallationType = (_job?['type'] ?? '').toString().toLowerCase() == 'installation';
-
-            if (isInstallationType) ...[
+            if ((_job?['type'] ?? '').toString().toLowerCase() == 'installation') ...[
               const Text('REQUIRED INSTALLATION PHOTOS (5)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amberAccent)),
               const SizedBox(height: 10),
               _buildPhotoSlotCard(label: '1. Bill', key: 'bill', file: _billPhoto, icon: Icons.receipt_long, color: Colors.amberAccent),
