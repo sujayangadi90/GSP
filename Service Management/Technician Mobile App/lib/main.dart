@@ -1518,41 +1518,44 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   Text('Mark Site Not Ready', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                 ],
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Upload site photo and select scheduled date & time for next visit:',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                    const SizedBox(height: 16),
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Upload site photo and select scheduled date & time for next visit:',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
 
-                    // 1. Photo Upload Slot
-                    const Text('1. Upload Site Photo', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12)),
-                    const SizedBox(height: 6),
-                    GestureDetector(
-                      onTap: () async {
-                        final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-                        if (picked != null) {
-                          setDialogState(() {
-                            sitePhoto = File(picked.path);
-                          });
-                        }
-                      },
-                      child: Container(
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.blueGrey[900],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: sitePhoto != null ? Colors.tealAccent : Colors.grey[700]!),
-                        ),
-                        child: sitePhoto != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.file(sitePhoto!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-                              )
+                      // 1. Photo Upload Slot
+                      const Text('1. Upload Site Photo', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: () async {
+                          final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                          if (picked != null) {
+                            setDialogState(() {
+                              sitePhoto = File(picked.path);
+                            });
+                          }
+                        },
+                        child: Container(
+                          height: 120,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.blueGrey[900],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: sitePhoto != null ? Colors.tealAccent : Colors.grey[700]!),
+                          ),
+                          child: sitePhoto != null
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.file(sitePhoto!, fit: BoxFit.cover),
+                                )
                             : Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: const [
@@ -1622,6 +1625,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   ],
                 ),
               ),
+            ),
               actions: [
                 TextButton(
                   onPressed: isSubmitting ? null : () => Navigator.pop(context),
