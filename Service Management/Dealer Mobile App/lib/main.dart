@@ -484,6 +484,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   builder: (context) => ProfileScreen(
                     user: widget.user,
                     role: 'Dealer Partner',
+                    token: widget.token,
+                    apiUrl: widget.apiUrl,
                     onLogout: widget.onLogout,
                   ),
                 ),
@@ -2500,12 +2502,16 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
 class ProfileScreen extends StatelessWidget {
   final Map<String, dynamic> user;
   final String role;
+  final String? token;
+  final String? apiUrl;
   final VoidCallback? onLogout;
 
   const ProfileScreen({
     super.key,
     required this.user,
     required this.role,
+    this.token,
+    this.apiUrl,
     this.onLogout,
   });
 
@@ -2579,8 +2585,36 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+            if (token != null && apiUrl != null)
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CollectionHistoryScreen(
+                        token: token!,
+                        apiUrl: apiUrl!,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.history, color: Colors.deepPurpleAccent),
+                label: const Text(
+                  'Collection History',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E1B24),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(52),
+                  side: BorderSide(color: Colors.deepPurple.shade700, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
+                ),
+              ),
             if (onLogout != null) ...[
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.pop(context);
@@ -3136,6 +3170,373 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class CollectionHistoryScreen extends StatefulWidget {
+  final String token;
+  final String apiUrl;
+
+  const CollectionHistoryScreen({
+    super.key,
+    required this.token,
+    required this.apiUrl,
+  });
+
+  @override
+  State<CollectionHistoryScreen> createState() => _CollectionHistoryScreenState();
+}
+
+class _CollectionHistoryScreenState extends State<CollectionHistoryScreen> {
+  bool _isLoading = true;
+  String? _error;
+  List<dynamic> _collections = [];
+  int _selectedYear = DateTime.now().year;
+
+  final List<String> _monthsList = const [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCollections();
+  }
+
+  Future<void> _fetchCollections() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final uri = Uri.parse('${widget.apiUrl}/dealer-collections?year=$_selectedYear');
+      final res = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        setState(() {
+          _collections = data['collections'] ?? [];
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = 'Failed to load collections (${res.statusCode})';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Error connecting to server: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    double totalYearlyCollection = 0;
+    for (var item in _collections) {
+      final amt = item['amount'];
+      if (amt is num) {
+        totalYearlyCollection += amt.toDouble();
+      }
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Collection History',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchCollections,
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Filter & Total Card Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1B24),
+              border: Border(
+                bottom: BorderSide(color: Colors.grey.shade800, width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'FILTER BY YEAR',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.purpleAccent,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<int>(
+                        value: _selectedYear,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFF0F172A),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF334155)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF334155)),
+                          ),
+                        ),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        dropdownColor: const Color(0xFF0F172A),
+                        items: [2024, 2025, 2026, 2027, 2028].map((y) {
+                          return DropdownMenuItem(value: y, child: Text(y.toString()));
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null && val != _selectedYear) {
+                            setState(() {
+                              _selectedYear = val;
+                            });
+                            _fetchCollections();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withOpacity(0.12),
+                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.35)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'TOTAL COLLECTED',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF34D399)),
+                        ),
+                        const SizedBox(height: 4),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '₹ ${totalYearlyCollection.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Content List
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Colors.purpleAccent))
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                            const SizedBox(height: 12),
+                            Text(_error!, style: const TextStyle(color: Colors.grey)),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: _fetchCollections,
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple.shade900),
+                              child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _collections.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.receipt_long_outlined, size: 56, color: Colors.grey.shade600),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No collection history found for $_selectedYear',
+                                  style: TextStyle(color: Colors.grey.shade400, fontSize: 15, fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _fetchCollections,
+                            color: Colors.purpleAccent,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _collections.length,
+                              itemBuilder: (context, index) {
+                                final item = _collections[index];
+                                final monthNum = item['month'] as int? ?? 1;
+                                final yearNum = item['year'] as int? ?? _selectedYear;
+                                final monthName = (monthNum >= 1 && monthNum <= 12) ? _monthsList[monthNum - 1] : 'Month $monthNum';
+                                final amt = item['amount'] ?? 0;
+                                final paymentMode = item['paymentMode'] ?? 'Cash';
+                                final refNum = item['referenceNumber'] ?? '';
+                                final collectedAtRaw = item['collectedAt'] ?? item['createdAt'];
+                                String formattedDate = '-';
+                                if (collectedAtRaw != null) {
+                                  try {
+                                    final dt = DateTime.parse(collectedAtRaw.toString()).toLocal();
+                                    formattedDate = "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+                                  } catch (_) {
+                                    formattedDate = collectedAtRaw.toString();
+                                  }
+                                }
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 14),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1E1B24),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.grey.shade800),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Header Row: Month/Year & Amount
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.between,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '$monthName $yearNum',
+                                                  style: const TextStyle(
+                                                    fontSize: 17,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.emerald.shade900.withOpacity(0.4),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: Colors.emerald.shade500.withOpacity(0.5)),
+                                                  ),
+                                                  child: const Text(
+                                                    'COLLECTED',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.emeraldAccent,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Text(
+                                              '₹ ${amt is num ? amt.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},') : amt}',
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w900,
+                                                color: Colors.emeraldAccent,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 12),
+                                          child: Divider(color: Color(0xFF2D2A36), height: 1),
+                                        ),
+                                        // Details Grid
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text(
+                                                    'Payment Mode',
+                                                    style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    paymentMode,
+                                                    style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            if (refNum.toString().isNotEmpty)
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text(
+                                                      'Ref Number',
+                                                      style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      refNum,
+                                                      style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Paid Date: $formattedDate',
+                                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+          ),
+        ],
       ),
     );
   }

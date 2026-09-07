@@ -228,7 +228,9 @@ const getDealerCollections = async (req, res) => {
 
     let query = {};
 
-    if (dealerId && dealerId !== 'ALL') {
+    if (req.user.role === 'dealer') {
+      query.dealer = req.user._id;
+    } else if (dealerId && dealerId !== 'ALL') {
       query.dealer = dealerId;
     }
     if (month && month !== 'ALL') {

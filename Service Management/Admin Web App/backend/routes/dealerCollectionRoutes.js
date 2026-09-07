@@ -8,11 +8,10 @@ const {
 const { protect, authorize } = require('../middleware/auth');
 
 router.use(protect);
-router.use(authorize('admin'));
 
-router.get('/calculate', calculateDealerCollection);
+router.get('/calculate', authorize('admin'), calculateDealerCollection);
 router.route('/')
-  .get(getDealerCollections)
-  .post(createDealerCollection);
+  .get(authorize('admin', 'dealer'), getDealerCollections)
+  .post(authorize('admin'), createDealerCollection);
 
 module.exports = router;
