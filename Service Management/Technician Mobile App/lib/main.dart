@@ -4244,11 +4244,11 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
     if (_selectedBrandObject == null) return 0.0;
 
     if (widget.type == 'service') {
-      if (_serviceType == 'In Warranty') {
+      if (_serviceType == 'Out Warranty') {
         final fee = _selectedBrandObject['customerServiceFee'] ?? _selectedBrandObject['serviceFee'] ?? 0;
         return (fee is num) ? fee.toDouble() : double.tryParse(fee.toString()) ?? 0.0;
       } else {
-        // Out Warranty -> Price is 0
+        // In Warranty / Paid by Dealer -> Customer Price is 0
         return 0.0;
       }
     } else {
@@ -4270,12 +4270,14 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
     
     String subtitle;
     if (isService) {
-      if (_serviceType == 'In Warranty') {
+      if (_serviceType == 'Out Warranty') {
         subtitle = _selectedBrandObject != null 
             ? 'Configured Service Fee for ${_selectedBrandObject['name'] ?? 'size/module'}' 
             : 'Select appliance & size/module to view configured fee';
       } else {
-        subtitle = 'Out of warranty service (Price: ₹ 0)';
+        subtitle = _serviceType == 'In Warranty' 
+            ? 'In warranty service covered (Price: ₹ 0)' 
+            : 'Service paid by dealer (Price: ₹ 0)';
       }
     } else {
       if (_installationType == 'Paid Installation') {
