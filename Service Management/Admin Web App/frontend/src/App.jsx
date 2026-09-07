@@ -996,7 +996,7 @@ export default function App() {
 
       setDealers(dealersData);
       setAllDealers(allDealersData);
-      setTechnicians(techsData);
+      setTechnicians(Array.isArray(techsData) ? techsData : (techsData?.technicians || techsData?.data || []));
       setTickets(ticketsData);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -1018,10 +1018,9 @@ export default function App() {
   const fetchTechnicians = async () => {
     try {
       const data = await apiFetch('/technicians');
-      setTechnicians(data);
-      if (Array.isArray(data)) {
-        setActiveTechniciansForAssign(data.filter(t => t.status === 'active'));
-      }
+      const techList = Array.isArray(data) ? data : (data?.technicians || data?.data || []);
+      setTechnicians(techList);
+      setActiveTechniciansForAssign(techList.filter(t => t.status === 'active'));
     } catch (err) {
       console.error('Error fetching technicians:', err);
     }
@@ -8801,13 +8800,14 @@ export default function App() {
                     </label>
                     <select
                       value={payoutSelectedTech}
+                      onFocus={() => { if (!technicians || technicians.length === 0) fetchTechnicians(); }}
                       onChange={(e) => setPayoutSelectedTech(e.target.value)}
                       className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
                     >
                       <option value="">-- Choose Technician --</option>
-                      {technicians.map((t) => (
+                      {(Array.isArray(technicians) ? technicians : []).map((t) => (
                         <option key={t._id || t.id} value={t._id || t.id}>
-                          {t.name} {t.code ? `(${t.code})` : `(${t.mobile})`}
+                          {t.name} {t.code ? `(${t.code})` : (t.mobile ? `(${t.mobile})` : '')}
                         </option>
                       ))}
                     </select>
@@ -8928,11 +8928,12 @@ export default function App() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                   <select
                     value={payoutFilters.technicianId}
+                    onFocus={() => { if (!technicians || technicians.length === 0) fetchTechnicians(); }}
                     onChange={(e) => setPayoutFilters({ ...payoutFilters, technicianId: e.target.value })}
                     className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
                   >
                     <option value="ALL">All Technicians</option>
-                    {technicians.map((t) => (
+                    {(Array.isArray(technicians) ? technicians : []).map((t) => (
                       <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>
                     ))}
                   </select>
