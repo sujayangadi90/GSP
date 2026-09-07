@@ -83,9 +83,20 @@ const calculateTechnicianPayout = async (req, res) => {
     const ticketsWithFees = await attachFeesToTickets(completedTickets);
 
     let totalEarnings = 0;
+    let serviceEarnings = 0;
+    let installationEarnings = 0;
+    let completedServiceJobsCount = 0;
+    let completedInstallationJobsCount = 0;
+
     ticketsWithFees.forEach((t) => {
-      if (typeof t.technicianEarning === 'number') {
-        totalEarnings += t.technicianEarning;
+      const earning = typeof t.technicianEarning === 'number' ? t.technicianEarning : 0;
+      totalEarnings += earning;
+      if (t.type === 'service') {
+        completedServiceJobsCount += 1;
+        serviceEarnings += earning;
+      } else if (t.type === 'installation') {
+        completedInstallationJobsCount += 1;
+        installationEarnings += earning;
       }
     });
 
@@ -102,6 +113,10 @@ const calculateTechnicianPayout = async (req, res) => {
       year: y,
       totalEarnings,
       completedJobsCount: ticketsWithFees.length,
+      completedServiceJobsCount,
+      serviceEarnings,
+      completedInstallationJobsCount,
+      installationEarnings,
       payout: existingPayout || null,
       status: existingPayout ? existingPayout.status : 'unpaid'
     });

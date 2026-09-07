@@ -8856,7 +8856,7 @@ export default function App() {
 
                 {payoutCalcResult && (
                   <div className="mt-6 border-t border-slate-800 pt-6">
-                    <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <span className="text-lg font-bold text-white">{payoutCalcResult.technician.name}</span>
@@ -8872,12 +8872,31 @@ export default function App() {
 
                         <div className="text-sm text-slate-400 flex flex-wrap items-center gap-x-6 gap-y-1">
                           <span>Month: <strong className="text-slate-200">{MONTHS_LIST[payoutCalcResult.month - 1]} {payoutCalcResult.year}</strong></span>
-                          <span>Completed Jobs: <strong className="text-slate-200">{payoutCalcResult.completedJobsCount}</strong></span>
+                          <span>Total Completed Jobs: <strong className="text-slate-200">{payoutCalcResult.completedJobsCount}</strong></span>
                         </div>
                       </div>
 
-                      <div className="flex flex-col md:items-end gap-3">
-                        <div className="text-left md:text-right">
+                      {/* Service & Installation Breakdown */}
+                      <div className="flex flex-wrap items-center gap-3 bg-slate-900/90 border border-slate-700/70 p-3 rounded-xl">
+                        <div className="px-3.5 py-2 rounded-lg bg-indigo-950/60 border border-indigo-800/60">
+                          <div className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider">Service Jobs</div>
+                          <div className="text-xs font-extrabold text-white flex items-center gap-2 mt-0.5">
+                            <span>{payoutCalcResult.completedServiceJobsCount || 0} Tickets</span>
+                            <span className="text-indigo-400 font-mono font-bold">₹{(payoutCalcResult.serviceEarnings || 0).toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+
+                        <div className="px-3.5 py-2 rounded-lg bg-emerald-950/60 border border-emerald-800/60">
+                          <div className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider">Installation Jobs</div>
+                          <div className="text-xs font-extrabold text-white flex items-center gap-2 mt-0.5">
+                            <span>{payoutCalcResult.completedInstallationJobsCount || 0} Tickets</span>
+                            <span className="text-emerald-400 font-mono font-bold">₹{(payoutCalcResult.installationEarnings || 0).toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col lg:items-end gap-3">
+                        <div className="text-left lg:text-right">
                           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Earnings / Payout Amount</div>
                           <div className="text-3xl font-black text-emerald-400 font-mono">₹{payoutCalcResult.totalEarnings.toLocaleString('en-IN')}</div>
                         </div>
@@ -9058,8 +9077,16 @@ export default function App() {
                         <span className="text-slate-400">Month / Year:</span>
                         <strong className="text-white">{MONTHS_LIST[payoutCalcResult.month - 1]} {payoutCalcResult.year}</strong>
                       </div>
+                      <div className="flex justify-between text-xs text-indigo-300 pt-1.5 border-t border-slate-700/50">
+                        <span>Service ({payoutCalcResult.completedServiceJobsCount || 0} Tickets):</span>
+                        <strong className="font-mono">₹{(payoutCalcResult.serviceEarnings || 0).toLocaleString('en-IN')}</strong>
+                      </div>
+                      <div className="flex justify-between text-xs text-emerald-300">
+                        <span>Installation ({payoutCalcResult.completedInstallationJobsCount || 0} Tickets):</span>
+                        <strong className="font-mono">₹{(payoutCalcResult.installationEarnings || 0).toLocaleString('en-IN')}</strong>
+                      </div>
                       <div className="flex justify-between border-t border-slate-700/60 pt-2">
-                        <span className="text-slate-400">Payout Amount:</span>
+                        <span className="text-slate-400 font-bold">Total Payout Amount:</span>
                         <strong className="text-emerald-400 text-base font-mono">₹{payoutCalcResult.totalEarnings.toLocaleString('en-IN')}</strong>
                       </div>
                     </div>
