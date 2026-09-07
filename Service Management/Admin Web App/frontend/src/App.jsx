@@ -493,6 +493,30 @@ export default function App() {
   // Sidebar / Submenu states
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [employeeMenuOpen, setEmployeeMenuOpen] = useState(false);
+  const [accountingMenuOpen, setAccountingMenuOpen] = useState(false);
+
+  // Accounting / Technician Payout states
+  const [payouts, setPayouts] = useState([]);
+  const [payoutFilters, setPayoutFilters] = useState({
+    technicianId: 'ALL',
+    month: 'ALL',
+    year: 'ALL',
+    paymentMode: 'ALL',
+    status: 'ALL',
+    fromDate: '',
+    toDate: ''
+  });
+  const [payoutSelectedTech, setPayoutSelectedTech] = useState('');
+  const [payoutSelectedMonth, setPayoutSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [payoutSelectedYear, setPayoutSelectedYear] = useState(new Date().getFullYear());
+  const [payoutCalcResult, setPayoutCalcResult] = useState(null);
+  const [loadingPayoutCalc, setLoadingPayoutCalc] = useState(false);
+  const [showMarkPaidModal, setShowMarkPaidModal] = useState(false);
+  const [markPaidForm, setMarkPaidForm] = useState({
+    paymentMode: 'Cash',
+    referenceNumber: ''
+  });
+  const [savingPayout, setSavingPayout] = useState(false);
 
   // Settings: Appliances & Brands states
   const [appliances, setAppliances] = useState([]);
@@ -1188,6 +1212,68 @@ export default function App() {
       alert(err.message);
     } finally {
       setLoadingTechProfile(false);
+    }
+  };
+
+  const fetchPayouts = async () => {
+    try {
+      let queryStr = `/payouts?technicianId=${payoutFilters.technicianId}&month=${payoutFilters.month}&year=${payoutFilters.year}&paymentMode=${payoutFilters.paymentMode}&status=${payoutFilters.status}`;
+      if (payoutFilters.fromDate && payoutFilters.toDate) {
+        queryStr += `&fromDate=${payoutFilters.fromDate}&toDate=${payoutFilters.toDate}`;
+      }
+      const data = await apiFetch(queryStr);
+      setPayouts(data.payouts || []);
+    } catch (err) {
+      console.error('Error fetching payouts:', err);
+    }
+  };
+
+  const handleCalculatePayout = async () => {
+    if (!payoutSelectedTech) {
+      alert('Please select a technician.');
+      return;
+    }
+    setLoadingPayoutCalc(true);
+    setPayoutCalcResult(null);
+    try {
+      const data = await apiFetch(`/payouts/calculate?technicianId=${payoutSelectedTech}&month=${payoutSelectedMonth}&year=${payoutSelectedYear}`);
+      setPayoutCalcResult(data);
+    } catch (err) {
+      alert(err.message || 'Failed to calculate payout');
+    } finally {
+      setLoadingPayoutCalc(false);
+    }
+  };
+
+  const handleSavePayout = async () => {
+    if (!payoutCalcResult) return;
+    if (!markPaidForm.paymentMode) {
+      alert('Please select a payment mode.');
+      return;
+    }
+    setSavingPayout(true);
+    try {
+      const res = await apiFetch('/payouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          technicianId: payoutCalcResult.technician._id,
+          month: payoutCalcResult.month,
+          year: payoutCalcResult.year,
+          paymentMode: markPaidForm.paymentMode,
+          referenceNumber: markPaidForm.referenceNumber,
+          amount: payoutCalcResult.totalEarnings
+        })
+      });
+      alert(res.message || 'Payout marked as Paid successfully');
+      setShowMarkPaidModal(false);
+      setMarkPaidForm({ paymentMode: 'Cash', referenceNumber: '' });
+      handleCalculatePayout();
+      fetchPayouts();
+    } catch (err) {
+      alert(err.message || 'Failed to record payout');
+    } finally {
+      setSavingPayout(false);
     }
   };
 
@@ -1934,6 +2020,9 @@ export default function App() {
         fetchAttendance();
         fetchAttendanceStats();
         fetchEmployees();
+      } else if (activeTab === 'technician_payout') {
+        fetchPayouts();
+        fetchTechnicians();
       } else if (activeTab === 'dashboard') {
         fetchDashboardData();
       } else if (activeTab === 'access_control' && user?.role === 'owner') {
@@ -1951,7 +2040,7 @@ export default function App() {
         fetchEvaluations();
       }
     }
-  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters, inventoryFilters, performanceFilters, employeeSearch, employeeStatusFilter, attendanceDateFilter, attendanceEmployeeFilter, attendanceStatusFilter, attendanceSearch]);
+  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters, inventoryFilters, performanceFilters, employeeSearch, employeeStatusFilter, attendanceDateFilter, attendanceEmployeeFilter, attendanceStatusFilter, attendanceSearch, payoutFilters]);
 
   useEffect(() => {
     setCustomerPage(1);
@@ -2003,6 +2092,7 @@ export default function App() {
         if (tab === 'dealers' && perms.manageDealers === false) return false;
         if ((tab === 'technicians' || tab === 'add-technician' || tab === 'edit-technician') && perms.manageTechnicians === false) return false;
         if (tab === 'performance' && perms.performance === false) return false;
+        if (tab === 'technician_payout' && perms.accounting === false) return false;
         if (tab === 'followups' && perms.followups === false) return false;
         if (tab === 'reports' && perms.reports === false) return false;
         if (tab === 'video_library' && perms.videoLibrary === false) return false;
@@ -3353,6 +3443,33 @@ export default function App() {
                       Performance
                     </button>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+          {(!user || user.role === 'admin' || user.permissions?.accounting !== false) && (
+            <div>
+              <button
+                onClick={() => setAccountingMenuOpen(!accountingMenuOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              >
+                <span className="flex items-center gap-3">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                  Accounting
+                </span>
+                <span>
+                  {(accountingMenuOpen || activeTab === 'technician_payout') ? '▲' : '▼'}
+                </span>
+              </button>
+              {(accountingMenuOpen || activeTab === 'technician_payout') && (
+                <div className="pl-6 mt-1 space-y-1">
+                  <button
+                    onClick={() => { setActiveTab('technician_payout'); setMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'technician_payout' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    Technician Payout
+                  </button>
                 </div>
               )}
             </div>
@@ -8651,6 +8768,366 @@ export default function App() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Technician Payout Main Tab */}
+          {activeTab === 'technician_payout' && (
+            <div className="space-y-8 max-w-full min-w-0">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                    <FileSpreadsheet className="w-8 h-8 text-emerald-400" />
+                    Technician Payout Management
+                  </h1>
+                  <p className="text-slate-400 mt-1">
+                    Accounting module to calculate technician monthly earnings and record payouts.
+                  </p>
+                </div>
+              </div>
+
+              {/* Section 1: Calculate & Mark Payout */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-violet-400" />
+                  Calculate Technician Earnings
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                      Select Technician <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      value={payoutSelectedTech}
+                      onChange={(e) => setPayoutSelectedTech(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                    >
+                      <option value="">-- Choose Technician --</option>
+                      {technicians.map((t) => (
+                        <option key={t._id || t.id} value={t._id || t.id}>
+                          {t.name} {t.code ? `(${t.code})` : `(${t.mobile})`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                      Select Month <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      value={payoutSelectedMonth}
+                      onChange={(e) => setPayoutSelectedMonth(Number(e.target.value))}
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                    >
+                      {MONTHS_LIST.map((m, idx) => (
+                        <option key={idx} value={idx + 1}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                      Select Year <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      value={payoutSelectedYear}
+                      onChange={(e) => setPayoutSelectedYear(Number(e.target.value))}
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                    >
+                      {YEARS_LIST.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleCalculatePayout}
+                    disabled={!payoutSelectedTech || loadingPayoutCalc}
+                    className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
+                  >
+                    {loadingPayoutCalc ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    Calculate Earnings
+                  </button>
+                </div>
+
+                {payoutCalcResult && (
+                  <div className="mt-6 border-t border-slate-800 pt-6">
+                    <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-white">{payoutCalcResult.technician.name}</span>
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-700 text-slate-300">
+                            {payoutCalcResult.technician.code || payoutCalcResult.technician.mobile}
+                          </span>
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
+                            payoutCalcResult.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}>
+                            {payoutCalcResult.status}
+                          </span>
+                        </div>
+
+                        <div className="text-sm text-slate-400 flex flex-wrap items-center gap-x-6 gap-y-1">
+                          <span>Month: <strong className="text-slate-200">{MONTHS_LIST[payoutCalcResult.month - 1]} {payoutCalcResult.year}</strong></span>
+                          <span>Completed Jobs: <strong className="text-slate-200">{payoutCalcResult.completedJobsCount}</strong></span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col md:items-end gap-3">
+                        <div className="text-left md:text-right">
+                          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Earnings / Payout Amount</div>
+                          <div className="text-3xl font-black text-emerald-400 font-mono">₹{payoutCalcResult.totalEarnings.toLocaleString('en-IN')}</div>
+                        </div>
+
+                        {payoutCalcResult.status === 'paid' ? (
+                          <div className="bg-emerald-950/40 border border-emerald-800/50 rounded-lg p-3 text-xs text-emerald-300">
+                            <div className="font-bold flex items-center gap-1.5"><CheckCircle className="w-4 h-4 text-emerald-400" /> Already Marked as Paid</div>
+                            <div>Payment Mode: <strong>{payoutCalcResult.payout?.paymentMode}</strong></div>
+                            {payoutCalcResult.payout?.referenceNumber && <div>Ref: <strong>{payoutCalcResult.payout.referenceNumber}</strong></div>}
+                            <div>Paid Date: {new Date(payoutCalcResult.payout?.paidAt).toLocaleDateString()}</div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setShowMarkPaidModal(true)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Mark as Paid
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Payout Records History Table */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-indigo-400" />
+                    Payout Records History
+                  </h2>
+                  <button
+                    onClick={fetchPayouts}
+                    className="text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Refresh Records
+                  </button>
+                </div>
+
+                {/* Filters bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                  <select
+                    value={payoutFilters.technicianId}
+                    onChange={(e) => setPayoutFilters({ ...payoutFilters, technicianId: e.target.value })}
+                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="ALL">All Technicians</option>
+                    {technicians.map((t) => (
+                      <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={payoutFilters.month}
+                    onChange={(e) => setPayoutFilters({ ...payoutFilters, month: e.target.value })}
+                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="ALL">All Months</option>
+                    {MONTHS_LIST.map((m, idx) => (
+                      <option key={idx} value={idx + 1}>{m}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={payoutFilters.year}
+                    onChange={(e) => setPayoutFilters({ ...payoutFilters, year: e.target.value })}
+                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="ALL">All Years</option>
+                    {YEARS_LIST.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={payoutFilters.paymentMode}
+                    onChange={(e) => setPayoutFilters({ ...payoutFilters, paymentMode: e.target.value })}
+                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="ALL">All Payment Modes</option>
+                    {[
+                      'Cash', 'UPI', 'Credit Card', 'Debit Card', 'Net Banking',
+                      'Bank Transfer / NEFT', 'RTGS', 'IMPS', 'Cheque', 'Demand Draft (DD)'
+                    ].map((mode) => (
+                      <option key={mode} value={mode}>{mode}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => setPayoutFilters({ technicianId: 'ALL', month: 'ALL', year: 'ALL', paymentMode: 'ALL', status: 'ALL', fromDate: '', toDate: '' })}
+                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
+                  </button>
+                </div>
+
+                {/* Records table */}
+                <div className="overflow-x-auto rounded-xl border border-slate-800">
+                  <table className="w-full text-left text-sm text-slate-300">
+                    <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 font-bold tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3">Technician</th>
+                        <th className="px-4 py-3">Month & Year</th>
+                        <th className="px-4 py-3">Amount Paid</th>
+                        <th className="px-4 py-3">Payment Mode</th>
+                        <th className="px-4 py-3">Ref Number</th>
+                        <th className="px-4 py-3">Paid Date</th>
+                        <th className="px-4 py-3">Recorded By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {payouts.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="px-4 py-8 text-center text-slate-500 font-medium">
+                            No payout records found.
+                          </td>
+                        </tr>
+                      ) : (
+                        payouts.map((rec) => (
+                          <tr key={rec._id} className="hover:bg-slate-800/40 transition">
+                            <td className="px-4 py-3 font-semibold text-white">
+                              {rec.technician?.name || 'N/A'}
+                              <div className="text-xs text-slate-500 font-mono">{rec.technician?.code || rec.technician?.mobile}</div>
+                            </td>
+                            <td className="px-4 py-3 font-medium">
+                              {MONTHS_LIST[rec.month - 1]} {rec.year}
+                            </td>
+                            <td className="px-4 py-3 font-bold text-emerald-400 font-mono">
+                              ₹{rec.amount?.toLocaleString('en-IN') || 0}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-lg font-medium">
+                                {rec.paymentMode}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs font-mono text-slate-400">
+                              {rec.referenceNumber || '-'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-400">
+                              {rec.paidAt ? new Date(rec.paidAt).toLocaleDateString() + ' ' + new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-400">
+                              {rec.paidBy?.name || 'Admin'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Mark as Paid Modal */}
+              {showMarkPaidModal && payoutCalcResult && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 relative">
+                    <button
+                      onClick={() => setShowMarkPaidModal(false)}
+                      className="absolute top-4 right-4 text-slate-400 hover:text-white transition"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+
+                    <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
+                      <CheckCircle className="w-6 h-6 text-emerald-400" />
+                      Mark Payout as Paid
+                    </h3>
+
+                    <div className="bg-slate-800/80 rounded-xl p-4 space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Technician:</span>
+                        <strong className="text-white">{payoutCalcResult.technician.name}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Month / Year:</span>
+                        <strong className="text-white">{MONTHS_LIST[payoutCalcResult.month - 1]} {payoutCalcResult.year}</strong>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-700/60 pt-2">
+                        <span className="text-slate-400">Payout Amount:</span>
+                        <strong className="text-emerald-400 text-base font-mono">₹{payoutCalcResult.totalEarnings.toLocaleString('en-IN')}</strong>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                          Payment Mode <span className="text-red-400">*</span>
+                        </label>
+                        <select
+                          value={markPaidForm.paymentMode}
+                          onChange={(e) => setMarkPaidForm({ ...markPaidForm, paymentMode: e.target.value })}
+                          className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                        >
+                          {[
+                            'Cash',
+                            'UPI',
+                            'Credit Card',
+                            'Debit Card',
+                            'Net Banking',
+                            'Bank Transfer / NEFT',
+                            'RTGS',
+                            'IMPS',
+                            'Cheque',
+                            'Demand Draft (DD)'
+                          ].map((mode) => (
+                            <option key={mode} value={mode}>{mode}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                          Reference Number (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={markPaidForm.referenceNumber}
+                          onChange={(e) => setMarkPaidForm({ ...markPaidForm, referenceNumber: e.target.value })}
+                          placeholder="e.g. UTR / Transaction ID / Cheque No"
+                          className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                      <button
+                        onClick={() => setShowMarkPaidModal(false)}
+                        className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 font-bold text-sm hover:bg-slate-800 transition cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSavePayout}
+                        disabled={savingPayout}
+                        className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
+                      >
+                        {savingPayout ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                        Confirm Payment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
