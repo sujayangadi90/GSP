@@ -12764,10 +12764,15 @@ export default function App() {
 
               {/* Live Fee & Expense Breakdown */}
               {(() => {
-                const appObj = appliances.find(a => a.name === newRequestForm.product.category);
+                const categoryName = (newRequestForm.product.category || '').trim().toLowerCase();
+                const productName = (newRequestForm.product.name || '').trim().toLowerCase();
+
+                const appObj = appliances.find(a => (a.name || '').trim().toLowerCase() === categoryName);
                 const selectedBrand = brands.find(b => {
-                  if (!appObj) return b.name === newRequestForm.product.name;
-                  return (b.appliance === appObj._id || b.appliance?._id === appObj._id) && b.name === newRequestForm.product.name;
+                  const matchesName = (b.name || '').trim().toLowerCase() === productName;
+                  if (!appObj) return matchesName;
+                  const matchesAppliance = b.appliance === appObj._id || b.appliance?._id === appObj._id;
+                  return matchesAppliance && matchesName;
                 });
 
                 let custFee = 0;
@@ -12805,6 +12810,12 @@ export default function App() {
                   }
                 }
 
+                const custSubtext = custFee > 0 
+                  ? 'To be collected from customer' 
+                  : (isService 
+                      ? (sType === 'In Warranty' ? 'Free (In Warranty)' : (sType === 'Paid by Dealer' ? 'Covered by Dealer' : 'Free Service')) 
+                      : (iType === 'Free Installation' ? 'Free Installation' : (iType === 'Paid by Dealer' ? 'Covered by Dealer' : (iType === 'Paid Installation' ? (selectedBrand ? 'No customer fee configured' : 'Select category & size/module') : 'Free Installation'))));
+
                 return (
                   <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-3">
                     <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -12822,7 +12833,7 @@ export default function App() {
                         <div>
                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Customer Fee</p>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            {custFee > 0 ? 'To be collected from customer' : (isService ? (sType === 'In Warranty' ? 'Free (In Warranty)' : 'Covered by Dealer') : (iType === 'Free Installation' ? 'Free Installation' : 'Covered by Dealer'))}
+                            {custSubtext}
                           </p>
                         </div>
                         <div className="text-right">
