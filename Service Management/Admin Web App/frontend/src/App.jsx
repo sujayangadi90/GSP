@@ -3314,14 +3314,48 @@ export default function App() {
               Manage Technicians
             </button>
           )}
-          {(!user || user.permissions?.performance !== false) && (
-            <button
-              onClick={() => { setActiveTab('performance'); setMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'performance' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-            >
-              <Award className="w-5 h-5 text-amber-400" />
-              Performance
-            </button>
+          {(!user || user.role === 'admin' || user.permissions?.employees !== false) && (
+            <div>
+              <button
+                onClick={() => setEmployeeMenuOpen(!employeeMenuOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              >
+                <span className="flex items-center gap-3">
+                  <Users className="w-5 h-5 text-indigo-400" />
+                  Employee
+                </span>
+                <span>
+                  {(employeeMenuOpen || activeTab === 'employees' || activeTab === 'attendance' || activeTab === 'performance' || activeTab === 'add-employee' || activeTab === 'edit-employee') ? '▲' : '▼'}
+                </span>
+              </button>
+              {(employeeMenuOpen || activeTab === 'employees' || activeTab === 'attendance' || activeTab === 'performance' || activeTab === 'add-employee' || activeTab === 'edit-employee') && (
+                <div className="pl-6 mt-1 space-y-1">
+                  <button
+                    onClick={() => { setActiveTab('employees'); setMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${(activeTab === 'employees' || activeTab === 'add-employee' || activeTab === 'edit-employee') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <Users className="w-4 h-4" />
+                    Employees
+                  </button>
+                  <button
+                    onClick={() => { setActiveTab('attendance'); setMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'attendance' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <Clock className="w-4 h-4 text-emerald-400" />
+                    Attendance
+                  </button>
+                  {(!user || user.permissions?.performance !== false) && (
+                    <button
+                      onClick={() => { setActiveTab('performance'); setMenuOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'performance' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                    >
+                      <Award className="w-4 h-4 text-amber-400" />
+                      Performance
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
           {(!user || user.permissions?.followups !== false) && (
             <button
@@ -3349,40 +3383,6 @@ export default function App() {
               <Video className="w-5 h-5" />
               Video Library
             </button>
-          )}
-          {(!user || user.role === 'admin') && (
-            <div>
-              <button
-                onClick={() => setEmployeeMenuOpen(!employeeMenuOpen)}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-              >
-                <span className="flex items-center gap-3">
-                  <Users className="w-5 h-5 text-indigo-400" />
-                  Employee
-                </span>
-                <span>
-                  {(employeeMenuOpen || activeTab === 'employees' || activeTab === 'attendance' || activeTab === 'add-employee' || activeTab === 'edit-employee') ? '▲' : '▼'}
-                </span>
-              </button>
-              {(employeeMenuOpen || activeTab === 'employees' || activeTab === 'attendance' || activeTab === 'add-employee' || activeTab === 'edit-employee') && (
-                <div className="pl-6 mt-1 space-y-1">
-                  <button
-                    onClick={() => { setActiveTab('employees'); setMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${(activeTab === 'employees' || activeTab === 'add-employee' || activeTab === 'edit-employee') ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
-                  >
-                    <Users className="w-4 h-4" />
-                    Employees
-                  </button>
-                  <button
-                    onClick={() => { setActiveTab('attendance'); setMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'attendance' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
-                  >
-                    <Clock className="w-4 h-4 text-emerald-400" />
-                    Attendance
-                  </button>
-                </div>
-              )}
-            </div>
           )}
           {(!user || user.permissions?.settings !== false) && (
             <div>
