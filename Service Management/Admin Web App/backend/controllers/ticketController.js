@@ -744,8 +744,9 @@ const updateTicketStatus = async (req, res) => {
       updatedBy: req.user.name
     });
 
-    const updatedTicket = await ticket.save();
-    res.json(updatedTicket);
+    const savedTicket = await ticket.save();
+    const [updatedTicketWithFees] = await attachFeesToTickets([savedTicket]);
+    res.json(updatedTicketWithFees);
 
     // Trigger Notification
     if (status === 'in_progress') {

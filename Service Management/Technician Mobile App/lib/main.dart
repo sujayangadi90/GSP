@@ -1822,10 +1822,22 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         }),
       );
       if (res.statusCode == 200) {
+        final updatedData = jsonDecode(res.body);
+        final hasFees = updatedData['customerServiceFee'] != null || 
+                        updatedData['customerInstallationFee'] != null || 
+                        updatedData['dealerServiceFee'] != null || 
+                        updatedData['dealerInstallationFee'] != null ||
+                        updatedData['customerFee'] != null;
         if (mounted) {
           setState(() {
-            _job = jsonDecode(res.body);
+            _job = updatedData;
+            if (!hasFees) {
+              _isFeeLoading = true;
+            }
           });
+        }
+        if (!hasFees) {
+          await _loadJob();
         }
       }
     } catch (e) {
