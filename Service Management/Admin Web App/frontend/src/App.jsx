@@ -11274,11 +11274,11 @@ export default function App() {
 
       {/* Ticket Details Panel Modal */}
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden my-4">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-7xl rounded-2xl shadow-2xl overflow-hidden my-2">
             <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
               <div>
-                <h3 className="font-extrabold text-white text-lg">{selectedTicket.ticketNumber || 'Ticket'} Details</h3>
+                <h3 className="font-extrabold text-white text-xl">{selectedTicket.ticketNumber || 'Ticket'} Details</h3>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
                   <p className="text-xs text-slate-400 capitalize">
                     Type: <span className="font-semibold text-white">{selectedTicket.type || 'Service'}</span> ({selectedTicket.type === 'service' ? (selectedTicket.serviceType || selectedTicket.serviceDetails?.serviceType || 'In Warranty') : (selectedTicket.installationType || selectedTicket.installationDetails?.installationType || 'Free Installation')}) • Status: {(selectedTicket.status || '').replace('_', ' ')}
@@ -11346,7 +11346,7 @@ export default function App() {
               </div>
             </div>
             
-            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[82vh] overflow-y-auto">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[86vh] overflow-y-auto">
               {/* Left Column: Customer & Product Details */}
               <div className="md:col-span-2 space-y-6">
                 
