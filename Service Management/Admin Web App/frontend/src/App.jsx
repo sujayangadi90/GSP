@@ -519,6 +519,26 @@ export default function App() {
   });
   const [savingPayout, setSavingPayout] = useState(false);
 
+  // Dealer Collection states
+  const [dealerCollections, setDealerCollections] = useState([]);
+  const [dealerCollectionFilters, setDealerCollectionFilters] = useState({
+    dealerId: 'ALL',
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+    paymentMode: 'ALL'
+  });
+  const [dealerCollectionSelectedDealer, setDealerCollectionSelectedDealer] = useState('');
+  const [dealerCollectionSelectedMonth, setDealerCollectionSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [dealerCollectionSelectedYear, setDealerCollectionSelectedYear] = useState(new Date().getFullYear());
+  const [dealerCollectionCalcResult, setDealerCollectionCalcResult] = useState(null);
+  const [loadingDealerCollectionCalc, setLoadingDealerCollectionCalc] = useState(false);
+  const [showRecordCollectionModal, setShowRecordCollectionModal] = useState(false);
+  const [recordCollectionForm, setRecordCollectionForm] = useState({
+    paymentMode: 'Cash',
+    referenceNumber: ''
+  });
+  const [savingDealerCollection, setSavingDealerCollection] = useState(false);
+
   // Settings: Appliances & Brands states
   const [appliances, setAppliances] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -1318,6 +1338,65 @@ export default function App() {
     }
   };
 
+  const fetchDealerCollections = async () => {
+    try {
+      let queryStr = `/dealer-collections?dealerId=${dealerCollectionFilters.dealerId}&month=${dealerCollectionFilters.month}&year=${dealerCollectionFilters.year}&paymentMode=${dealerCollectionFilters.paymentMode}`;
+      const data = await apiFetch(queryStr);
+      setDealerCollections(data.collections || []);
+    } catch (err) {
+      console.error('Error fetching dealer collections:', err);
+    }
+  };
+
+  const handleCalculateDealerCollection = async () => {
+    if (!dealerCollectionSelectedDealer) {
+      alert('Please select a dealer.');
+      return;
+    }
+    setLoadingDealerCollectionCalc(true);
+    setDealerCollectionCalcResult(null);
+    try {
+      const data = await apiFetch(`/dealer-collections/calculate?dealerId=${dealerCollectionSelectedDealer}&month=${dealerCollectionSelectedMonth}&year=${dealerCollectionSelectedYear}`);
+      setDealerCollectionCalcResult(data);
+    } catch (err) {
+      alert(err.message || 'Failed to calculate dealer collection');
+    } finally {
+      setLoadingDealerCollectionCalc(false);
+    }
+  };
+
+  const handleSaveDealerCollection = async () => {
+    if (!dealerCollectionCalcResult) return;
+    if (!recordCollectionForm.paymentMode) {
+      alert('Please select a payment mode.');
+      return;
+    }
+    setSavingDealerCollection(true);
+    try {
+      const res = await apiFetch('/dealer-collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dealerId: dealerCollectionCalcResult.dealer._id,
+          month: dealerCollectionCalcResult.month,
+          year: dealerCollectionCalcResult.year,
+          paymentMode: recordCollectionForm.paymentMode,
+          referenceNumber: recordCollectionForm.referenceNumber,
+          amount: dealerCollectionCalcResult.totalCollection
+        })
+      });
+      alert(res.message || 'Dealer Collection recorded successfully');
+      setShowRecordCollectionModal(false);
+      setRecordCollectionForm({ paymentMode: 'Cash', referenceNumber: '' });
+      handleCalculateDealerCollection();
+      fetchDealerCollections();
+    } catch (err) {
+      alert(err.message || 'Failed to record dealer collection');
+    } finally {
+      setSavingDealerCollection(false);
+    }
+  };
+
   const fetchDealerHistory = async () => {
     if (!dealerFromDate || !dealerToDate) {
       alert('Both dates are mandatory.');
@@ -2064,6 +2143,9 @@ export default function App() {
       } else if (activeTab === 'technician_payout') {
         fetchPayouts();
         fetchTechnicians();
+      } else if (activeTab === 'dealer_collection') {
+        fetchDealerCollections();
+        fetchDealers();
       } else if (activeTab === 'dashboard') {
         fetchDashboardData();
       } else if (activeTab === 'access_control' && user?.role === 'owner') {
@@ -2081,7 +2163,7 @@ export default function App() {
         fetchEvaluations();
       }
     }
-  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters, inventoryFilters, performanceFilters, employeeSearch, employeeStatusFilter, attendanceDateFilter, attendanceEmployeeFilter, attendanceStatusFilter, attendanceSearch, payoutFilters]);
+  }, [user, dealerSearch, techSearch, ticketFilters, activeTab, followUpFilters, appliedDashboardRange, amcFilters, inventoryFilters, performanceFilters, employeeSearch, employeeStatusFilter, attendanceDateFilter, attendanceEmployeeFilter, attendanceStatusFilter, attendanceSearch, payoutFilters, dealerCollectionFilters]);
 
   useEffect(() => {
     setCustomerPage(1);
@@ -2133,7 +2215,7 @@ export default function App() {
         if (tab === 'dealers' && perms.manageDealers === false) return false;
         if ((tab === 'technicians' || tab === 'add-technician' || tab === 'edit-technician') && perms.manageTechnicians === false) return false;
         if (tab === 'performance' && perms.performance === false) return false;
-        if (tab === 'technician_payout' && perms.accounting === false) return false;
+        if ((tab === 'technician_payout' || tab === 'dealer_collection') && perms.accounting === false) return false;
         if (tab === 'followups' && perms.followups === false) return false;
         if (tab === 'reports' && perms.reports === false) return false;
         if (tab === 'video_library' && perms.videoLibrary === false) return false;
@@ -3499,10 +3581,10 @@ export default function App() {
                   Accounting
                 </span>
                 <span>
-                  {(accountingMenuOpen || activeTab === 'technician_payout') ? '▲' : '▼'}
+                  {(accountingMenuOpen || activeTab === 'technician_payout' || activeTab === 'dealer_collection') ? '▲' : '▼'}
                 </span>
               </button>
-              {(accountingMenuOpen || activeTab === 'technician_payout') && (
+              {(accountingMenuOpen || activeTab === 'technician_payout' || activeTab === 'dealer_collection') && (
                 <div className="pl-6 mt-1 space-y-1">
                   <button
                     onClick={() => { setActiveTab('technician_payout'); setMenuOpen(false); }}
@@ -3510,6 +3592,13 @@ export default function App() {
                   >
                     <TrendingUp className="w-4 h-4 text-emerald-400" />
                     Technician Payout
+                  </button>
+                  <button
+                    onClick={() => { setActiveTab('dealer_collection'); setMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'dealer_collection' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <Users className="w-4 h-4 text-blue-400" />
+                    Dealer Collection
                   </button>
                 </div>
               )}
@@ -9191,6 +9280,393 @@ export default function App() {
                       >
                         {savingPayout ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                         Confirm Payment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Dealer Collection Main Tab */}
+          {activeTab === 'dealer_collection' && (
+            <div className="space-y-8 max-w-full min-w-0">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                    <Users className="w-8 h-8 text-blue-400" />
+                    Dealer Collection Management
+                  </h1>
+                  <p className="text-slate-400 mt-1">
+                    Accounting module to calculate dealer expenses and record dealer collection history.
+                  </p>
+                </div>
+              </div>
+
+              {/* Section 1: Calculate & Record Dealer Collection */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-blue-400" />
+                  Calculate Dealer Expenses / Collection
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                      Select Dealer <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      value={dealerCollectionSelectedDealer}
+                      onFocus={() => { if (!dealers || dealers.length === 0) fetchDealers(); }}
+                      onChange={(e) => setDealerCollectionSelectedDealer(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                    >
+                      <option value="">-- Choose Dealer --</option>
+                      {(Array.isArray(dealers) ? dealers : []).map((d) => (
+                        <option key={d._id || d.id} value={d._id || d.id}>
+                          {d.name || d.dealerName} {d.dealerCode ? `(${d.dealerCode})` : (d.mobile ? `(${d.mobile})` : '')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                      Select Month <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      value={dealerCollectionSelectedMonth}
+                      onChange={(e) => setDealerCollectionSelectedMonth(Number(e.target.value))}
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                    >
+                      {MONTHS_LIST.map((m, idx) => (
+                        <option key={idx} value={idx + 1}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                      Select Year <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      value={dealerCollectionSelectedYear}
+                      onChange={(e) => setDealerCollectionSelectedYear(Number(e.target.value))}
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                    >
+                      {YEARS_LIST.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleCalculateDealerCollection}
+                    disabled={!dealerCollectionSelectedDealer || loadingDealerCollectionCalc}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
+                  >
+                    {loadingDealerCollectionCalc ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    Calculate Collection
+                  </button>
+                </div>
+
+                {dealerCollectionCalcResult && (
+                  <div className="mt-6 border-t border-slate-800 pt-6">
+                    <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-white">{dealerCollectionCalcResult.dealer.name}</span>
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-700 text-slate-300">
+                            {dealerCollectionCalcResult.dealer.dealerCode || dealerCollectionCalcResult.dealer.mobile}
+                          </span>
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
+                            dealerCollectionCalcResult.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}>
+                            {dealerCollectionCalcResult.status === 'paid' ? 'Collected / Paid' : 'Pending Collection'}
+                          </span>
+                        </div>
+
+                        <div className="text-sm text-slate-400 flex flex-wrap items-center gap-x-6 gap-y-1">
+                          <span>Month: <strong className="text-slate-200">{MONTHS_LIST[dealerCollectionCalcResult.month - 1]} {dealerCollectionCalcResult.year}</strong></span>
+                          <span>Total Completed Jobs: <strong className="text-slate-200">{dealerCollectionCalcResult.completedJobsCount}</strong></span>
+                        </div>
+                      </div>
+
+                      {/* Service & Installation Breakdown */}
+                      <div className="flex flex-wrap items-center gap-3 bg-slate-900/90 border border-slate-700/70 p-3 rounded-xl">
+                        <div className="px-3.5 py-2 rounded-lg bg-indigo-950/60 border border-indigo-800/60">
+                          <div className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider">From Service</div>
+                          <div className="text-xs font-extrabold text-white flex items-center gap-2 mt-0.5">
+                            <span>{dealerCollectionCalcResult.serviceJobsCount || 0} Tickets</span>
+                            <span className="text-indigo-400 font-mono font-bold">₹{(dealerCollectionCalcResult.serviceExpense || 0).toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+
+                        <div className="px-3.5 py-2 rounded-lg bg-emerald-950/60 border border-emerald-800/60">
+                          <div className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider">From Installations</div>
+                          <div className="text-xs font-extrabold text-white flex items-center gap-2 mt-0.5">
+                            <span>{dealerCollectionCalcResult.installationJobsCount || 0} Tickets</span>
+                            <span className="text-emerald-400 font-mono font-bold">₹{(dealerCollectionCalcResult.installationExpense || 0).toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col lg:items-end gap-3">
+                        <div className="text-left lg:text-right">
+                          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Collection Amount</div>
+                          <div className="text-3xl font-black text-emerald-400 font-mono">₹{dealerCollectionCalcResult.totalCollection.toLocaleString('en-IN')}</div>
+                        </div>
+
+                        {dealerCollectionCalcResult.status === 'paid' ? (
+                          <div className="bg-emerald-950/40 border border-emerald-800/50 rounded-lg p-3 text-xs text-emerald-300">
+                            <div className="font-bold flex items-center gap-1.5"><CheckCircle className="w-4 h-4 text-emerald-400" /> Collection Recorded</div>
+                            <div>Payment Mode: <strong>{dealerCollectionCalcResult.collection?.paymentMode}</strong></div>
+                            {dealerCollectionCalcResult.collection?.referenceNumber && <div>Ref: <strong>{dealerCollectionCalcResult.collection.referenceNumber}</strong></div>}
+                            <div>Collected Date: {new Date(dealerCollectionCalcResult.collection?.paidAt).toLocaleDateString()}</div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setShowRecordCollectionModal(true)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Mark as Paid / Collected
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Collection Record History Table */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-indigo-400" />
+                    Collection Record History
+                  </h2>
+                  <button
+                    onClick={fetchDealerCollections}
+                    className="text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Refresh Records
+                  </button>
+                </div>
+
+                {/* Filters bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                  <select
+                    value={dealerCollectionFilters.dealerId}
+                    onFocus={() => { if (!dealers || dealers.length === 0) fetchDealers(); }}
+                    onChange={(e) => setDealerCollectionFilters({ ...dealerCollectionFilters, dealerId: e.target.value })}
+                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="ALL">All Dealers</option>
+                    {(Array.isArray(dealers) ? dealers : []).map((d) => (
+                      <option key={d._id || d.id} value={d._id || d.id}>{d.name || d.dealerName}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={dealerCollectionFilters.month}
+                    onChange={(e) => setDealerCollectionFilters({ ...dealerCollectionFilters, month: e.target.value })}
+                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                  >
+                    {MONTHS_LIST.map((m, idx) => (
+                      <option key={idx} value={idx + 1}>{m}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={dealerCollectionFilters.year}
+                    onChange={(e) => setDealerCollectionFilters({ ...dealerCollectionFilters, year: e.target.value })}
+                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                  >
+                    {YEARS_LIST.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={dealerCollectionFilters.paymentMode}
+                    onChange={(e) => setDealerCollectionFilters({ ...dealerCollectionFilters, paymentMode: e.target.value })}
+                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="ALL">All Payment Modes</option>
+                    {[
+                      'Cash', 'UPI', 'Credit Card', 'Debit Card', 'Net Banking',
+                      'Bank Transfer / NEFT', 'RTGS', 'IMPS', 'Cheque', 'Demand Draft (DD)'
+                    ].map((mode) => (
+                      <option key={mode} value={mode}>{mode}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => setDealerCollectionFilters({ dealerId: 'ALL', month: new Date().getMonth() + 1, year: new Date().getFullYear(), paymentMode: 'ALL' })}
+                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
+                  </button>
+                </div>
+
+                {/* Records table */}
+                <div className="overflow-x-auto rounded-xl border border-slate-800">
+                  <table className="w-full text-left text-sm text-slate-300">
+                    <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 font-bold tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3">Dealer</th>
+                        <th className="px-4 py-3">Month & Year</th>
+                        <th className="px-4 py-3">Amount Collected</th>
+                        <th className="px-4 py-3">Payment Mode</th>
+                        <th className="px-4 py-3">Ref Number</th>
+                        <th className="px-4 py-3">Collected Date</th>
+                        <th className="px-4 py-3">Recorded By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {dealerCollections.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="px-4 py-8 text-center text-slate-500 font-medium">
+                            No collection records found.
+                          </td>
+                        </tr>
+                      ) : (
+                        dealerCollections.map((rec) => (
+                          <tr key={rec._id} className="hover:bg-slate-800/40 transition">
+                            <td className="px-4 py-3 font-semibold text-white">
+                              {rec.dealer?.name || rec.dealer?.dealerName || 'N/A'}
+                              <div className="text-xs text-slate-500 font-mono">{rec.dealer?.dealerCode || rec.dealer?.mobile}</div>
+                            </td>
+                            <td className="px-4 py-3 font-medium">
+                              {MONTHS_LIST[rec.month - 1]} {rec.year}
+                            </td>
+                            <td className="px-4 py-3 font-bold text-emerald-400 font-mono">
+                              ₹{rec.amount?.toLocaleString('en-IN') || 0}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-lg font-medium">
+                                {rec.paymentMode}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs font-mono text-slate-400">
+                              {rec.referenceNumber || '-'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-400">
+                              {rec.paidAt ? new Date(rec.paidAt).toLocaleDateString() + ' ' + new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-400">
+                              {rec.paidBy?.name || 'Admin'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Record Collection Modal */}
+              {showRecordCollectionModal && dealerCollectionCalcResult && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 relative">
+                    <button
+                      onClick={() => setShowRecordCollectionModal(false)}
+                      className="absolute top-4 right-4 text-slate-400 hover:text-white transition"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+
+                    <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
+                      <CheckCircle className="w-6 h-6 text-emerald-400" />
+                      Record Dealer Collection
+                    </h3>
+
+                    <div className="bg-slate-800/80 rounded-xl p-4 space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Dealer:</span>
+                        <strong className="text-white">{dealerCollectionCalcResult.dealer.name}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Month / Year:</span>
+                        <strong className="text-white">{MONTHS_LIST[dealerCollectionCalcResult.month - 1]} {dealerCollectionCalcResult.year}</strong>
+                      </div>
+                      <div className="flex justify-between text-xs text-indigo-300 pt-1.5 border-t border-slate-700/50">
+                        <span>From Service ({dealerCollectionCalcResult.serviceJobsCount || 0} Tickets):</span>
+                        <strong className="font-mono">₹{(dealerCollectionCalcResult.serviceExpense || 0).toLocaleString('en-IN')}</strong>
+                      </div>
+                      <div className="flex justify-between text-xs text-emerald-300">
+                        <span>From Installations ({dealerCollectionCalcResult.installationJobsCount || 0} Tickets):</span>
+                        <strong className="font-mono">₹{(dealerCollectionCalcResult.installationExpense || 0).toLocaleString('en-IN')}</strong>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-700/60 pt-2">
+                        <span className="text-slate-400 font-bold">Total Collection Amount:</span>
+                        <strong className="text-emerald-400 text-base font-mono">₹{dealerCollectionCalcResult.totalCollection.toLocaleString('en-IN')}</strong>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                          Payment Mode <span className="text-red-400">*</span>
+                        </label>
+                        <select
+                          value={recordCollectionForm.paymentMode}
+                          onChange={(e) => setRecordCollectionForm({ ...recordCollectionForm, paymentMode: e.target.value })}
+                          className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                        >
+                          {[
+                            'Cash',
+                            'UPI',
+                            'Credit Card',
+                            'Debit Card',
+                            'Net Banking',
+                            'Bank Transfer / NEFT',
+                            'RTGS',
+                            'IMPS',
+                            'Cheque',
+                            'Demand Draft (DD)'
+                          ].map((mode) => (
+                            <option key={mode} value={mode}>{mode}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                          Reference Number (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={recordCollectionForm.referenceNumber}
+                          onChange={(e) => setRecordCollectionForm({ ...recordCollectionForm, referenceNumber: e.target.value })}
+                          placeholder="e.g. UTR / Transaction ID / Cheque No"
+                          className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                      <button
+                        onClick={() => setShowRecordCollectionModal(false)}
+                        className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 font-bold text-sm hover:bg-slate-800 transition cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveDealerCollection}
+                        disabled={savingDealerCollection}
+                        className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
+                      >
+                        {savingDealerCollection ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                        Confirm Collection
                       </button>
                     </div>
                   </div>
