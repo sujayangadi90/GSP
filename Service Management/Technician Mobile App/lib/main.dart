@@ -1088,8 +1088,15 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   bool _isFeeLoading = true;
   final _workDoneController = TextEditingController();
   final _remarksController = TextEditingController();
-  final List<File> _beforePhotos = [];
-  final List<File> _afterPhotos = [];
+
+  File? _billPhoto;
+  File? _installation1Photo;
+  File? _installation2Photo;
+  File? _serialNumberPhoto;
+  File? _warrantyCardPhoto;
+  File? _beforePhoto;
+  File? _afterPhoto;
+
   final _picker = ImagePicker();
   List<dynamic> _inventory = [];
   final List<Map<String, dynamic>> _selectedParts = [];
@@ -1097,6 +1104,117 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   Position? _capturedPosition;
   bool _isFetchingLocation = false;
   String? _locationError;
+
+  Future<void> _pickSlotImage(String key) async {
+    final pickedFile = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1920,
+      maxHeight: 1080,
+      imageQuality: 80,
+    );
+    if (pickedFile != null) {
+      setState(() {
+        if (key == 'bill') _billPhoto = File(pickedFile.path);
+        else if (key == 'installation1') _installation1Photo = File(pickedFile.path);
+        else if (key == 'installation2') _installation2Photo = File(pickedFile.path);
+        else if (key == 'serialNumber') _serialNumberPhoto = File(pickedFile.path);
+        else if (key == 'warrantyCard') _warrantyCardPhoto = File(pickedFile.path);
+        else if (key == 'before') _beforePhoto = File(pickedFile.path);
+        else if (key == 'after') _afterPhoto = File(pickedFile.path);
+      });
+    }
+  }
+
+  void _removeSlotImage(String key) {
+    setState(() {
+      if (key == 'bill') _billPhoto = null;
+      else if (key == 'installation1') _installation1Photo = null;
+      else if (key == 'installation2') _installation2Photo = null;
+      else if (key == 'serialNumber') _serialNumberPhoto = null;
+      else if (key == 'warrantyCard') _warrantyCardPhoto = null;
+      else if (key == 'before') _beforePhoto = null;
+      else if (key == 'after') _afterPhoto = null;
+    });
+  }
+
+  Widget _buildPhotoSlotCard({
+    required String label,
+    required String key,
+    required File? file,
+    required IconData icon,
+    required Color color,
+  }) {
+    final hasFile = file != null;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        border: Border.all(
+          color: hasFile ? color.withOpacity(0.8) : Colors.white24,
+          width: hasFile ? 1.5 : 1.0,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasFile ? 'Photo Captured' : 'Required *',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: hasFile ? Colors.greenAccent : Colors.redAccent,
+                    fontWeight: hasFile ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasFile) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.file(file, width: 44, height: 44, fit: BoxFit.cover),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              onPressed: () => _removeSlotImage(key),
+              icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+              tooltip: 'Remove',
+            ),
+          ] else ...[
+            ElevatedButton.icon(
+              onPressed: () => _pickSlotImage(key),
+              icon: const Icon(Icons.add_a_photo, size: 14),
+              label: const Text('Capture', style: TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color.withOpacity(0.3),
+                foregroundColor: color,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   Future<void> _fetchLocation() async {
     setState(() {
@@ -1387,36 +1505,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
           _isFeeLoading = false;
           if (_isLoading) _isLoading = false;
         });
-      }
     }
-  }
-          if (hasFile) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Image.file(file, width: 44, height: 44, fit: BoxFit.cover),
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              onPressed: () => _removeSlotImage(key),
-              icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
-              tooltip: 'Remove',
-            ),
-          ] else ...[
-            ElevatedButton.icon(
-              onPressed: () => _pickSlotImage(key),
-              icon: const Icon(Icons.add_a_photo, size: 14),
-              label: const Text('Capture', style: TextStyle(fontSize: 12)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color.withOpacity(0.3),
-                foregroundColor: color,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 
   Future<void> _submitCompletion() async {
