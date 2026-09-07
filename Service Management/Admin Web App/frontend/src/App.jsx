@@ -3984,7 +3984,7 @@ export default function App() {
                                 }`}>
                                   {ticket.status === 'site_not_ready' ? 'Site Not Ready' : ticket.status.replace('_', ' ')}
                                 </span>
-                                {ticket.siteNotReady && ticket.status !== 'site_not_ready' && (
+                                {ticket.siteNotReady && ticket.status !== 'site_not_ready' && ticket.status !== 'closed' && ticket.status !== 'completed' && (
                                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-red-950/80 text-red-300 border border-red-800/50">
                                     Site Not Ready
                                   </span>
