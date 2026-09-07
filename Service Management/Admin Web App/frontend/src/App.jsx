@@ -9427,9 +9427,9 @@ export default function App() {
                         {dealerCollectionCalcResult.status === 'paid' ? (
                           <div className="bg-emerald-950/40 border border-emerald-800/50 rounded-lg p-3 text-xs text-emerald-300">
                             <div className="font-bold flex items-center gap-1.5"><CheckCircle className="w-4 h-4 text-emerald-400" /> Collection Recorded</div>
-                            <div>Payment Mode: <strong>{dealerCollectionCalcResult.collection?.paymentMode}</strong></div>
-                            {dealerCollectionCalcResult.collection?.referenceNumber && <div>Ref: <strong>{dealerCollectionCalcResult.collection.referenceNumber}</strong></div>}
-                            <div>Collected Date: {new Date(dealerCollectionCalcResult.collection?.paidAt).toLocaleDateString()}</div>
+                            <div>Payment Mode: <strong>{dealerCollectionCalcResult.collectionRecord?.paymentMode}</strong></div>
+                            {dealerCollectionCalcResult.collectionRecord?.referenceNumber && <div>Ref: <strong>{dealerCollectionCalcResult.collectionRecord.referenceNumber}</strong></div>}
+                            <div>Collected Date: {(dealerCollectionCalcResult.collectionRecord?.collectedAt || dealerCollectionCalcResult.collectionRecord?.createdAt) ? new Date(dealerCollectionCalcResult.collectionRecord.collectedAt || dealerCollectionCalcResult.collectionRecord.createdAt).toLocaleDateString() : '-'}</div>
                           </div>
                         ) : (
                           <button
@@ -9560,10 +9560,10 @@ export default function App() {
                               {rec.referenceNumber || '-'}
                             </td>
                             <td className="px-4 py-3 text-xs text-slate-400">
-                              {rec.paidAt ? new Date(rec.paidAt).toLocaleDateString() + ' ' + new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                              {(rec.collectedAt || rec.createdAt) ? new Date(rec.collectedAt || rec.createdAt).toLocaleDateString() + ' ' + new Date(rec.collectedAt || rec.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                             </td>
                             <td className="px-4 py-3 text-xs text-slate-400">
-                              {rec.paidBy?.name || 'Admin'}
+                              {rec.recordedBy?.name || rec.paidBy?.name || 'Admin'}
                             </td>
                           </tr>
                         ))
