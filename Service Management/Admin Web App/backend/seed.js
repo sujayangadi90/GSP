@@ -8,7 +8,8 @@ dotenv.config();
 
 const seedDatabase = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/gsp_service_db');
+    const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/global_service_point';
+    await mongoose.connect(mongoUri);
     console.log('Connected to MongoDB for seeding...');
 
     // Seed Admin
