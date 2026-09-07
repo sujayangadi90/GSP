@@ -499,8 +499,8 @@ export default function App() {
   const [payouts, setPayouts] = useState([]);
   const [payoutFilters, setPayoutFilters] = useState({
     technicianId: 'ALL',
-    month: 'ALL',
-    year: 'ALL',
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
     paymentMode: 'ALL',
     status: 'ALL',
     fromDate: '',
@@ -8957,7 +8957,6 @@ export default function App() {
                     onChange={(e) => setPayoutFilters({ ...payoutFilters, month: e.target.value })}
                     className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
                   >
-                    <option value="ALL">All Months</option>
                     {MONTHS_LIST.map((m, idx) => (
                       <option key={idx} value={idx + 1}>{m}</option>
                     ))}
@@ -8968,7 +8967,6 @@ export default function App() {
                     onChange={(e) => setPayoutFilters({ ...payoutFilters, year: e.target.value })}
                     className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
                   >
-                    <option value="ALL">All Years</option>
                     {YEARS_LIST.map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
@@ -8989,7 +8987,7 @@ export default function App() {
                   </select>
 
                   <button
-                    onClick={() => setPayoutFilters({ technicianId: 'ALL', month: 'ALL', year: 'ALL', paymentMode: 'ALL', status: 'ALL', fromDate: '', toDate: '' })}
+                    onClick={() => setPayoutFilters({ technicianId: 'ALL', month: new Date().getMonth() + 1, year: new Date().getFullYear(), paymentMode: 'ALL', status: 'ALL', fromDate: '', toDate: '' })}
                     className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
