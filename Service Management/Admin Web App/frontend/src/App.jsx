@@ -10171,21 +10171,54 @@ export default function App() {
                 {(() => {
                   const completionsList = selectedTicket.completionHistory && selectedTicket.completionHistory.length > 0
                     ? selectedTicket.completionHistory
-                    : (selectedTicket.completion?.workDone ? [selectedTicket.completion] : []);
+                    : (selectedTicket.completion ? [selectedTicket.completion] : []);
                   
                   return completionsList.map((comp, idx) => {
                     const submissionLabel = completionsList.length > 1
                       ? `${idx + 1}${idx === 0 ? 'st' : idx === 1 ? 'nd' : idx === 2 ? 'rd' : 'th'} Completion Submission`
                       : "Technician Job Submission";
+
+                    const isInstallationType = (selectedTicket.type || '').toLowerCase() === 'installation';
+                    const expectedSlots = isInstallationType ? [
+                      { key: 'bill', label: 'Bill' },
+                      { key: 'installation1', label: 'Installation 1' },
+                      { key: 'installation2', label: 'Installation 2' },
+                      { key: 'serialNumber', label: 'Serial Number' },
+                      { key: 'warrantyCard', label: 'Warranty Card' },
+                    ] : [
+                      { key: 'before', label: 'Before' },
+                      { key: 'after', label: 'After' },
+                      { key: 'warrantyCard', label: 'Warranty Card' },
+                      { key: 'bill', label: 'Bill' },
+                    ];
+
+                    const getPhotoUrlForSlot = (slotKey, slotLabel) => {
+                      if (comp.labeledPhotos && comp.labeledPhotos.length > 0) {
+                        const match = comp.labeledPhotos.find(lp =>
+                          lp.label?.toLowerCase() === slotLabel.toLowerCase() ||
+                          lp.label?.toLowerCase() === slotKey.toLowerCase()
+                        );
+                        if (match && match.url) return match.url;
+                      }
+                      if (slotKey === 'before' && comp.beforePhotos && comp.beforePhotos.length > 0) {
+                        return comp.beforePhotos[0];
+                      }
+                      if (slotKey === 'after' && comp.afterPhotos && comp.afterPhotos.length > 0) {
+                        return comp.afterPhotos[0];
+                      }
+                      return null;
+                    };
+
+                    const uploadedCount = expectedSlots.filter(s => !!getPhotoUrlForSlot(s.key, s.label)).length;
                     
                     return (
                       <div key={idx} className="bg-slate-800/40 border border-slate-850 p-5 rounded-2xl space-y-4">
                         <h4 className="font-bold text-white text-sm border-b border-slate-700 pb-2 flex items-center justify-between">
                           <span>{submissionLabel}</span>
-                          <span className="text-xs text-slate-400">{new Date(comp.submittedAt).toLocaleString()}</span>
+                          <span className="text-xs text-slate-400">{comp.submittedAt ? new Date(comp.submittedAt).toLocaleString() : 'N/A'}</span>
                         </h4>
                         <div className="text-sm text-slate-300 space-y-2">
-                          <p><span className="text-slate-500 font-semibold">Work Done:</span> {comp.workDone}</p>
+                          <p><span className="text-slate-500 font-semibold">Work Done:</span> {comp.workDone || 'Not specified'}</p>
                           <p><span className="text-slate-500 font-semibold">Remarks:</span> {comp.remarks || 'None'}</p>
                           {comp.location?.lat && (
                             <div className="text-xs text-emerald-400 font-mono flex items-center gap-1.5 pt-1 font-semibold">
@@ -10197,72 +10230,46 @@ export default function App() {
                             </div>
                           )}
                         </div>
-                        {/* Completion Photos */}
-                        {comp.labeledPhotos && comp.labeledPhotos.length > 0 ? (
-                          <div>
-                            <p className="text-xs font-bold text-violet-400 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
-                              <span>📷</span> Completion Photos ({comp.labeledPhotos.length}):
+
+                        {/* Completion Photos Grid */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2.5">
+                            <p className="text-xs font-bold text-violet-400 flex items-center gap-1.5 uppercase tracking-wider">
+                              <span>📷</span> COMPLETION PHOTOS ({uploadedCount}/{expectedSlots.length}):
                             </p>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                              {comp.labeledPhotos.map((lp, i) => {
-                                const photo = lp.url || '';
-                                const imgUrl = photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`;
-                                return (
-                                  <div key={i} className="flex flex-col">
-                                    <span className="text-[11px] font-bold text-slate-300 truncate bg-slate-800/90 px-2 py-1 rounded-t-lg border-t border-x border-slate-700 text-center">{lp.label}</span>
-                                    <a href={imgUrl} target="_blank" rel="noreferrer">
-                                      <img src={imgUrl} alt={lp.label} className="rounded-b-lg object-cover w-full h-24 border border-slate-700 hover:opacity-90 transition" />
-                                    </a>
+                          </div>
+
+                          <div className={`grid grid-cols-2 sm:grid-cols-3 ${isInstallationType ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-3`}>
+                            {expectedSlots.map((slot) => {
+                              const photoPath = getPhotoUrlForSlot(slot.key, slot.label);
+                              const isUploaded = !!photoPath;
+                              const imgUrl = isUploaded ? (photoPath.startsWith('http') ? photoPath : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photoPath}`) : '';
+
+                              return isUploaded ? (
+                                <div key={slot.key} className="flex flex-col bg-slate-900/80 rounded-xl overflow-hidden border border-slate-700 shadow-sm">
+                                  <div className="bg-slate-800/90 px-2 py-1 flex items-center justify-between border-b border-slate-700">
+                                    <span className="text-[11px] font-bold text-slate-200 truncate">{slot.label}</span>
+                                    <span className="text-[10px] bg-emerald-950 text-emerald-400 font-semibold px-1.5 py-0.5 rounded border border-emerald-800/60">✓</span>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : (comp.beforePhotos && comp.beforePhotos.length > 0) || (comp.afterPhotos && comp.afterPhotos.length > 0) ? (
-                          <div className="space-y-3">
-                            {comp.beforePhotos && comp.beforePhotos.length > 0 && (
-                              <div>
-                                <p className="text-xs font-bold text-amber-400 mb-1.5 flex items-center gap-1.5">
-                                  <span>📷</span> Before Photos ({comp.beforePhotos.length}/2):
-                                </p>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                  {comp.beforePhotos.map((photo, i) => (
-                                    <a key={i} href={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} target="_blank" rel="noreferrer">
-                                      <img src={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} alt={`Before ${i+1}`} className="rounded-xl object-cover w-full h-24 border border-amber-800/40 hover:opacity-90 transition" />
-                                    </a>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            {comp.afterPhotos && comp.afterPhotos.length > 0 && (
-                              <div>
-                                <p className="text-xs font-bold text-emerald-400 mb-1.5 flex items-center gap-1.5">
-                                  <span>✅</span> After Photos ({comp.afterPhotos.length}/4):
-                                </p>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                  {comp.afterPhotos.map((photo, i) => (
-                                    <a key={i} href={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} target="_blank" rel="noreferrer">
-                                      <img src={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} alt={`After ${i+1}`} className="rounded-xl object-cover w-full h-24 border border-emerald-800/40 hover:opacity-90 transition" />
-                                    </a>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          comp.photos && comp.photos.length > 0 && (
-                            <div>
-                              <p className="text-xs text-slate-500 font-semibold mb-2">Completion Photos</p>
-                              <div className="grid grid-cols-3 gap-2">
-                                {comp.photos.map((photo, i) => (
-                                  <a key={i} href={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} target="_blank" rel="noreferrer">
-                                    <img src={photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`} alt="Completion" className="rounded-lg object-cover w-full h-24 border border-slate-700" />
+                                  <a href={imgUrl} target="_blank" rel="noreferrer" className="block relative group">
+                                    <img src={imgUrl} alt={slot.label} className="object-cover w-full h-24 group-hover:opacity-90 transition" />
                                   </a>
-                                ))}
-                              </div>
-                            </div>
-                          )
-                        )}
+                                </div>
+                              ) : (
+                                <div
+                                  key={slot.key}
+                                  onClick={() => setShowAdminPhotoUpload(true)}
+                                  className="flex flex-col bg-slate-950/40 rounded-xl border border-dashed border-slate-700/80 hover:border-sky-500/60 cursor-pointer transition p-2.5 items-center justify-center min-h-[110px] text-center group"
+                                >
+                                  <span className="text-[11px] font-bold text-slate-400 group-hover:text-sky-300 transition mb-1">{slot.label}</span>
+                                  <span className="text-xl opacity-30 group-hover:opacity-70 transition">📷</span>
+                                  <span className="text-[10px] text-slate-500 group-hover:text-sky-400 mt-1">Not Uploaded</span>
+                                  <span className="text-[9px] text-sky-400/90 font-medium underline mt-0.5">+ Upload</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
 
                         {/* Admin Photo Upload Section */}
                         <div className="mt-4 pt-3 border-t border-slate-800">

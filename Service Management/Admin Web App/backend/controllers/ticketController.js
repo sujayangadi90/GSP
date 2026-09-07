@@ -1914,6 +1914,9 @@ const adminUploadCompletionPhotos = async (req, res) => {
         workDone: 'Updated by Admin',
         submittedAt: new Date()
       };
+    } else {
+      if (!ticket.completion.workDone) ticket.completion.workDone = 'Updated by Admin';
+      if (!ticket.completion.submittedAt) ticket.completion.submittedAt = new Date();
     }
 
     let labeledPhotos = ticket.completion.labeledPhotos || [];
