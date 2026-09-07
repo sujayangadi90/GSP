@@ -1959,6 +1959,17 @@ const adminUploadCompletionPhotos = async (req, res) => {
     ticket.completion.beforePhotos = beforePhotos;
     ticket.completion.afterPhotos = afterPhotos;
 
+    if (ticket.completionHistory && ticket.completionHistory.length > 0) {
+      const lastIdx = ticket.completionHistory.length - 1;
+      ticket.completionHistory[lastIdx].labeledPhotos = labeledPhotos;
+      ticket.completionHistory[lastIdx].photos = photos;
+      ticket.completionHistory[lastIdx].beforePhotos = beforePhotos;
+      ticket.completionHistory[lastIdx].afterPhotos = afterPhotos;
+      ticket.markModified('completionHistory');
+    }
+
+    ticket.markModified('completion');
+
     ticket.timeline.push({
       status: ticket.status,
       note: 'Completion photos uploaded/updated by Admin',

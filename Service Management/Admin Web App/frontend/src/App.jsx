@@ -10193,18 +10193,21 @@ export default function App() {
                     ];
 
                     const getPhotoUrlForSlot = (slotKey, slotLabel) => {
-                      if (comp.labeledPhotos && comp.labeledPhotos.length > 0) {
-                        const match = comp.labeledPhotos.find(lp =>
-                          lp.label?.toLowerCase() === slotLabel.toLowerCase() ||
-                          lp.label?.toLowerCase() === slotKey.toLowerCase()
-                        );
-                        if (match && match.url) return match.url;
-                      }
-                      if (slotKey === 'before' && comp.beforePhotos && comp.beforePhotos.length > 0) {
-                        return comp.beforePhotos[0];
-                      }
-                      if (slotKey === 'after' && comp.afterPhotos && comp.afterPhotos.length > 0) {
-                        return comp.afterPhotos[0];
+                      const sources = [comp, selectedTicket.completion].filter(Boolean);
+                      for (const src of sources) {
+                        if (src.labeledPhotos && src.labeledPhotos.length > 0) {
+                          const match = src.labeledPhotos.find(lp =>
+                            lp.label?.toLowerCase() === slotLabel.toLowerCase() ||
+                            lp.label?.toLowerCase() === slotKey.toLowerCase()
+                          );
+                          if (match && match.url) return match.url;
+                        }
+                        if (slotKey === 'before' && src.beforePhotos && src.beforePhotos.length > 0) {
+                          return src.beforePhotos[0];
+                        }
+                        if (slotKey === 'after' && src.afterPhotos && src.afterPhotos.length > 0) {
+                          return src.afterPhotos[0];
+                        }
                       }
                       return null;
                     };
