@@ -8,6 +8,7 @@ const {
   updateTicketStatus,
   submitWorkCompletion,
   adminUploadCompletionPhotos,
+  submitSiteNotReady,
   verifyWork,
   closeTicket,
   cancelTicket,
@@ -77,6 +78,7 @@ router.route('/:id/photos').patch(
 
 // Technician-only updates
 router.route('/:id/status').patch(authorize('technician'), updateTicketStatus);
+router.route('/:id/site-not-ready').patch(authorize('technician'), upload.single('photo'), submitSiteNotReady);
 router.route('/:id/complete').patch(
   authorize('technician'),
   upload.fields([

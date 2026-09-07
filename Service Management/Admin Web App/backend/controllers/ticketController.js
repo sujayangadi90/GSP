@@ -1993,6 +1993,46 @@ const adminUploadCompletionPhotos = async (req, res) => {
   }
 };
 
+// Technician submit Site Not Ready
+const submitSiteNotReady = async (req, res) => {
+  const { nextVisitDate, remarks } = req.body;
+  try {
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    const photoPath = req.file ? ('uploads/' + req.file.filename) : (ticket.siteNotReady?.photo || '');
+
+    ticket.status = 'site_not_ready';
+    ticket.siteNotReady = {
+      photo: photoPath,
+      nextVisitDate: nextVisitDate ? new Date(nextVisitDate) : null,
+      remarks: remarks || '',
+      updatedAt: new Date(),
+      updatedBy: req.user ? req.user.name : 'Technician'
+    };
+
+    ticket.timeline.push({
+      status: 'site_not_ready',
+      note: `Site marked Not Ready by technician. Next visit scheduled for: ${nextVisitDate ? new Date(nextVisitDate).toLocaleString() : 'Not set'}. ${remarks ? 'Remarks: ' + remarks : ''}`,
+      updatedBy: req.user ? req.user.name : 'Technician'
+    });
+
+    await ticket.save();
+
+    const updatedTicket = await Ticket.findById(ticket._id)
+      .populate('dealer', 'name code mobile city address email')
+      .populate('assignedTechnician', 'name code mobile email status profilePic pincodes')
+      .populate('createdBy', 'name role code');
+
+    res.json(updatedTicket);
+  } catch (error) {
+    console.error('Error submitting site not ready:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createTicket,
   getTickets,
@@ -2002,6 +2042,7 @@ module.exports = {
   updateTicketStatus,
   submitWorkCompletion,
   adminUploadCompletionPhotos,
+  submitSiteNotReady,
   verifyWork,
   closeTicket,
   cancelTicket,

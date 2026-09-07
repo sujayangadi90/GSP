@@ -908,12 +908,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: (status == 'assigned' ? Colors.amber : Colors.orange).withOpacity(0.2),
+                    color: (status == 'assigned'
+                            ? Colors.amber
+                            : status == 'site_not_ready'
+                                ? Colors.redAccent
+                                : Colors.orange)
+                        .withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    status.toString().toUpperCase(),
-                    style: TextStyle(color: status == 'assigned' ? Colors.amber : Colors.orange, fontSize: 9, fontWeight: FontWeight.bold),
+                    status == 'site_not_ready'
+                        ? 'SITE NOT READY'
+                        : status.toString().toUpperCase().replaceAll('_', ' '),
+                    style: TextStyle(
+                      color: status == 'assigned'
+                          ? Colors.amber
+                          : status == 'site_not_ready'
+                              ? Colors.redAccent
+                              : Colors.orange,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -1477,6 +1492,211 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     );
   }
 
+  void _showSiteNotReadyDialog() {
+    File? sitePhoto;
+    DateTime? nextVisitDateTime;
+    final remarksController = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final dateStr = nextVisitDateTime != null
+                ? '${nextVisitDateTime!.year}-${nextVisitDateTime!.month.toString().padLeft(2, '0')}-${nextVisitDateTime!.day.toString().padLeft(2, '0')} ${nextVisitDateTime!.hour.toString().padLeft(2, '0')}:${nextVisitDateTime!.minute.toString().padLeft(2, '0')}'
+                : 'Select Date & Time *';
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E293B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: const [
+                  Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 22),
+                  SizedBox(width: 8),
+                  Text('Mark Site Not Ready', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Upload site photo and select scheduled date & time for next visit:',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 1. Photo Upload Slot
+                    const Text('1. Upload Site Photo', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                        if (picked != null) {
+                          setDialogState(() {
+                            sitePhoto = File(picked.path);
+                          });
+                        }
+                      },
+                      child: Container(
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.blueGrey[900],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: sitePhoto != null ? Colors.tealAccent : Colors.grey[700]!),
+                        ),
+                        child: sitePhoto != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.file(sitePhoto!, fit: BoxFit.cover, width: double.infinity),
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(Icons.add_a_photo, color: Colors.tealAccent, size: 28),
+                                  SizedBox(height: 6),
+                                  Text('Tap to take Site Photo', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                ],
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 2. Next Visit Date & Time Picker
+                    const Text('2. Next Visit Date & Time *', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now().add(const Duration(days: 1)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 90)),
+                        );
+                        if (date != null) {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: const TimeOfDay(hour: 10, minute: 0),
+                          );
+                          if (time != null) {
+                            setDialogState(() {
+                              nextVisitDateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                            });
+                          }
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.blueGrey[900],
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: nextVisitDateTime != null ? Colors.amberAccent : Colors.grey[700]!),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(dateStr, style: TextStyle(color: nextVisitDateTime != null ? Colors.amberAccent : Colors.white54, fontWeight: FontWeight.bold, fontSize: 13)),
+                            const Icon(Icons.calendar_today, color: Colors.amberAccent, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Remarks
+                    const Text('Remarks / Reason (Optional)', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: remarksController,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. Work site structure not ready',
+                        hintStyle: TextStyle(color: Colors.white30, fontSize: 11),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting ? null : () async {
+                    if (nextVisitDateTime == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please select Date & Time for next visit.')),
+                      );
+                      return;
+                    }
+
+                    setDialogState(() {
+                      isSubmitting = true;
+                    });
+
+                    try {
+                      final uri = Uri.parse('${widget.apiUrl}/tickets/${_job!['_id']}/site-not-ready');
+                      final request = http.MultipartRequest('PATCH', uri);
+                      request.headers['Authorization'] = 'Bearer ${widget.token}';
+                      request.fields['nextVisitDate'] = nextVisitDateTime!.toIso8601String();
+                      request.fields['remarks'] = remarksController.text.trim();
+
+                      if (sitePhoto != null) {
+                        request.files.add(await http.MultipartFile.fromPath('photo', sitePhoto!.path));
+                      }
+
+                      final streamedRes = await request.send();
+                      final response = await http.Response.fromStream(streamedRes);
+
+                      if (response.statusCode == 200) {
+                        final updatedData = jsonDecode(response.body);
+                        if (mounted) {
+                          setState(() {
+                            _job = updatedData;
+                          });
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Site marked as Not Ready.')),
+                          );
+                        }
+                      } else {
+                        final errData = jsonDecode(response.body);
+                        throw Exception(errData['message'] ?? 'Failed to update site status');
+                      }
+                    } catch (err) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(err.toString().replaceAll('Exception: ', ''))),
+                        );
+                      }
+                    } finally {
+                      setDialogState(() {
+                        isSubmitting = false;
+                      });
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red[800],
+                    foregroundColor: Colors.white,
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Submit Site Not Ready'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _loadJob() async {
     if (_job == null) {
       setState(() => _isLoading = true);
@@ -1797,6 +2017,55 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+            ],
+            if (status == 'in_progress' || status == 'site_not_ready') ...[
+              ElevatedButton.icon(
+                onPressed: _showSiteNotReadyDialog,
+                icon: const Icon(Icons.location_off_rounded, color: Colors.orangeAccent),
+                label: Text(
+                  status == 'site_not_ready' ? 'Update Site Not Ready Details' : 'Site Not Ready',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[900]?.withOpacity(0.5) ?? Colors.red,
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.redAccent),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              if (_job!['siteNotReady'] != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.1),
+                    border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'SITE NOT READY DETAILS',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.redAccent),
+                      ),
+                      const SizedBox(height: 4),
+                      if (_job!['siteNotReady']['nextVisitDate'] != null)
+                        Text(
+                          'Next Visit: ${DateTime.tryParse(_job!['siteNotReady']['nextVisitDate'].toString())?.toLocal().toString().split('.')[0] ?? _job!['siteNotReady']['nextVisitDate']}',
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                      if (_job!['siteNotReady']['remarks'] != null && _job!['siteNotReady']['remarks'].toString().isNotEmpty)
+                        Text(
+                          'Remarks: ${_job!['siteNotReady']['remarks']}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
             ],
             _buildDetailBlock('Customer Details', [

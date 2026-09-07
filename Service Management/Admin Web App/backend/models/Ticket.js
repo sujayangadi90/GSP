@@ -22,7 +22,7 @@ const TicketSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['new', 'assigned', 'in_progress', 'completed', 'verification_pending', 'closed', 'cancelled'],
+    enum: ['new', 'assigned', 'in_progress', 'site_not_ready', 'completed', 'verification_pending', 'closed', 'cancelled'],
     default: 'new'
   },
   customer: {
@@ -90,6 +90,13 @@ const TicketSchema = new mongoose.Schema({
     ref: 'User'
   },
   assignmentNotes: String,
+  siteNotReady: {
+    photo: String,
+    nextVisitDate: Date,
+    remarks: String,
+    updatedAt: Date,
+    updatedBy: String
+  },
   completion: {
     photos: [String],
     beforePhotos: [String],

@@ -3863,6 +3863,7 @@ export default function App() {
                       <option value="assigned">Assigned</option>
                       <option value="pending">Pending/Action</option>
                       <option value="in_progress">Work In Progress</option>
+                      <option value="site_not_ready">Site Not Ready</option>
                       <option value="verification_pending">Verification Pending</option>
                       <option value="completed">Completed (Pending Close)</option>
                       <option value="closed">Closed</option>
@@ -3971,17 +3972,23 @@ export default function App() {
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex flex-wrap gap-2 items-center">
-                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
                                   ticket.status === 'new' ? 'bg-blue-900/50 text-blue-300 border border-blue-700/30' :
                                   ticket.status === 'assigned' ? 'bg-amber-900/50 text-amber-300 border border-amber-700/30' :
                                   ticket.status === 'in_progress' ? 'bg-orange-900/50 text-orange-300 border border-orange-700/30' :
+                                  ticket.status === 'site_not_ready' ? 'bg-red-900/60 text-red-300 border border-red-700/40 font-black' :
                                   ticket.status === 'verification_pending' ? 'bg-purple-900/50 text-purple-300 border border-purple-700/30' :
                                   ticket.status === 'completed' ? 'bg-green-900/50 text-green-300 border border-green-700/30' :
                                   ticket.status === 'cancelled' ? 'bg-rose-900/50 text-rose-300 border border-rose-700/30' :
                                   'bg-slate-800 text-slate-400'
                                 }`}>
-                                  {ticket.status.replace('_', ' ')}
+                                  {ticket.status === 'site_not_ready' ? 'Site Not Ready' : ticket.status.replace('_', ' ')}
                                 </span>
+                                {ticket.siteNotReady && ticket.status !== 'site_not_ready' && (
+                                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-red-950/80 text-red-300 border border-red-800/50">
+                                    Site Not Ready
+                                  </span>
+                                )}
                                 {ticket.adminVerification?.status === 'rejected' && (
                                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-red-950/60 text-red-400 border border-red-800/40">
                                     Reassigned
@@ -10100,6 +10107,79 @@ export default function App() {
                     )}
                   </div>
                 </div>
+
+                {/* Site Details Card (Site Not Ready) */}
+                {selectedTicket.siteNotReady && (
+                  <div className="bg-slate-800/40 border border-red-900/50 p-5 rounded-2xl space-y-3">
+                    <h4 className="font-bold text-red-300 text-sm border-b border-red-900/40 pb-2 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <span className="text-base">⚠️</span> Site Details (Site Not Ready)
+                      </span>
+                      <span className="text-xs bg-red-950 text-red-300 px-2.5 py-0.5 rounded-full font-bold border border-red-800/50 uppercase">
+                        Not Ready
+                      </span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      {/* Site Photo */}
+                      <div>
+                        <p className="text-slate-400 font-semibold mb-2 flex items-center gap-1.5">
+                          <span>📸</span> Site Photo:
+                        </p>
+                        {selectedTicket.siteNotReady.photo ? (
+                          <a
+                            href={selectedTicket.siteNotReady.photo.startsWith('http') ? selectedTicket.siteNotReady.photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${selectedTicket.siteNotReady.photo}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block group relative max-w-xs rounded-xl overflow-hidden border border-red-800/50 shadow-md"
+                          >
+                            <img
+                              src={selectedTicket.siteNotReady.photo.startsWith('http') ? selectedTicket.siteNotReady.photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${selectedTicket.siteNotReady.photo}`}
+                              alt="Site Not Ready"
+                              className="w-full h-36 object-cover group-hover:opacity-90 transition"
+                            />
+                            <div className="absolute bottom-0 inset-x-0 bg-slate-950/80 px-2 py-1 text-[10px] text-red-300 text-center font-medium">
+                              Click to view full image
+                            </div>
+                          </a>
+                        ) : (
+                          <p className="text-slate-500 italic bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                            No photo attached
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Next Visit Date & Time + Remarks */}
+                      <div className="space-y-2.5">
+                        <div>
+                          <p className="text-slate-400 font-semibold mb-1 flex items-center gap-1.5">
+                            <span>📅</span> Next Visit Date & Time:
+                          </p>
+                          <p className="text-sm font-bold text-amber-300 bg-amber-950/50 px-3 py-1.5 rounded-lg border border-amber-900/50 inline-block font-mono">
+                            {selectedTicket.siteNotReady.nextVisitDate
+                              ? new Date(selectedTicket.siteNotReady.nextVisitDate).toLocaleString()
+                              : 'Not Scheduled'}
+                          </p>
+                        </div>
+
+                        {selectedTicket.siteNotReady.remarks && (
+                          <div>
+                            <p className="text-slate-400 font-semibold mb-1">Technician Remarks:</p>
+                            <p className="text-slate-300 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 italic">
+                              {selectedTicket.siteNotReady.remarks}
+                            </p>
+                          </div>
+                        )}
+
+                        {selectedTicket.siteNotReady.updatedAt && (
+                          <p className="text-[10px] text-slate-500">
+                            Reported by {selectedTicket.siteNotReady.updatedBy || 'Technician'} on {new Date(selectedTicket.siteNotReady.updatedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Financial & Fee Breakdown Card */}
                 <div className="bg-slate-800/40 border border-slate-850 p-5 rounded-2xl">
