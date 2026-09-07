@@ -50,7 +50,8 @@ import {
   RefreshCw,
   Download,
   FileSpreadsheet,
-  AlertTriangle
+  AlertTriangle,
+  DollarSign
 } from 'lucide-react';
 
 
