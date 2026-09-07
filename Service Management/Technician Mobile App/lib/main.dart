@@ -3013,6 +3013,21 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                 Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: ChoiceChip(
+                    label: const Text('Site Not Ready'),
+                    selected: _selectedStatusFilter == 'site_not_ready',
+                    onSelected: (sel) {
+                      if (sel) {
+                        setState(() {
+                          _selectedStatusFilter = 'site_not_ready';
+                        });
+                        _fetchJobs();
+                      }
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
                     label: const Text('Pending Verification'),
                     selected: _selectedStatusFilter == 'verification_pending',
                     onSelected: (sel) {
