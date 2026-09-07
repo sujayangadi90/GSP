@@ -401,17 +401,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _earnings = 0.0;
   bool _isLoading = false;
   List _jobs = [];
-  int _selectedMonth = DateTime.now().month;
-  int _selectedYear = DateTime.now().year;
+  String _selectedFilterType = 'this_month'; // 'this_month', 'last_2_months', 'custom'
+  int _customMonth = DateTime.now().month;
+  int _customYear = DateTime.now().year;
 
   String _getMonthName(int month) {
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     return months[month - 1];
   }
 
+  Map<String, String> _getDateRangeForFilter() {
+    final now = DateTime.now();
+    final currentYear = now.year;
+    final currentMonth = now.month;
+
+    if (_selectedFilterType == 'last_2_months') {
+      final prevMonthDate = DateTime(currentYear, currentMonth - 1, 1);
+      final startStr = "${prevMonthDate.year}-${prevMonthDate.month.toString().padLeft(2, '0')}-01";
+
+      final lastDayCurrentMonth = DateTime(currentYear, currentMonth + 1, 0);
+      final endStr = "${lastDayCurrentMonth.year}-${lastDayCurrentMonth.month.toString().padLeft(2, '0')}-${lastDayCurrentMonth.day.toString().padLeft(2, '0')}";
+
+      return {'fromDate': startStr, 'toDate': endStr};
+    } else if (_selectedFilterType == 'custom') {
+      final startStr = "$_customYear-${_customMonth.toString().padLeft(2, '0')}-01";
+      final lastDayCustomMonth = DateTime(_customYear, _customMonth + 1, 0);
+      final endStr = "$_customYear-${_customMonth.toString().padLeft(2, '0')}-${lastDayCustomMonth.day.toString().padLeft(2, '0')}";
+
+      return {'fromDate': startStr, 'toDate': endStr};
+    } else {
+      // Default: 'this_month'
+      final startStr = "$currentYear-${currentMonth.toString().padLeft(2, '0')}-01";
+      final lastDayCurrentMonth = DateTime(currentYear, currentMonth + 1, 0);
+      final endStr = "$currentYear-${currentMonth.toString().padLeft(2, '0')}-${lastDayCurrentMonth.day.toString().padLeft(2, '0')}";
+
+      return {'fromDate': startStr, 'toDate': endStr};
+    }
+  }
+
   Future<void> _selectMonthYear(BuildContext context) async {
-    int tempMonth = _selectedMonth;
-    int tempYear = _selectedYear;
+    int tempMonth = _customMonth;
+    int tempYear = _customYear;
 
     await showDialog(
       context: context,
@@ -482,8 +512,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 TextButton(
                   onPressed: () {
                     setState(() {
-                      _selectedMonth = tempMonth;
-                      _selectedYear = tempYear;
+                      _selectedFilterType = 'custom';
+                      _customMonth = tempMonth;
+                      _customYear = tempYear;
                     });
                     Navigator.pop(context);
                     _loadJobs();
@@ -507,8 +538,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadJobs() async {
     setState(() => _isLoading = true);
     try {
+      final range = _getDateRangeForFilter();
       final res = await http.get(
-        Uri.parse('${widget.apiUrl}/tickets?month=$_selectedMonth&year=$_selectedYear'),
+        Uri.parse('${widget.apiUrl}/tickets?fromDate=${range['fromDate']}&toDate=${range['toDate']}'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}'
@@ -626,26 +658,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     'Job Metrics',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
-                  GestureDetector(
-                    onTap: () => _selectMonthYear(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E2422),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.teal.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today, color: Colors.teal, size: 14),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${_getMonthName(_selectedMonth)} $_selectedYear',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E2422),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedFilterType,
+                        dropdownColor: const Color(0xFF1E2422),
+                        icon: const Icon(Icons.arrow_drop_down, color: Colors.white, size: 18),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                        items: [
+                          const DropdownMenuItem<String>(
+                            value: 'this_month',
+                            child: Row(
+                              children: [
+                                Icon(Icons.calendar_today, color: Colors.teal, size: 14),
+                                SizedBox(width: 6),
+                                Text('This Month'),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.arrow_drop_down, color: Colors.white, size: 16),
+                          const DropdownMenuItem<String>(
+                            value: 'last_2_months',
+                            child: Row(
+                              children: [
+                                Icon(Icons.date_range, color: Colors.teal, size: 14),
+                                SizedBox(width: 6),
+                                Text('Last 2 Months'),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem<String>(
+                            value: 'custom',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.edit_calendar, color: Colors.teal, size: 14),
+                                const SizedBox(width: 6),
+                                Text(_selectedFilterType == 'custom' 
+                                  ? '${_getMonthName(_customMonth)} $_customYear' 
+                                  : 'Custom Month'),
+                              ],
+                            ),
+                          ),
                         ],
+                        onChanged: (val) async {
+                          if (val == null) return;
+                          if (val == 'custom') {
+                            await _selectMonthYear(context);
+                          } else {
+                            setState(() {
+                              _selectedFilterType = val;
+                            });
+                            _loadJobs();
+                          }
+                        },
                       ),
                     ),
                   ),
@@ -675,8 +745,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     token: widget.token,
                                     apiUrl: widget.apiUrl,
                                     initialStatus: 'assigned',
-                                    initialMonth: _selectedMonth,
-                                    initialYear: _selectedYear,
+                                    initialMonth: _selectedFilterType == 'custom' ? _customMonth : null,
+                                    initialYear: _selectedFilterType == 'custom' ? _customYear : null,
                                   ),
                                 ),
                               ).then((_) => _loadJobs()),
@@ -692,8 +762,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     token: widget.token,
                                     apiUrl: widget.apiUrl,
                                     initialStatus: 'in_progress',
-                                    initialMonth: _selectedMonth,
-                                    initialYear: _selectedYear,
+                                    initialMonth: _selectedFilterType == 'custom' ? _customMonth : null,
+                                    initialYear: _selectedFilterType == 'custom' ? _customYear : null,
                                   ),
                                 ),
                               ).then((_) => _loadJobs()),
@@ -709,8 +779,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     token: widget.token,
                                     apiUrl: widget.apiUrl,
                                     initialStatus: 'verification_pending',
-                                    initialMonth: _selectedMonth,
-                                    initialYear: _selectedYear,
+                                    initialMonth: _selectedFilterType == 'custom' ? _customMonth : null,
+                                    initialYear: _selectedFilterType == 'custom' ? _customYear : null,
                                   ),
                                 ),
                               ).then((_) => _loadJobs()),
@@ -726,8 +796,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     token: widget.token,
                                     apiUrl: widget.apiUrl,
                                     initialStatus: 'closed',
-                                    initialMonth: _selectedMonth,
-                                    initialYear: _selectedYear,
+                                    initialMonth: _selectedFilterType == 'custom' ? _customMonth : null,
+                                    initialYear: _selectedFilterType == 'custom' ? _customYear : null,
                                   ),
                                 ),
                               ).then((_) => _loadJobs()),
@@ -756,7 +826,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      'For the month of ${_getMonthName(_selectedMonth)}',
+                                      _selectedFilterType == 'last_2_months'
+                                          ? 'For the last 2 months'
+                                          : _selectedFilterType == 'custom'
+                                              ? 'For ${_getMonthName(_customMonth)} $_customYear'
+                                              : 'For the month of ${_getMonthName(DateTime.now().month)}',
                                       style: const TextStyle(fontSize: 10, color: Colors.grey),
                                     ),
                                   ],
