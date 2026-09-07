@@ -9,7 +9,7 @@ const getAppliances = async (req, res) => {
     const { active } = req.query;
     let query = {};
     if (active === 'true') {
-      query.isActive = true;
+      query.isActive = { $ne: false };
     }
     const appliances = await Appliance.find(query).sort({ name: 1 });
     res.json(appliances);

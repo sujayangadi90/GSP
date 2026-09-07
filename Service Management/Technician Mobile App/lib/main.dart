@@ -3751,8 +3751,9 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
         headers: {'Authorization': 'Bearer ${widget.token}'},
       );
       if (res.statusCode == 200) {
+        final List fetched = jsonDecode(res.body);
         setState(() {
-          _appliances = jsonDecode(res.body);
+          _appliances = fetched.where((app) => app['isActive'] != false).toList();
         });
       }
     } catch (e) {
@@ -3767,8 +3768,9 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
         headers: {'Authorization': 'Bearer ${widget.token}'},
       );
       if (res.statusCode == 200) {
+        final List fetched = jsonDecode(res.body);
         setState(() {
-          _brands = jsonDecode(res.body);
+          _brands = fetched.where((b) => b['isActive'] != false).toList();
         });
       }
     } catch (e) {

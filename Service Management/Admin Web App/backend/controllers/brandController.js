@@ -13,7 +13,7 @@ const getBrands = async (req, res) => {
       query.appliance = appliance;
     }
     if (active === 'true') {
-      query.isActive = true;
+      query.isActive = { $ne: false };
     }
 
     const brands = await Brand.find(query)
