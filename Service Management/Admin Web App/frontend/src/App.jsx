@@ -383,6 +383,7 @@ export default function App() {
   const [amcForm, setAmcForm] = useState(null); // null or form fields object
   const [assignTechId, setAssignTechId] = useState('');
   const [assignNotes, setAssignNotes] = useState('');
+  const [verificationForm, setVerificationForm] = useState({ status: 'approved', reason: '' });
   const [closureRemarks, setClosureRemarks] = useState('');
   const [closurePaymentMode, setClosurePaymentMode] = useState('Cash');
   const [closureRefNumber, setClosureRefNumber] = useState('');
