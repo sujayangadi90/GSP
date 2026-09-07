@@ -521,7 +521,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         for (var job in jobsData) {
           final s = job['status'];
           if (s == 'assigned') assigned++;
-          if (s == 'in_progress') inProgress++;
+          if (s == 'in_progress' || s == 'site_not_ready') inProgress++;
           if (s == 'verification_pending') pending++;
           if (s == 'completed' || s == 'closed') {
             completed++;
@@ -560,7 +560,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final activeJobs = _jobs.where((j) => j['status'] == 'assigned' || j['status'] == 'in_progress').toList();
+    final activeJobs = _jobs.where((j) => j['status'] == 'assigned' || j['status'] == 'in_progress' || j['status'] == 'site_not_ready').toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -2174,7 +2174,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       );
     }
     
-    if (status == 'in_progress') {
+    if (status == 'in_progress' || status == 'site_not_ready') {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
