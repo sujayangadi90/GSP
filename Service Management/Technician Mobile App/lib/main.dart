@@ -1682,22 +1682,39 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                           runSpacing: 8,
                           children: List.generate(completionsList.length, (attemptIndex) {
                             final comp = completionsList[attemptIndex];
-                            final labeledPhotos = comp['labeledPhotos'] as List?;
-                            final beforePhotos = comp['beforePhotos'] as List?;
-                            final afterPhotos = comp['afterPhotos'] as List?;
-                            final compPhotos = comp['photos'] as List?;
+                            final mainCompletion = _job!['completion'] as Map<String, dynamic>?;
+                            final mainLabeled = (mainCompletion?['labeledPhotos'] as List?) ?? [];
+                            final bool isLatestAttempt = attemptIndex == completionsList.length - 1;
 
-                            if (labeledPhotos != null && labeledPhotos.isNotEmpty) {
+                            List labeledPhotos = (comp['labeledPhotos'] as List?) ?? [];
+                            if (isLatestAttempt && mainLabeled.isNotEmpty) {
+                              final Map<String, Map<String, dynamic>> merged = {};
+                              for (var lp in labeledPhotos) {
+                                if (lp is Map && lp['label'] != null) {
+                                  merged[lp['label'].toString().toLowerCase()] = Map<String, dynamic>.from(lp);
+                                }
+                              }
+                              for (var lp in mainLabeled) {
+                                if (lp is Map && lp['label'] != null) {
+                                  final key = lp['label'].toString().toLowerCase();
+                                  merged[key] = Map<String, dynamic>.from(lp);
+                                }
+                              }
+                              labeledPhotos = merged.values.toList();
+                            }
+
+                            if (labeledPhotos.isNotEmpty) {
                               return Wrap(
                                 spacing: 6,
                                 runSpacing: 6,
                                 children: labeledPhotos.map((lp) {
-                                  final label = lp['label'] ?? 'Photo';
-                                  final url = lp['url'] ?? '';
+                                  final label = lp['label']?.toString() ?? 'Photo';
+                                  final url = lp['url']?.toString() ?? '';
+                                  final displayLabel = completionsList.length > 1 ? '$label (Attempt ${attemptIndex + 1})' : label;
                                   return ElevatedButton.icon(
                                     onPressed: () => _viewPhotos(context, [url], title: '$label (Attempt ${attemptIndex + 1})'),
                                     icon: const Icon(Icons.photo_camera, size: 13, color: Colors.cyanAccent),
-                                    label: Text(label, style: const TextStyle(fontSize: 11)),
+                                    label: Text(displayLabel, style: const TextStyle(fontSize: 11)),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.blueGrey[800],
                                       foregroundColor: Colors.white,
@@ -1709,27 +1726,28 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                               );
                             }
 
+                            final beforePhotos = (comp['beforePhotos'] as List?) ?? (isLatestAttempt ? (mainCompletion?['beforePhotos'] as List?) : null);
+                            final afterPhotos = (comp['afterPhotos'] as List?) ?? (isLatestAttempt ? (mainCompletion?['afterPhotos'] as List?) : null);
+
                             if ((beforePhotos != null && beforePhotos.isNotEmpty) || (afterPhotos != null && afterPhotos.isNotEmpty)) {
-                              return Row(
-                                mainAxisSize: MainAxisSize.min,
+                              return Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
                                 children: [
                                   if (beforePhotos != null && beforePhotos.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 6.0),
-                                      child: ElevatedButton.icon(
-                                        onPressed: () => _viewPhotos(
-                                          context,
-                                          beforePhotos,
-                                          title: 'Before Photos (Attempt ${attemptIndex + 1})',
-                                        ),
-                                        icon: const Icon(Icons.camera_alt, size: 13, color: Colors.amberAccent),
-                                        label: Text('Before (${beforePhotos.length})', style: const TextStyle(fontSize: 11)),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.amber[900]!.withOpacity(0.4),
-                                          foregroundColor: Colors.amber[200],
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                        ),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _viewPhotos(
+                                        context,
+                                        beforePhotos,
+                                        title: 'Before Photos (Attempt ${attemptIndex + 1})',
+                                      ),
+                                      icon: const Icon(Icons.camera_alt, size: 13, color: Colors.amberAccent),
+                                      label: Text('Before (${beforePhotos.length})${completionsList.length > 1 ? ' (Attempt ${attemptIndex + 1})' : ''}', style: const TextStyle(fontSize: 11)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.amber[900]!.withOpacity(0.4),
+                                        foregroundColor: Colors.amber[200],
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                       ),
                                     ),
                                   if (afterPhotos != null && afterPhotos.isNotEmpty)
@@ -1740,7 +1758,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                                         title: 'After Photos (Attempt ${attemptIndex + 1})',
                                       ),
                                       icon: const Icon(Icons.check_circle, size: 13, color: Colors.greenAccent),
-                                      label: Text('After (${afterPhotos.length})', style: const TextStyle(fontSize: 11)),
+                                      label: Text('After (${afterPhotos.length})${completionsList.length > 1 ? ' (Attempt ${attemptIndex + 1})' : ''}', style: const TextStyle(fontSize: 11)),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.teal[900],
                                         foregroundColor: Colors.white,
@@ -1752,22 +1770,26 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                               );
                             }
 
-                            if (compPhotos == null || compPhotos.isEmpty) return const SizedBox.shrink();
-                            return ElevatedButton.icon(
-                              onPressed: () => _viewPhotos(
-                                context,
-                                compPhotos,
-                                title: 'Photos (Attempt ${attemptIndex + 1})',
-                              ),
-                              icon: const Icon(Icons.photo_library, size: 14),
-                              label: Text('Photos (Attempt ${attemptIndex + 1})'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.teal[900],
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                            );
+                            final compPhotos = (comp['photos'] as List?) ?? (isLatestAttempt ? (mainCompletion?['photos'] as List?) : null);
+                            if (compPhotos != null && compPhotos.isNotEmpty) {
+                              return ElevatedButton.icon(
+                                onPressed: () => _viewPhotos(
+                                  context,
+                                  compPhotos,
+                                  title: 'Photos (Attempt ${attemptIndex + 1})',
+                                ),
+                                icon: const Icon(Icons.photo_library, size: 14),
+                                label: Text('Photos (${compPhotos.length})${completionsList.length > 1 ? ' (Attempt ${attemptIndex + 1})' : ''}'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal[900],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              );
+                            }
+
+                            return const SizedBox.shrink();
                           }),
                         ),
                       ];
@@ -2833,31 +2855,72 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                                   runSpacing: 8,
                                   children: List.generate(completionHistory.length, (attemptIndex) {
                                     final comp = completionHistory[attemptIndex];
-                                    final beforePhotos = comp['beforePhotos'] as List?;
-                                    final afterPhotos = comp['afterPhotos'] as List?;
-                                    final compPhotos = comp['photos'] as List?;
+                                    final mainCompletion = job['completion'] as Map<String, dynamic>?;
+                                    final mainLabeled = (mainCompletion?['labeledPhotos'] as List?) ?? [];
+                                    final bool isLatestAttempt = attemptIndex == completionHistory.length - 1;
+
+                                    List labeledPhotos = (comp['labeledPhotos'] as List?) ?? [];
+                                    if (isLatestAttempt && mainLabeled.isNotEmpty) {
+                                      final Map<String, Map<String, dynamic>> merged = {};
+                                      for (var lp in labeledPhotos) {
+                                        if (lp is Map && lp['label'] != null) {
+                                          merged[lp['label'].toString().toLowerCase()] = Map<String, dynamic>.from(lp);
+                                        }
+                                      }
+                                      for (var lp in mainLabeled) {
+                                        if (lp is Map && lp['label'] != null) {
+                                          final key = lp['label'].toString().toLowerCase();
+                                          merged[key] = Map<String, dynamic>.from(lp);
+                                        }
+                                      }
+                                      labeledPhotos = merged.values.toList();
+                                    }
+
+                                    if (labeledPhotos.isNotEmpty) {
+                                      return Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        children: labeledPhotos.map((lp) {
+                                          final label = lp['label']?.toString() ?? 'Photo';
+                                          final url = lp['url']?.toString() ?? '';
+                                          final displayLabel = completionHistory.length > 1 ? '$label (Attempt ${attemptIndex + 1})' : label;
+                                          return ElevatedButton.icon(
+                                            onPressed: () => _viewPhotos(context, [url], title: '$label (Attempt ${attemptIndex + 1})'),
+                                            icon: const Icon(Icons.photo_camera, size: 13, color: Colors.cyanAccent),
+                                            label: Text(displayLabel, style: const TextStyle(fontSize: 11)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.blueGrey[800],
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                          );
+                                        }).toList(),
+                                      );
+                                    }
+
+                                    final beforePhotos = (comp['beforePhotos'] as List?) ?? (isLatestAttempt ? (mainCompletion?['beforePhotos'] as List?) : null);
+                                    final afterPhotos = (comp['afterPhotos'] as List?) ?? (isLatestAttempt ? (mainCompletion?['afterPhotos'] as List?) : null);
 
                                     if ((beforePhotos != null && beforePhotos.isNotEmpty) || (afterPhotos != null && afterPhotos.isNotEmpty)) {
-                                      return Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                      return Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
                                         children: [
                                           if (beforePhotos != null && beforePhotos.isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(right: 6.0),
-                                              child: ElevatedButton.icon(
-                                                onPressed: () => _viewPhotos(
-                                                  context,
-                                                  beforePhotos,
-                                                  title: 'Before Photos (Attempt ${attemptIndex + 1})',
-                                                ),
-                                                icon: const Icon(Icons.camera_alt, size: 13, color: Colors.amberAccent),
-                                                label: Text('Before (${beforePhotos.length})', style: const TextStyle(fontSize: 11)),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.amber[900]!.withOpacity(0.4),
-                                                  foregroundColor: Colors.amber[200],
-                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                                ),
+                                            ElevatedButton.icon(
+                                              onPressed: () => _viewPhotos(
+                                                context,
+                                                beforePhotos,
+                                                title: 'Before Photos (Attempt ${attemptIndex + 1})',
+                                              ),
+                                              icon: const Icon(Icons.camera_alt, size: 13, color: Colors.amberAccent),
+                                              label: Text('Before (${beforePhotos.length})${completionHistory.length > 1 ? ' (Attempt ${attemptIndex + 1})' : ''}', style: const TextStyle(fontSize: 11)),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.amber[900]!.withOpacity(0.4),
+                                                foregroundColor: Colors.amber[200],
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                               ),
                                             ),
                                           if (afterPhotos != null && afterPhotos.isNotEmpty)
@@ -2868,7 +2931,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                                                 title: 'After Photos (Attempt ${attemptIndex + 1})',
                                               ),
                                               icon: const Icon(Icons.check_circle, size: 13, color: Colors.greenAccent),
-                                              label: Text('After (${afterPhotos.length})', style: const TextStyle(fontSize: 11)),
+                                              label: Text('After (${afterPhotos.length})${completionHistory.length > 1 ? ' (Attempt ${attemptIndex + 1})' : ''}', style: const TextStyle(fontSize: 11)),
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: Colors.teal[900],
                                                 foregroundColor: Colors.white,
@@ -2880,37 +2943,69 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                                       );
                                     }
 
-                                    if (compPhotos == null || compPhotos.isEmpty) return const SizedBox.shrink();
+                                    final compPhotos = (comp['photos'] as List?) ?? (isLatestAttempt ? (mainCompletion?['photos'] as List?) : null);
+                                    if (compPhotos != null && compPhotos.isNotEmpty) {
+                                      return ElevatedButton.icon(
+                                        onPressed: () => _viewPhotos(
+                                          context,
+                                          compPhotos,
+                                          title: 'Photos (Attempt ${attemptIndex + 1})',
+                                        ),
+                                        icon: const Icon(Icons.photo_library, size: 14),
+                                        label: Text('Photos (${compPhotos.length})${completionHistory.length > 1 ? ' (Attempt ${attemptIndex + 1})' : ''}'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.teal[900],
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                      );
+                                    }
+
+                                    return const SizedBox.shrink();
+                                  }),
+                                ),
+                              ] else if (job['completion'] != null) ...[
+                                const SizedBox(height: 12),
+                                (() {
+                                  final mainComp = job['completion'] as Map<String, dynamic>;
+                                  final mainLabeled = (mainComp['labeledPhotos'] as List?) ?? [];
+                                  if (mainLabeled.isNotEmpty) {
+                                    return Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: mainLabeled.map((lp) {
+                                        final label = lp['label']?.toString() ?? 'Photo';
+                                        final url = lp['url']?.toString() ?? '';
+                                        return ElevatedButton.icon(
+                                          onPressed: () => _viewPhotos(context, [url], title: label),
+                                          icon: const Icon(Icons.photo_camera, size: 13, color: Colors.cyanAccent),
+                                          label: Text(label, style: const TextStyle(fontSize: 11)),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blueGrey[800],
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    );
+                                  }
+                                  if (hasPhotos) {
                                     return ElevatedButton.icon(
-                                      onPressed: () => _viewPhotos(
-                                        context,
-                                        compPhotos,
-                                        title: 'Completion Attempt ${attemptIndex + 1}',
-                                      ),
-                                      icon: const Icon(Icons.photo_library, size: 14),
-                                      label: Text('Photos (Attempt ${attemptIndex + 1})'),
+                                      onPressed: () => _viewPhotos(context, photos),
+                                      icon: const Icon(Icons.photo_library, size: 16),
+                                      label: const Text('View Photos'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.teal[900],
                                         foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                       ),
                                     );
-                                  }),
-                                ),
-                              ] else if (hasPhotos) ...[
-                                const SizedBox(height: 12),
-                                ElevatedButton.icon(
-                                  onPressed: () => _viewPhotos(context, photos),
-                                  icon: const Icon(Icons.photo_library, size: 16),
-                                  label: const Text('View Photos'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.teal[900],
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  ),
-                                ),
+                                  }
+                                  return const SizedBox.shrink();
+                                })(),
                               ]
                             ],
                           ),
