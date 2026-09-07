@@ -1298,38 +1298,20 @@ const getDashboardStats = async (req, res) => {
       createdAt: { $gte: start, $lte: end }
     });
 
-    // New Requests: tickets created within [start, end] with status 'new'
+    // New Requests: all active tickets with status 'new' currently in system
     const newCount = await Ticket.countDocuments({
-      createdAt: { $gte: start, $lte: end },
       status: 'new'
     });
 
-    // Assigned Requests: assignment date within [start, end] and status !== 'new'
+    // Assigned Requests: all active tickets currently assigned
     const assignedCount = await Ticket.countDocuments({
-      status: { $ne: 'new' },
-      timeline: {
-        $elemMatch: {
-          status: 'assigned',
-          timestamp: { $gte: start, $lte: end }
-        }
-      }
+      status: 'assigned'
     });
 
-    // Pending/Action Requests: in_progress, verification_pending, or completed
-    // whose status entry timestamp (or updatedAt fallback) is in the date range
-    const pendingTickets = await Ticket.find({
-      status: { $in: ['in_progress', 'verification_pending', 'completed'] }
+    // Pending/Action Requests: all active tickets in progress, pending verification, site not ready, or completed
+    const pendingCount = await Ticket.countDocuments({
+      status: { $in: ['in_progress', 'verification_pending', 'site_not_ready', 'completed'] }
     });
-    const pendingCount = pendingTickets.filter(ticket => {
-      const currentStatusTimeline = [...ticket.timeline]
-        .reverse()
-        .find(item => item.status === ticket.status);
-      if (currentStatusTimeline) {
-        const ts = new Date(currentStatusTimeline.timestamp);
-        return ts >= start && ts <= end;
-      }
-      return ticket.updatedAt >= start && ticket.updatedAt <= end;
-    }).length;
 
     // Closed Requests: closedAt in [start, end] and status === 'closed'
     const closedCount = await Ticket.countDocuments({
@@ -1337,19 +1319,17 @@ const getDashboardStats = async (req, res) => {
       closedAt: { $gte: start, $lte: end }
     });
 
-    // Pending Work Verifications: status === 'verification_pending' and verification request date (completion.submittedAt) in [start, end]
+    // Pending Work Verifications: all tickets currently requiring admin verification
     const pendingVerifications = await Ticket.find({
-      status: 'verification_pending',
-      'completion.submittedAt': { $gte: start, $lte: end }
+      status: 'verification_pending'
     })
     .populate('dealer', 'name code email mobile')
     .populate('assignedTechnician', 'name code mobile')
-    .sort({ 'completion.submittedAt': -1 });
+    .sort({ 'completion.submittedAt': -1, updatedAt: -1 });
 
-    // New Unassigned Tickets: status === 'new' and createdAt in [start, end]
+    // New Unassigned Tickets: all tickets currently awaiting technician assignment
     const newUnassignedTickets = await Ticket.find({
-      status: 'new',
-      createdAt: { $gte: start, $lte: end }
+      status: 'new'
     })
     .populate('dealer', 'name code email mobile')
     .sort({ createdAt: -1 });

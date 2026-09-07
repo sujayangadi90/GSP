@@ -660,15 +660,10 @@ export default function App() {
   };
 
   const todayStr = getLocalDateString();
-  const [dashboardDateFilter, setDashboardDateFilter] = useState('Today');
-  const [dashboardCustomRange, setDashboardCustomRange] = useState({
-    fromDate: todayStr,
-    toDate: todayStr
-  });
-  const [appliedDashboardRange, setAppliedDashboardRange] = useState({
-    fromDate: todayStr,
-    toDate: todayStr
-  });
+  const initialMonthRange = calculatePredefinedRange('This Month');
+  const [dashboardDateFilter, setDashboardDateFilter] = useState('This Month');
+  const [dashboardCustomRange, setDashboardCustomRange] = useState(initialMonthRange);
+  const [appliedDashboardRange, setAppliedDashboardRange] = useState(initialMonthRange);
   const [dashboardPendingVerifications, setDashboardPendingVerifications] = useState([]);
   const [dashboardNewUnassigned, setDashboardNewUnassigned] = useState([]);
   const [dashboardLoading, setDashboardLoading] = useState(false);
