@@ -6926,7 +6926,7 @@ export default function App() {
                     <p className="text-2xl font-bold text-amber-400 mt-1">
                       {isDealerFilterApplied
                         ? dealerPerformanceStats.inProgress
-                        : historyTickets.filter(t => t.status === 'assigned' || t.status === 'in_progress').length}
+                        : historyTickets.filter(t => t.status === 'assigned' || t.status === 'in_progress' || t.status === 'site_not_ready').length}
                     </p>
                   </div>
                   <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
@@ -6969,7 +6969,7 @@ export default function App() {
                   <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
                     <span className="text-amber-500/80 text-xs font-semibold uppercase">In Progress / Assigned</span>
                     <p className="text-2xl font-bold text-amber-400 mt-1">
-                      {historyTickets.filter(t => t.status === 'assigned' || t.status === 'in_progress').length}
+                      {historyTickets.filter(t => t.status === 'assigned' || t.status === 'in_progress' || t.status === 'site_not_ready').length}
                     </p>
                   </div>
                   <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
@@ -10648,13 +10648,15 @@ export default function App() {
                     </div>
                   )}
 
-                  {selectedTicket.status === 'assigned' || selectedTicket.status === 'in_progress' ? (
+                  {selectedTicket.status === 'assigned' || selectedTicket.status === 'in_progress' || selectedTicket.status === 'site_not_ready' ? (
                     <div className="bg-slate-800 p-3.5 rounded-xl border border-slate-700/50 space-y-2 text-xs">
                       <p className="font-semibold text-slate-300">Currently Assigned: {selectedTicket.assignedTechnician?.name || 'Technician'}</p>
-                      <p className="text-slate-400">Waiting for technician updates.</p>
+                      <p className="text-slate-400">
+                        {selectedTicket.status === 'site_not_ready' ? 'Site reported not ready. Scheduled for next visit.' : 'Waiting for technician updates.'}
+                      </p>
                       <button 
                         onClick={() => {
-                          // Allow re-assigning even if assigned
+                          // Allow re-assigning even if assigned or site not ready
                           setSelectedTicket({...selectedTicket, status: 'new'});
                         }}
                         className="text-violet-400 font-bold hover:underline"
