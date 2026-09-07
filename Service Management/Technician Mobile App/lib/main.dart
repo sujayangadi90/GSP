@@ -1131,8 +1131,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     builder: (context) => JobHistoryScreen(
                       token: widget.token,
                       apiUrl: widget.apiUrl,
-                      initialMonth: _selectedMonth,
-                      initialYear: _selectedYear,
+                      initialMonth: _selectedFilterType == 'custom' ? _customMonth : null,
+                      initialYear: _selectedFilterType == 'custom' ? _customYear : null,
                     ),
                   ),
                 ),
