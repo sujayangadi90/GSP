@@ -66,9 +66,16 @@ router.route('/:id/status').patch(authorize('technician'), updateTicketStatus);
 router.route('/:id/complete').patch(
   authorize('technician'),
   upload.fields([
+    { name: 'bill', maxCount: 1 },
+    { name: 'installation1', maxCount: 1 },
+    { name: 'installation2', maxCount: 1 },
+    { name: 'serialNumber', maxCount: 1 },
+    { name: 'warrantyCard', maxCount: 1 },
+    { name: 'before', maxCount: 1 },
+    { name: 'after', maxCount: 1 },
     { name: 'photos', maxCount: 10 },
-    { name: 'beforePhotos', maxCount: 2 },
-    { name: 'afterPhotos', maxCount: 4 }
+    { name: 'beforePhotos', maxCount: 10 },
+    { name: 'afterPhotos', maxCount: 10 }
   ]),
   submitWorkCompletion
 );

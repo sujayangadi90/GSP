@@ -2231,11 +2231,12 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
   }
 
   Widget _buildCompletionPhotosBlock(Map<String, dynamic> comp, {String title = 'WORK COMPLETION PHOTOS'}) {
+    final labeledList = (comp['labeledPhotos'] as List?) ?? [];
     final beforeList = (comp['beforePhotos'] as List?) ?? [];
     final afterList = (comp['afterPhotos'] as List?) ?? [];
     final legacyList = (comp['photos'] as List?) ?? [];
 
-    final hasStructured = beforeList.isNotEmpty || afterList.isNotEmpty;
+    final hasStructured = labeledList.isNotEmpty || beforeList.isNotEmpty || afterList.isNotEmpty;
     if (!hasStructured && legacyList.isEmpty) return const SizedBox.shrink();
 
     final base = widget.apiUrl.replaceAll('/api', '');
@@ -2252,7 +2253,83 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
         children: [
           Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.purpleAccent)),
           const SizedBox(height: 12),
-          if (hasStructured) ...[
+          if (labeledList.isNotEmpty) ...[
+            SizedBox(
+              height: 115,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: labeledList.length,
+                itemBuilder: (context, idx) {
+                  final item = labeledList[idx];
+                  final label = (item['label'] ?? 'Photo').toString();
+                  final path = (item['url'] ?? '').toString();
+                  final url = path.startsWith('http') ? path : '$base/$path';
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 10.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.withOpacity(0.4),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                          ),
+                          child: Text(
+                            label,
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.purpleAccent),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => Dialog(
+                                backgroundColor: Colors.black,
+                                insetPadding: const EdgeInsets.all(10),
+                                child: Stack(
+                                  children: [
+                                    InteractiveViewer(
+                                      child: Center(
+                                        child: Image.network(url, fit: BoxFit.contain),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 10,
+                                      right: 10,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                                        onPressed: () => Navigator.pop(ctx),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                            child: Image.network(
+                              url,
+                              width: 85,
+                              height: 85,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                width: 85,
+                                height: 85,
+                                color: Colors.grey[900],
+                                child: const Icon(Icons.broken_image, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ] else if (hasStructured) ...[
             if (beforeList.isNotEmpty) ...[
               Row(
                 children: [

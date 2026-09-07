@@ -10157,8 +10157,28 @@ export default function App() {
                             </div>
                           )}
                         </div>
-                        {/* Before & After Photos */}
-                        {(comp.beforePhotos && comp.beforePhotos.length > 0) || (comp.afterPhotos && comp.afterPhotos.length > 0) ? (
+                        {/* Completion Photos */}
+                        {comp.labeledPhotos && comp.labeledPhotos.length > 0 ? (
+                          <div>
+                            <p className="text-xs font-bold text-violet-400 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
+                              <span>📷</span> Completion Photos ({comp.labeledPhotos.length}):
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                              {comp.labeledPhotos.map((lp, i) => {
+                                const photo = lp.url || '';
+                                const imgUrl = photo.startsWith('http') ? photo : `${API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''}/${photo}`;
+                                return (
+                                  <div key={i} className="flex flex-col">
+                                    <span className="text-[11px] font-bold text-slate-300 truncate bg-slate-800/90 px-2 py-1 rounded-t-lg border-t border-x border-slate-700 text-center">{lp.label}</span>
+                                    <a href={imgUrl} target="_blank" rel="noreferrer">
+                                      <img src={imgUrl} alt={lp.label} className="rounded-b-lg object-cover w-full h-24 border border-slate-700 hover:opacity-90 transition" />
+                                    </a>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (comp.beforePhotos && comp.beforePhotos.length > 0) || (comp.afterPhotos && comp.afterPhotos.length > 0) ? (
                           <div className="space-y-3">
                             {comp.beforePhotos && comp.beforePhotos.length > 0 && (
                               <div>

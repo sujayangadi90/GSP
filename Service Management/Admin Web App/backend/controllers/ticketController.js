@@ -780,26 +780,56 @@ const submitWorkCompletion = async (req, res) => {
     let beforePhotos = [];
     let afterPhotos = [];
     let completionPhotos = [];
+    let labeledPhotos = [];
+
+    const labelMap = {
+      bill: 'Bill',
+      installation1: 'Installation 1',
+      installation2: 'Installation 2',
+      serialNumber: 'Serial Number',
+      warrantyCard: 'Warranty Card',
+      before: 'Before',
+      after: 'After'
+    };
 
     if (req.files) {
       if (Array.isArray(req.files)) {
         req.files.forEach(file => {
-          completionPhotos.push('uploads/' + file.filename);
+          const path = 'uploads/' + file.filename;
+          completionPhotos.push(path);
         });
       } else {
+        Object.keys(labelMap).forEach(key => {
+          if (req.files[key] && req.files[key].length > 0) {
+            const path = 'uploads/' + req.files[key][0].filename;
+            const label = labelMap[key];
+            labeledPhotos.push({ label, url: path });
+            completionPhotos.push(path);
+            if (key === 'before') beforePhotos.push(path);
+            if (key === 'after') afterPhotos.push(path);
+          }
+        });
+
         if (req.files.beforePhotos) {
           req.files.beforePhotos.forEach(file => {
-            beforePhotos.push('uploads/' + file.filename);
+            const path = 'uploads/' + file.filename;
+            beforePhotos.push(path);
+            completionPhotos.push(path);
+            labeledPhotos.push({ label: 'Before', url: path });
           });
         }
         if (req.files.afterPhotos) {
           req.files.afterPhotos.forEach(file => {
-            afterPhotos.push('uploads/' + file.filename);
+            const path = 'uploads/' + file.filename;
+            afterPhotos.push(path);
+            completionPhotos.push(path);
+            labeledPhotos.push({ label: 'After', url: path });
           });
         }
         if (req.files.photos) {
           req.files.photos.forEach(file => {
-            completionPhotos.push('uploads/' + file.filename);
+            const path = 'uploads/' + file.filename;
+            completionPhotos.push(path);
           });
         }
       }
@@ -812,10 +842,11 @@ const submitWorkCompletion = async (req, res) => {
       completionPhotos = ticket.completion.photos;
       beforePhotos = ticket.completion.beforePhotos || [];
       afterPhotos = ticket.completion.afterPhotos || [];
+      labeledPhotos = ticket.completion.labeledPhotos || [];
     }
 
-    if (completionPhotos.length === 0 && beforePhotos.length === 0 && afterPhotos.length === 0) {
-      return res.status(400).json({ message: 'Please upload at least one completion photo' });
+    if (completionPhotos.length === 0 && beforePhotos.length === 0 && afterPhotos.length === 0 && labeledPhotos.length === 0) {
+      return res.status(400).json({ message: 'Please upload the required completion photos' });
     }
 
     let parsedUsedParts = [];
@@ -866,6 +897,7 @@ const submitWorkCompletion = async (req, res) => {
       photos: completionPhotos,
       beforePhotos: beforePhotos,
       afterPhotos: afterPhotos,
+      labeledPhotos: labeledPhotos,
       workDone,
       remarks,
       location: completionLocation,

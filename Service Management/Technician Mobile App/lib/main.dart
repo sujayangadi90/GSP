@@ -1390,67 +1390,33 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       }
     }
   }
-
-  Future<void> _updateStatus(String nextStatus, String timelineNote) async {
-    setState(() => _isLoading = true);
-    try {
-      final res = await http.patch(
-        Uri.parse('${widget.apiUrl}/tickets/${widget.jobId}/status'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${widget.token}'
-        },
-        body: jsonEncode({
-          'status': nextStatus,
-          'note': timelineNote,
-        }),
-      );
-      if (res.statusCode == 200) {
-        setState(() {
-          _job = jsonDecode(res.body);
-        });
-      }
-    } catch (e) {
-      print('Status change error: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _pickBeforeImage() async {
-    if (_beforePhotos.length >= 2) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 2 Before photos allowed')));
-      return;
-    }
-    final pickedFile = await _picker.pickImage(
-      source: ImageSource.camera,
-      maxWidth: 1920,
-      maxHeight: 1080,
-      imageQuality: 80,
+          if (hasFile) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.file(file, width: 44, height: 44, fit: BoxFit.cover),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              onPressed: () => _removeSlotImage(key),
+              icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+              tooltip: 'Remove',
+            ),
+          ] else ...[
+            ElevatedButton.icon(
+              onPressed: () => _pickSlotImage(key),
+              icon: const Icon(Icons.add_a_photo, size: 14),
+              label: const Text('Capture', style: TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color.withOpacity(0.3),
+                foregroundColor: color,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
-    if (pickedFile != null) {
-      setState(() {
-        _beforePhotos.add(File(pickedFile.path));
-      });
-    }
-  }
-
-  Future<void> _pickAfterImage() async {
-    if (_afterPhotos.length >= 4) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 4 After photos allowed')));
-      return;
-    }
-    final pickedFile = await _picker.pickImage(
-      source: ImageSource.camera,
-      maxWidth: 1920,
-      maxHeight: 1080,
-      imageQuality: 80,
-    );
-    if (pickedFile != null) {
-      setState(() {
-        _afterPhotos.add(File(pickedFile.path));
-      });
-    }
   }
 
   Future<void> _submitCompletion() async {
@@ -1459,11 +1425,22 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       return;
     }
 
-    if (_beforePhotos.isEmpty && _afterPhotos.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please upload at least one Before or After photo'), backgroundColor: Colors.red),
-      );
-      return;
+    final ticketType = (_job?['type'] ?? 'service').toString().toLowerCase();
+
+    if (ticketType == 'installation') {
+      if (_billPhoto == null || _installation1Photo == null || _installation2Photo == null || _serialNumberPhoto == null || _warrantyCardPhoto == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please upload all 5 required installation photos (Bill, Installation 1, Installation 2, Serial Number, Warranty Card)'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+    } else {
+      if (_beforePhoto == null || _afterPhoto == null || _warrantyCardPhoto == null || _billPhoto == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please upload all 4 required service photos (Before, After, Warranty Card, Bill)'), backgroundColor: Colors.red),
+        );
+        return;
+      }
     }
 
     setState(() => _isLoading = true);
@@ -1484,12 +1461,26 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         'quantity': p['quantity']
       }).toList());
 
-      for (var file in _beforePhotos) {
-        request.files.add(await http.MultipartFile.fromPath('beforePhotos', file.path));
+      if (_billPhoto != null) {
+        request.files.add(await http.MultipartFile.fromPath('bill', _billPhoto!.path));
       }
-
-      for (var file in _afterPhotos) {
-        request.files.add(await http.MultipartFile.fromPath('afterPhotos', file.path));
+      if (_installation1Photo != null) {
+        request.files.add(await http.MultipartFile.fromPath('installation1', _installation1Photo!.path));
+      }
+      if (_installation2Photo != null) {
+        request.files.add(await http.MultipartFile.fromPath('installation2', _installation2Photo!.path));
+      }
+      if (_serialNumberPhoto != null) {
+        request.files.add(await http.MultipartFile.fromPath('serialNumber', _serialNumberPhoto!.path));
+      }
+      if (_warrantyCardPhoto != null) {
+        request.files.add(await http.MultipartFile.fromPath('warrantyCard', _warrantyCardPhoto!.path));
+      }
+      if (_beforePhoto != null) {
+        request.files.add(await http.MultipartFile.fromPath('before', _beforePhoto!.path));
+      }
+      if (_afterPhoto != null) {
+        request.files.add(await http.MultipartFile.fromPath('after', _afterPhoto!.path));
       }
 
       final streamedResponse = await request.send();
@@ -1589,9 +1580,32 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                           runSpacing: 8,
                           children: List.generate(completionsList.length, (attemptIndex) {
                             final comp = completionsList[attemptIndex];
+                            final labeledPhotos = comp['labeledPhotos'] as List?;
                             final beforePhotos = comp['beforePhotos'] as List?;
                             final afterPhotos = comp['afterPhotos'] as List?;
                             final compPhotos = comp['photos'] as List?;
+
+                            if (labeledPhotos != null && labeledPhotos.isNotEmpty) {
+                              return Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: labeledPhotos.map((lp) {
+                                  final label = lp['label'] ?? 'Photo';
+                                  final url = lp['url'] ?? '';
+                                  return ElevatedButton.icon(
+                                    onPressed: () => _viewPhotos(context, [url], title: '$label (Attempt ${attemptIndex + 1})'),
+                                    icon: const Icon(Icons.photo_camera, size: 13, color: Colors.cyanAccent),
+                                    label: Text(label, style: const TextStyle(fontSize: 11)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blueGrey[800],
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                  );
+                                }).toList(),
+                              );
+                            }
 
                             if ((beforePhotos != null && beforePhotos.isNotEmpty) || (afterPhotos != null && afterPhotos.isNotEmpty)) {
                               return Row(
@@ -1793,105 +1807,23 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // BEFORE PHOTOS SECTION (MAX 2)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.camera_alt, size: 14, color: Colors.amberAccent),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Before Photos (${_beforePhotos.length}/2)',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amberAccent),
-                    ),
-                  ],
-                ),
-                if (_beforePhotos.length < 2)
-                  TextButton.icon(
-                    onPressed: _pickBeforeImage,
-                    icon: const Icon(Icons.add_a_photo, size: 14, color: Colors.amberAccent),
-                    label: const Text('Add (Max 2)', style: TextStyle(fontSize: 12, color: Colors.amberAccent)),
-                  ),
-              ],
-            ),
-            if (_beforePhotos.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _beforePhotos.map((f) => Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(f, height: 70, width: 70, fit: BoxFit.cover),
-                    ),
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _beforePhotos.remove(f)),
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-                          child: const Icon(Icons.close, size: 12, color: Colors.red),
-                        ),
-                      ),
-                    )
-                  ],
-                )).toList(),
-              ),
-            ],
-            const SizedBox(height: 16),
+            final isInstallationType = (_job?['type'] ?? '').toString().toLowerCase() == 'installation';
 
-            // AFTER PHOTOS SECTION (MAX 4)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.check_circle, size: 14, color: Colors.greenAccent),
-                    const SizedBox(width: 6),
-                    Text(
-                      'After Photos (${_afterPhotos.length}/4)',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.greenAccent),
-                    ),
-                  ],
-                ),
-                if (_afterPhotos.length < 4)
-                  TextButton.icon(
-                    onPressed: _pickAfterImage,
-                    icon: const Icon(Icons.add_a_photo, size: 14, color: Colors.greenAccent),
-                    label: const Text('Add (Max 4)', style: TextStyle(fontSize: 12, color: Colors.greenAccent)),
-                  ),
-              ],
-            ),
-            if (_afterPhotos.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _afterPhotos.map((f) => Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(f, height: 70, width: 70, fit: BoxFit.cover),
-                    ),
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _afterPhotos.remove(f)),
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-                          child: const Icon(Icons.close, size: 12, color: Colors.red),
-                        ),
-                      ),
-                    )
-                  ],
-                )).toList(),
-              ),
+            if (isInstallationType) ...[
+              const Text('REQUIRED INSTALLATION PHOTOS (5)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amberAccent)),
+              const SizedBox(height: 10),
+              _buildPhotoSlotCard(label: '1. Bill', key: 'bill', file: _billPhoto, icon: Icons.receipt_long, color: Colors.amberAccent),
+              _buildPhotoSlotCard(label: '2. Installation 1', key: 'installation1', file: _installation1Photo, icon: Icons.build, color: Colors.cyanAccent),
+              _buildPhotoSlotCard(label: '3. Installation 2', key: 'installation2', file: _installation2Photo, icon: Icons.build, color: Colors.lightBlueAccent),
+              _buildPhotoSlotCard(label: '4. Serial Number', key: 'serialNumber', file: _serialNumberPhoto, icon: Icons.qr_code, color: Colors.purpleAccent),
+              _buildPhotoSlotCard(label: '5. Warranty Card', key: 'warrantyCard', file: _warrantyCardPhoto, icon: Icons.card_membership, color: Colors.greenAccent),
+            ] else ...[
+              const Text('REQUIRED SERVICE PHOTOS (4)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.cyanAccent)),
+              const SizedBox(height: 10),
+              _buildPhotoSlotCard(label: '1. Before', key: 'before', file: _beforePhoto, icon: Icons.camera_alt, color: Colors.amberAccent),
+              _buildPhotoSlotCard(label: '2. After', key: 'after', file: _afterPhoto, icon: Icons.check_circle, color: Colors.greenAccent),
+              _buildPhotoSlotCard(label: '3. Warranty Card', key: 'warrantyCard', file: _warrantyCardPhoto, icon: Icons.card_membership, color: Colors.purpleAccent),
+              _buildPhotoSlotCard(label: '4. Bill', key: 'bill', file: _billPhoto, icon: Icons.receipt_long, color: Colors.cyanAccent),
             ],
             const SizedBox(height: 16),
 
