@@ -3480,6 +3480,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _selectedYear = DateTime.now().year;
   bool _eomLoading = false;
   Map<String, dynamic>? _topEvaluation;
+  bool _payoutsLoading = false;
+  List<dynamic> _payoutsList = [];
 
   final List<String> _monthsList = const [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -3492,6 +3494,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _fetchEmployeeOfTheMonth();
+    _fetchMyPayouts();
+  }
+
+  Future<void> _fetchMyPayouts() async {
+    if (widget.token == null || widget.apiUrl == null) return;
+    setState(() => _payoutsLoading = true);
+
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/payouts/my-payouts'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(res.body);
+        if (data['payouts'] is List) {
+          setState(() {
+            _payoutsList = List.from(data['payouts']);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching technician payouts: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _payoutsLoading = false);
+      }
+    }
   }
 
   Future<void> _fetchEmployeeOfTheMonth() async {
@@ -3914,6 +3947,152 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildPayoutsCard() {
+    return Card(
+      color: Colors.grey.shade900.withOpacity(0.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade800),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.payments_outlined, color: Colors.tealAccent, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Payout History',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.grey, size: 18),
+                  onPressed: _fetchMyPayouts,
+                  tooltip: 'Refresh Payouts',
+                ),
+              ],
+            ),
+            const Divider(color: Colors.grey),
+            const SizedBox(height: 8),
+            if (_payoutsLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16.0),
+                  child: CircularProgressIndicator(color: Colors.tealAccent, strokeWidth: 2),
+                ),
+              )
+            else if (_payoutsList.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16.0),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.account_balance_wallet_outlined, size: 36, color: Colors.grey),
+                      SizedBox(height: 8),
+                      Text(
+                        'No payout records found',
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _payoutsList.length,
+                separatorBuilder: (context, index) => const Divider(color: Colors.grey, height: 20),
+                itemBuilder: (context, index) {
+                  final item = _payoutsList[index];
+                  final monthIdx = (item['month'] is num) ? (item['month'] as num).toInt() - 1 : 0;
+                  final monthName = (monthIdx >= 0 && monthIdx < 12) ? _monthsList[monthIdx] : 'Month ${item['month']}';
+                  final year = item['year'] ?? '';
+                  final monthYearStr = '$monthName $year';
+                  
+                  final amount = item['amount'] ?? 0;
+                  final paymentMode = item['paymentMode'] ?? 'Cash';
+                  final refNum = (item['referenceNumber'] != null && item['referenceNumber'].toString().trim().isNotEmpty)
+                      ? item['referenceNumber'].toString()
+                      : '—';
+                  
+                  String paidDateStr = '—';
+                  if (item['paidAt'] != null) {
+                    try {
+                      final dt = DateTime.parse(item['paidAt']).toLocal();
+                      paidDateStr = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                    } catch (_) {
+                      paidDateStr = item['paidAt'].toString();
+                    }
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            monthYearStr,
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF064E3B),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF047857)),
+                            ),
+                            child: Text(
+                              '₹$amount',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF34D399), fontSize: 14),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildPayoutDetailItem('Payment Mode', paymentMode),
+                          _buildPayoutDetailItem('Ref Number', refNum),
+                          _buildPayoutDetailItem('Paid Date', paidDateStr),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPayoutDetailItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: Colors.grey),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final baseUrl = widget.apiUrl != null ? widget.apiUrl!.replaceAll('/api', '') : '';
@@ -4024,6 +4203,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+            _buildPayoutsCard(),
             if (widget.token != null && widget.apiUrl != null) ...[
               const SizedBox(height: 16),
               ElevatedButton.icon(

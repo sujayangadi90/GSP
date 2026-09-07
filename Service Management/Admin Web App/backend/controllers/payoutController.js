@@ -201,7 +201,9 @@ const getPayouts = async (req, res) => {
 
     let query = {};
 
-    if (technicianId && technicianId !== 'ALL') {
+    if (req.user && req.user.role === 'technician') {
+      query.technician = req.user._id;
+    } else if (technicianId && technicianId !== 'ALL') {
       query.technician = technicianId;
     }
     if (month && month !== 'ALL') {
