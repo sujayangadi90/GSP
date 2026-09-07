@@ -11273,8 +11273,8 @@ export default function App() {
 
       {/* Ticket Details Panel Modal */}
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden my-8">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden my-4">
             <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
               <div>
                 <h3 className="font-extrabold text-white text-lg">{selectedTicket.ticketNumber || 'Ticket'} Details</h3>
@@ -11293,20 +11293,20 @@ export default function App() {
                     let creatorCode = dealer?.code ? ` (${dealer.code})` : '';
                     let badgeColor = 'bg-purple-950/70 text-purple-300 border-purple-800/50';
 
-                    if (source === 'admin' || creator?.role === 'admin') {
-                      creatorType = 'Admin';
-                      creatorName = creator?.name || 'Admin User';
+                    if (source === 'admin' || (creator && (creator.role === 'admin' || creator.role === 'owner'))) {
+                      creatorType = (creator?.role || 'ADMIN').toUpperCase();
+                      creatorName = creator?.name || 'Admin';
                       creatorCode = '';
                       badgeColor = 'bg-blue-950/70 text-blue-300 border-blue-800/50';
-                    } else if (source === 'technician' || creator?.role === 'technician') {
-                      creatorType = 'Technician';
+                    } else if (source === 'technician' || (creator && creator.role === 'technician')) {
+                      creatorType = 'TECHNICIAN';
                       creatorName = creator?.name || 'Technician';
                       creatorCode = creator?.code ? ` (${creator.code})` : '';
                       badgeColor = 'bg-teal-950/70 text-teal-300 border-teal-800/50';
-                    } else if (creator?.role === 'dealer') {
-                      creatorType = 'Dealer';
-                      creatorName = creator?.name || dealer?.name || 'Dealer';
-                      creatorCode = creator?.code ? ` (${creator.code})` : (dealer?.code ? ` (${dealer.code})` : '');
+                    } else if (dealer || (creator && creator.role === 'dealer')) {
+                      creatorType = 'DEALER';
+                      creatorName = dealer?.name || creator?.name || 'Dealer';
+                      creatorCode = dealer?.code || creator?.code ? ` (${dealer?.code || creator?.code})` : '';
                       badgeColor = 'bg-purple-950/70 text-purple-300 border-purple-800/50';
                     }
 
@@ -11345,7 +11345,7 @@ export default function App() {
               </div>
             </div>
             
-            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[calc(85vh-150px)] overflow-y-auto">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[82vh] overflow-y-auto">
               {/* Left Column: Customer & Product Details */}
               <div className="md:col-span-2 space-y-6">
                 
