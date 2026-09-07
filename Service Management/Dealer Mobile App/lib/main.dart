@@ -3430,7 +3430,7 @@ class _CollectionHistoryScreenState extends State<CollectionHistoryScreen> {
                                       children: [
                                         // Header Row: Month/Year & Amount
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.between,
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Column(
@@ -3448,16 +3448,16 @@ class _CollectionHistoryScreenState extends State<CollectionHistoryScreen> {
                                                 Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.emerald.shade900.withOpacity(0.4),
+                                                    color: const Color(0xFF064E3B).withOpacity(0.4),
                                                     borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(color: Colors.emerald.shade500.withOpacity(0.5)),
+                                                    border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
                                                   ),
                                                   child: const Text(
                                                     'COLLECTED',
                                                     style: TextStyle(
                                                       fontSize: 10,
                                                       fontWeight: FontWeight.bold,
-                                                      color: Colors.emeraldAccent,
+                                                      color: Color(0xFF34D399),
                                                     ),
                                                   ),
                                                 ),
@@ -3468,7 +3468,7 @@ class _CollectionHistoryScreenState extends State<CollectionHistoryScreen> {
                                               style: const TextStyle(
                                                 fontSize: 20,
                                                 fontWeight: FontWeight.w900,
-                                                color: Colors.emeraldAccent,
+                                                color: Color(0xFF34D399),
                                               ),
                                             ),
                                           ],
