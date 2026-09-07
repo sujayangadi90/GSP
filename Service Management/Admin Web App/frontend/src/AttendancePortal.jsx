@@ -64,7 +64,7 @@ export default function AttendancePortal() {
   const [viewPhoto, setViewPhoto] = useState(null);
 
   const API_BASE = window.location.origin.includes("localhost:5173") || window.location.origin.includes("localhost:3000")
-    ? "http://localhost:5050" 
+    ? "http://localhost:5055" 
     : "";
 
   useEffect(() => {

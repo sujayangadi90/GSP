@@ -156,15 +156,17 @@ TicketSchema.pre('save', async function (next) {
   if (!this.isNew) return next();
   
   try {
-    const lastTicket = await this.constructor.findOne({}, {}, { sort: { 'createdAt': -1 } });
-    let nextNum = 1001;
-    if (lastTicket && lastTicket.ticketNumber) {
-      const match = lastTicket.ticketNumber.match(/\d+/);
-      if (match) {
-        nextNum = parseInt(match[0], 10) + 1;
+    if (!this.ticketNumber) {
+      const lastTicket = await this.constructor.findOne({ ticketNumber: { $regex: /^TKT-\d+$/ } }, {}, { sort: { 'createdAt': -1 } });
+      let nextNum = 1001;
+      if (lastTicket && lastTicket.ticketNumber) {
+        const match = lastTicket.ticketNumber.match(/\d+/);
+        if (match) {
+          nextNum = parseInt(match[0], 10) + 1;
+        }
       }
+      this.ticketNumber = `TKT-${nextNum}`;
     }
-    this.ticketNumber = `TKT-${nextNum}`;
     
     // Set initial timeline entry
     this.timeline.push({

@@ -85,7 +85,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 5050;
+const PORT = process.env.PORT || 5055;
 app.listen(PORT, () => {
   console.log(`Backend Server running on port ${PORT}`);
 
