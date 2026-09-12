@@ -207,50 +207,45 @@ const attachFeesToTickets = async (tickets) => {
     }
     ticketObj.totalPartsPrice = totalPartsPrice;
 
-    if (ticketObj.status === 'completed' || ticketObj.status === 'closed') {
-      if (!isPaidByDealer) {
-        ticketObj.dealerExpense = 0;
-      } else {
-        if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null && typeof ticketObj.dealerExpense === 'number' && ticketObj.dealerExpense > 0) {
-          // Use historical snapshot
-        } else {
-          if (brandObj) {
-            let baseDealerFee = null;
-            if (ticketObj.type === 'service') {
-              baseDealerFee = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null);
-            } else if (ticketObj.type === 'installation') {
-              baseDealerFee = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null);
-            }
-
-            if (baseDealerFee !== null) {
-              ticketObj.dealerExpense = baseDealerFee + totalPartsPrice;
-            } else {
-              ticketObj.dealerExpense = totalPartsPrice > 0 ? totalPartsPrice : 'Fee Not Configured';
-            }
-          } else {
-            ticketObj.dealerExpense = totalPartsPrice > 0 ? totalPartsPrice : 'Fee Not Configured';
-          }
-        }
-      }
-
-      if (ticketObj.technicianEarning !== undefined && ticketObj.technicianEarning !== null && typeof ticketObj.technicianEarning === 'number') {
+    if (!isPaidByDealer) {
+      ticketObj.dealerExpense = 0;
+    } else {
+      if (ticketObj.dealerExpense !== undefined && ticketObj.dealerExpense !== null && typeof ticketObj.dealerExpense === 'number' && ticketObj.dealerExpense > 0) {
         // Use historical snapshot
       } else {
         if (brandObj) {
+          let baseDealerFee = null;
           if (ticketObj.type === 'service') {
-            ticketObj.technicianEarning = brandObj.technicianServiceFee !== undefined ? brandObj.technicianServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
+            baseDealerFee = brandObj.dealerServiceFee !== undefined ? brandObj.dealerServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : null);
           } else if (ticketObj.type === 'installation') {
-            ticketObj.technicianEarning = brandObj.technicianInstallationFee !== undefined ? brandObj.technicianInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
-          } else {
-            ticketObj.technicianEarning = 'Fee Not Configured';
+            baseDealerFee = brandObj.dealerInstallationFee !== undefined ? brandObj.dealerInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : null);
           }
+
+          if (baseDealerFee !== null) {
+            ticketObj.dealerExpense = baseDealerFee + totalPartsPrice;
+          } else {
+            ticketObj.dealerExpense = totalPartsPrice > 0 ? totalPartsPrice : 'Fee Not Configured';
+          }
+        } else {
+          ticketObj.dealerExpense = totalPartsPrice > 0 ? totalPartsPrice : 'Fee Not Configured';
+        }
+      }
+    }
+
+    if (ticketObj.technicianEarning !== undefined && ticketObj.technicianEarning !== null && typeof ticketObj.technicianEarning === 'number' && ticketObj.technicianEarning > 0) {
+      // Use historical snapshot
+    } else {
+      if (brandObj) {
+        if (ticketObj.type === 'service') {
+          ticketObj.technicianEarning = brandObj.technicianServiceFee !== undefined ? brandObj.technicianServiceFee : (brandObj.serviceFee !== undefined ? brandObj.serviceFee : 'Fee Not Configured');
+        } else if (ticketObj.type === 'installation') {
+          ticketObj.technicianEarning = brandObj.technicianInstallationFee !== undefined ? brandObj.technicianInstallationFee : (brandObj.installationFee !== undefined ? brandObj.installationFee : 'Fee Not Configured');
         } else {
           ticketObj.technicianEarning = 'Fee Not Configured';
         }
+      } else {
+        ticketObj.technicianEarning = 'Fee Not Configured';
       }
-    } else {
-      ticketObj.dealerExpense = 0;
-      ticketObj.technicianEarning = 0;
     }
 
     return ticketObj;
@@ -1341,19 +1336,23 @@ const getDashboardStats = async (req, res) => {
     });
 
     // Pending Work Verifications: all tickets currently requiring admin verification
-    const pendingVerifications = await Ticket.find({
+    const pendingVerificationsRaw = await Ticket.find({
       status: 'verification_pending'
     })
     .populate('dealer', 'name code email mobile')
     .populate('assignedTechnician', 'name code mobile')
     .sort({ 'completion.submittedAt': -1, updatedAt: -1 });
 
+    const pendingVerifications = await attachFeesToTickets(pendingVerificationsRaw);
+
     // New Unassigned Tickets: all tickets currently awaiting technician assignment
-    const newUnassignedTickets = await Ticket.find({
+    const newUnassignedTicketsRaw = await Ticket.find({
       status: 'new'
     })
     .populate('dealer', 'name code email mobile')
     .sort({ createdAt: -1 });
+
+    const newUnassignedTickets = await attachFeesToTickets(newUnassignedTicketsRaw);
 
     // --- Analytics Aggregations (with individual try/catches for robustness) ---
 

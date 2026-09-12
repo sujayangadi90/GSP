@@ -11523,11 +11523,13 @@ export default function App() {
                         <p className="text-[11px] text-emerald-400 font-bold uppercase tracking-wider">Technician Earning</p>
                       </div>
                       <p className="text-xl font-extrabold text-emerald-300">
-                        {typeof selectedTicket.technicianEarning === 'number'
+                        {typeof selectedTicket.technicianEarning === 'number' && selectedTicket.technicianEarning > 0
                           ? `₹ ${selectedTicket.technicianEarning}`
-                          : typeof selectedTicket.technicianFee === 'number'
+                          : typeof selectedTicket.technicianFee === 'number' && selectedTicket.technicianFee > 0
                             ? `₹ ${selectedTicket.technicianFee}`
-                            : selectedTicket.technicianEarning || 'Fee Not Configured'}
+                            : typeof selectedTicket.technicianEarning === 'number'
+                              ? `₹ ${selectedTicket.technicianEarning}`
+                              : selectedTicket.technicianEarning || 'Fee Not Configured'}
                       </p>
                       <p className="text-[10px] text-slate-400 mt-0.5">
                         Tech: {selectedTicket.assignedTechnician?.name || 'Unassigned'}
