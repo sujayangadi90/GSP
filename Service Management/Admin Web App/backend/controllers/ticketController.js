@@ -269,6 +269,48 @@ const getTickets = async (req, res) => {
       query.assignedTechnician = req.user._id;
     }
 
+    // Global Search: When user provides a search query, bypass status, date, city, and type filters
+    if (search && search.trim() !== '') {
+      const searchPattern = search.trim();
+      const searchRegex = { $regex: searchPattern, $options: 'i' };
+      
+      const searchQuery = { ...query };
+      searchQuery.$or = [
+        { ticketNumber: searchRegex },
+        { 'customer.name': searchRegex },
+        { 'customer.mobile': searchRegex },
+        { 'customer.city': searchRegex },
+        { 'product.name': searchRegex },
+        { 'product.modelNumber': searchRegex },
+        { 'product.serialNumber': searchRegex }
+      ];
+
+      const tickets = await Ticket.find(searchQuery)
+        .populate('dealer', 'name code email mobile')
+        .populate('assignedTechnician', 'name code mobile')
+        .populate('createdBy', 'name code email mobile role')
+        .populate('completion.usedParts.part', 'name sku sellingPrice')
+        .populate('completionHistory.usedParts.part', 'name sku sellingPrice')
+        .sort({ createdAt: -1 });
+
+      const ticketsWithFees = await attachFeesToTickets(tickets);
+
+      if (page) {
+        const p = parseInt(page, 10) || 1;
+        const l = parseInt(limit, 10) || 10;
+        const skip = (p - 1) * l;
+        const paginated = ticketsWithFees.slice(skip, skip + l);
+        return res.json({
+          data: paginated,
+          page: p,
+          limit: l,
+          hasMore: (skip + paginated.length) < ticketsWithFees.length
+        });
+      }
+
+      return res.json(ticketsWithFees);
+    }
+
     // Dashboard specific filters for admin
     if (dashboardFilter === 'true' && req.user.role === 'admin' && fromDate && toDate) {
       const start = new Date(`${fromDate}T00:00:00`);
