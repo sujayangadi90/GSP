@@ -1,5 +1,5 @@
 const express = require('express');
-const { getTechnicians, addTechnician, getTechnicianById, updateTechnician, toggleTechnicianStatus, getTechnicianWallet, getTechnicianWalletSelf } = require('../controllers/technicianController');
+const { getTechnicians, addTechnician, getTechnicianById, updateTechnician, toggleTechnicianStatus, getTechnicianWallet, getTechnicianWalletSelf, syncPastWalletTransactions } = require('../controllers/technicianController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const router = express.Router();
@@ -8,6 +8,9 @@ router.use(protect);
 
 router.route('/me/wallet')
   .get(getTechnicianWalletSelf);
+
+router.route('/sync-wallets')
+  .post(authorize('admin'), syncPastWalletTransactions);
 
 router.route('/upload')
   .post(authorize('admin'), upload.single('file'), (req, res) => {

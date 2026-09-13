@@ -344,6 +344,114 @@ const getTechnicianWalletSelf = async (req, res) => {
   }
 };
 
+// @desc    Sync / Backfill past tickets earnings and payouts into Technician Wallets (Admin)
+// @route   POST /api/technicians/sync-wallets
+// @access  Private (Admin)
+const syncPastWalletTransactions = async (req, res) => {
+  try {
+    const Ticket = require('../models/Ticket');
+    const Payout = require('../models/Payout');
+    const Brand = require('../models/Brand');
+
+    // 1. Fetch brands to attach fees
+    const brands = await Brand.find({}).populate('appliance');
+    const brandFeeMap = {};
+    const brandByNameMap = {};
+    brands.forEach((b) => {
+      const appName = b.appliance ? b.appliance.name.toString().trim().toLowerCase() : '';
+      const bName = b.name.toString().trim().toLowerCase();
+      const feeData = {
+        serviceFee: b.serviceFee || 0,
+        installationFee: b.installationFee || 0,
+        technicianServiceFee: b.technicianServiceFee !== undefined ? b.technicianServiceFee : (b.serviceFee || 0),
+        technicianInstallationFee: b.technicianInstallationFee !== undefined ? b.technicianInstallationFee : (b.installationFee || 0)
+      };
+      brandFeeMap[`${appName}_${bName}`] = feeData;
+      if (!brandByNameMap[bName]) brandByNameMap[bName] = feeData;
+    });
+
+    // 2. Fetch all completed or closed tickets with assigned technicians
+    const tickets = await Ticket.find({
+      status: { $in: ['completed', 'closed'] },
+      assignedTechnician: { $exists: true, $ne: null }
+    }).sort({ createdAt: 1 });
+
+    let creditedCount = 0;
+    let totalCreditedAmount = 0;
+
+    for (const t of tickets) {
+      // Check if already credited
+      const existingCredit = await WalletTransaction.findOne({ ticket: t._id, type: 'credit' });
+      if (existingCredit) continue;
+
+      let earning = typeof t.technicianEarning === 'number' ? t.technicianEarning : null;
+      if (earning === null || earning <= 0) {
+        const appCategory = (t.product?.category || '').toString().trim().toLowerCase();
+        const brandName = (t.product?.name || '').toString().trim().toLowerCase();
+        const brandObj = brandFeeMap[`${appCategory}_${brandName}`] || brandByNameMap[brandName];
+        if (brandObj) {
+          if (t.type === 'service') {
+            earning = brandObj.technicianServiceFee;
+          } else if (t.type === 'installation') {
+            earning = brandObj.technicianInstallationFee;
+          }
+        }
+      }
+
+      const creditAmt = Number(earning) || 0;
+      if (creditAmt > 0) {
+        await creditTechnicianWallet(
+          t.assignedTechnician,
+          creditAmt,
+          t._id,
+          `Earnings credited for Ticket #${t.ticketNumber || t._id} (Historical Sync)`,
+          req.user ? req.user.name : 'System Sync'
+        );
+        creditedCount++;
+        totalCreditedAmount += creditAmt;
+      }
+    }
+
+    // 3. Fetch all paid payouts
+    const payouts = await Payout.find({ status: 'paid' }).sort({ paidAt: 1, createdAt: 1 });
+    let debitedCount = 0;
+    let totalDebitedAmount = 0;
+
+    for (const p of payouts) {
+      const existingDebit = await WalletTransaction.findOne({ payout: p._id, type: 'debit' });
+      if (existingDebit) continue;
+
+      const debitAmt = Number(p.amount) || 0;
+      if (debitAmt > 0 && p.technician) {
+        await debitTechnicianWallet(
+          p.technician,
+          debitAmt,
+          p._id,
+          `Payout disbursed for ${p.month}/${p.year} via ${p.paymentMode || 'Paid'} (Historical Sync)`,
+          req.user ? req.user.name : 'System Sync'
+        );
+        debitedCount++;
+        totalDebitedAmount += debitAmt;
+      }
+    }
+
+    res.json({
+      message: 'Technician wallets successfully synced with past historical data.',
+      summary: {
+        ticketsProcessed: tickets.length,
+        creditedCount,
+        totalCreditedAmount,
+        payoutsProcessed: payouts.length,
+        debitedCount,
+        totalDebitedAmount
+      }
+    });
+  } catch (error) {
+    console.error('Error syncing past wallet transactions:', error);
+    res.status(500).json({ message: 'Failed to sync past wallet transactions', error: error.message });
+  }
+};
+
 module.exports = {
   getTechnicians,
   addTechnician,
@@ -353,6 +461,7 @@ module.exports = {
   creditTechnicianWallet,
   debitTechnicianWallet,
   getTechnicianWallet,
-  getTechnicianWalletSelf
+  getTechnicianWalletSelf,
+  syncPastWalletTransactions
 };
 

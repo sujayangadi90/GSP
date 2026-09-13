@@ -752,9 +752,27 @@ export default function App() {
   // Technician Wallet States
   const [selectedTechWallet, setSelectedTechWallet] = useState(null);
   const [techWalletLoading, setTechWalletLoading] = useState(false);
+  const [syncingWallets, setSyncingWallets] = useState(false);
   const [walletFromDate, setWalletFromDate] = useState('');
   const [walletToDate, setWalletToDate] = useState('');
   const [walletTypeFilter, setWalletTypeFilter] = useState('');
+
+  const handleSyncPastWallets = async () => {
+    if (!window.confirm('Sync past wallet transactions? This will calculate earnings for all past completed/closed tickets and payouts into technician wallets.')) {
+      return;
+    }
+    try {
+      setSyncingWallets(true);
+      const res = await apiFetch('/technicians/sync-wallets', { method: 'POST' });
+      alert(res.message || 'Wallets synced successfully');
+      fetchTechnicians();
+    } catch (err) {
+      console.error('Error syncing wallets:', err);
+      alert(err.message || 'Failed to sync past wallet transactions');
+    } finally {
+      setSyncingWallets(false);
+    }
+  };
 
   const openTechWalletModal = async (techId, fromDate = '', toDate = '', type = '') => {
     try {
@@ -4582,30 +4600,40 @@ export default function App() {
                   <h1 className="text-3xl font-extrabold text-white tracking-tight">Technician Team</h1>
                   <p className="text-slate-400 mt-1">Manage field service technicians and activations</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setTechForm({ 
-                      name: '', 
-                      mobile: '', 
-                      email: '', 
-                      password: '', 
-                      appliances: [],
-                      profilePic: '',
-                      drivingLicense: '',
-                      aadhar: '',
-                      insurance: '',
-                      bikeInsurance: '',
-                      bikePhoto: '',
-                      pincodes: []
-                    });
-                    setPincodeInput('');
-                    setActiveTab('add-technician');
-                  }}
-                  className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Technician
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleSyncPastWallets}
+                    disabled={syncingWallets}
+                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-emerald-400 border border-emerald-800/40 font-bold py-2.5 px-4 rounded-xl shadow-lg text-sm flex items-center gap-2 cursor-pointer transition duration-150"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${syncingWallets ? 'animate-spin' : ''}`} />
+                    {syncingWallets ? 'Syncing Wallets...' : '🔄 Sync Past Wallets'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTechForm({ 
+                        name: '', 
+                        mobile: '', 
+                        email: '', 
+                        password: '', 
+                        appliances: [],
+                        profilePic: '',
+                        drivingLicense: '',
+                        aadhar: '',
+                        insurance: '',
+                        bikeInsurance: '',
+                        bikePhoto: '',
+                        pincodes: []
+                      });
+                      setPincodeInput('');
+                      setActiveTab('add-technician');
+                    }}
+                    className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg hover:shadow-violet-600/20 text-sm flex items-center gap-2 cursor-pointer transition duration-150"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Technician
+                  </button>
+                </div>
               </div>
 
               {/* Search */}
