@@ -8214,7 +8214,7 @@ export default function App() {
                                 ₹{item.sellingPrice}
                               </td>
                               <td className="p-4">
-                                <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase ${statusClass}`}>
+                                <span className={`inline-block whitespace-nowrap px-2.5 py-0.5 rounded text-[10px] font-bold uppercase ${statusClass}`}>
                                   {statusLabel}
                                 </span>
                               </td>
