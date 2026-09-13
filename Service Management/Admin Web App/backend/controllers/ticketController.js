@@ -743,7 +743,16 @@ const assignTechnician = async (req, res) => {
       updatedBy: req.user.name
     });
 
-    const updatedTicket = await ticket.save();
+    await ticket.save();
+
+    const populatedTicket = await Ticket.findById(ticket._id)
+      .populate('dealer', 'name code email mobile contactPerson address city')
+      .populate('assignedTechnician', 'name code mobile email')
+      .populate('createdBy', 'name code email mobile role')
+      .populate('completion.usedParts.part', 'name sku sellingPrice')
+      .populate('completionHistory.usedParts.part', 'name sku sellingPrice');
+
+    const [updatedTicket] = await attachFeesToTickets([populatedTicket]);
     res.json(updatedTicket);
 
     // Trigger Notifications
