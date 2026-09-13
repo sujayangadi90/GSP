@@ -13349,18 +13349,18 @@ export default function App() {
       {/* Raise Request Modal */}
       {createRequestOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl my-8 overflow-hidden">
-            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
-              <h3 className="font-bold text-white">Raise Installation / Service Request</h3>
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl my-6 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700 shrink-0">
+              <h3 className="font-bold text-white text-lg">Raise Installation / Service Request</h3>
               <button 
                 onClick={() => setCreateRequestOpen(false)} 
                 className="text-slate-400 hover:text-slate-200 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </button>
             </div>
             
-            <form onSubmit={handleCreateRequest} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleCreateRequest} className="p-6 space-y-6 overflow-y-auto flex-1">
               
               {/* Request Details */}
               <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800 space-y-4">
