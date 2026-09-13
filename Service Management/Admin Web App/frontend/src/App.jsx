@@ -3706,7 +3706,17 @@ export default function App() {
       });
       setInvoiceFile(null);
       setUploadedInvoicePath('');
+      setTicketFilters({
+        status: 'all',
+        type: 'all',
+        city: '',
+        search: '',
+        fromDate: '',
+        toDate: '',
+        dashboardFilter: ''
+      });
       fetchData();
+      fetchDashboardData();
     } catch (err) {
       alert(`Error: ${err.message}`);
     } finally {
