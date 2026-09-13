@@ -1778,6 +1778,124 @@ const getReports = async (req, res) => {
       });
     }
 
+    if (reportType === 'inventory_burn') {
+      if (!fromDate || !toDate) {
+        return res.status(400).json({ message: 'fromDate and toDate are required' });
+      }
+
+      const start = new Date(`${fromDate}T00:00:00`);
+      const end = new Date(`${toDate}T23:59:59.999`);
+
+      const query = {
+        $or: [
+          { 'completion.usedParts.0': { $exists: true } },
+          { 'completionHistory.usedParts.0': { $exists: true } }
+        ],
+        $or: [
+          { 'completion.submittedAt': { $gte: start, $lte: end } },
+          { 'adminVerification.verifiedAt': { $gte: start, $lte: end } },
+          { closedAt: { $gte: start, $lte: end } },
+          { updatedAt: { $gte: start, $lte: end } }
+        ]
+      };
+
+      if (technician && technician !== 'ALL') {
+        query.assignedTechnician = technician;
+      }
+      if (ticketType && ticketType !== 'ALL') {
+        query.type = ticketType.toLowerCase();
+      }
+      if (category && category !== 'ALL') {
+        query['product.category'] = { $regex: new RegExp(`^${category.trim()}$`, 'i') };
+      }
+      if (brand && brand !== 'ALL') {
+        query['product.name'] = { $regex: new RegExp(`^${brand.trim()}$`, 'i') };
+      }
+
+      const matchingTickets = await Ticket.find(query)
+        .populate('dealer', 'name code')
+        .populate('assignedTechnician', 'name code mobile')
+        .populate('customer', 'name mobile')
+        .populate('completion.usedParts.part', 'name sku sellingPrice')
+        .populate('completionHistory.usedParts.part', 'name sku sellingPrice')
+        .sort({ updatedAt: -1 });
+
+      const burnItems = [];
+      let totalItemsBurned = 0;
+      let totalBurnValue = 0;
+      const uniqueTickets = new Set();
+
+      matchingTickets.forEach(t => {
+        const partsList = (t.completion && t.completion.usedParts && t.completion.usedParts.length > 0)
+          ? t.completion.usedParts
+          : ((t.completionHistory && t.completionHistory.length > 0) ? t.completionHistory[t.completionHistory.length - 1].usedParts : []);
+
+        if (partsList && partsList.length > 0) {
+          uniqueTickets.add(t._id.toString());
+          partsList.forEach(up => {
+            const partObj = up.part || {};
+            const itemName = partObj.name || 'Unknown Part';
+            const sku = partObj.sku || 'N/A';
+            const sellingPrice = Number(partObj.sellingPrice) || 0;
+            const quantity = Number(up.quantity) || 1;
+            const totalValue = quantity * sellingPrice;
+
+            totalItemsBurned += quantity;
+            totalBurnValue += totalValue;
+
+            burnItems.push({
+              _id: `${t._id}-${partObj._id || Math.random()}`,
+              ticketId: t._id,
+              ticketNumber: t.ticketNumber,
+              ticketType: t.type,
+              customerName: t.customer?.name || t.customerName || 'N/A',
+              customerMobile: t.customer?.mobile || t.customerMobile || '',
+              technicianName: t.assignedTechnician?.name || t.technicianName || 'Unassigned',
+              dealerName: t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : 'N/A',
+              itemName,
+              sku,
+              quantity,
+              sellingPrice,
+              totalValue,
+              date: t.completion?.submittedAt || t.adminVerification?.verifiedAt || t.updatedAt
+            });
+          });
+        }
+      });
+
+      const isAll = limit === '0' || limit === 0 || limit === 'all';
+      const p = parseInt(page, 10) || 1;
+      let paginatedBurnItems;
+      let skip = 0;
+      let l = 25;
+
+      if (isAll) {
+        paginatedBurnItems = burnItems;
+        l = burnItems.length;
+      } else {
+        l = parseInt(limit, 10) || 25;
+        skip = (p - 1) * l;
+        paginatedBurnItems = burnItems.slice(skip, skip + l);
+      }
+
+      return res.json({
+        data: paginatedBurnItems,
+        summary: {
+          totalAmount: totalBurnValue,
+          completedCount: uniqueTickets.size,
+          serviceAmount: 0,
+          installationAmount: 0,
+          totalItemsBurned,
+          totalBurnValue,
+          totalTicketsWithParts: uniqueTickets.size
+        },
+        page: isAll ? 1 : p,
+        limit: l,
+        totalCount: burnItems.length,
+        hasMore: isAll ? false : (skip + paginatedBurnItems.length) < burnItems.length
+      });
+    }
+
     if (!fromDate || !toDate) {
       return res.status(400).json({ message: 'fromDate and toDate are required' });
     }
