@@ -85,9 +85,9 @@ export default function EditTicketModal({
           assignedTechnician: techVal,
           status: ticket.status || "new",
           // Fees
-          technicianEarning: ticket.technicianEarning !== undefined && ticket.technicianEarning !== null ? ticket.technicianEarning : (ticket.technicianFee !== undefined ? ticket.technicianFee : ""),
-          dealerExpense: ticket.dealerExpense !== undefined && ticket.dealerExpense !== null ? ticket.dealerExpense : "",
-          customerFee: ticket.customerFee !== undefined && ticket.customerFee !== null ? ticket.customerFee : (type === "installation" ? (ticket.customerInstallationFee ?? ticket.installationFee ?? "") : (ticket.customerServiceFee ?? ticket.serviceFee ?? "")),
+          technicianEarning: typeof ticket.technicianEarning === 'number' ? ticket.technicianEarning : (typeof ticket.technicianFee === 'number' ? ticket.technicianFee : ""),
+          dealerExpense: typeof ticket.dealerExpense === 'number' ? ticket.dealerExpense : "",
+          customerFee: typeof ticket.customerFee === 'number' ? ticket.customerFee : (type === "installation" ? (typeof ticket.customerInstallationFee === 'number' ? ticket.customerInstallationFee : (typeof ticket.installationFee === 'number' ? ticket.installationFee : "")) : (typeof ticket.customerServiceFee === 'number' ? ticket.customerServiceFee : (typeof ticket.serviceFee === 'number' ? ticket.serviceFee : ""))),
           // Invoice
           invoiceImage: ticket.invoiceImage || ""
         });
@@ -165,9 +165,15 @@ export default function EditTicketModal({
     payload.append("status", formData.status);
 
     // Fees overrides
-    if (formData.technicianEarning !== "") payload.append("technicianEarning", formData.technicianEarning);
-    if (formData.dealerExpense !== "") payload.append("dealerExpense", formData.dealerExpense);
-    if (formData.customerFee !== "") payload.append("customerFee", formData.customerFee);
+    if (formData.technicianEarning !== "" && !isNaN(Number(formData.technicianEarning))) {
+      payload.append("technicianEarning", formData.technicianEarning);
+    }
+    if (formData.dealerExpense !== "" && !isNaN(Number(formData.dealerExpense))) {
+      payload.append("dealerExpense", formData.dealerExpense);
+    }
+    if (formData.customerFee !== "" && !isNaN(Number(formData.customerFee))) {
+      payload.append("customerFee", formData.customerFee);
+    }
 
     if (invoiceFile) {
       payload.append("invoiceImage", invoiceFile);

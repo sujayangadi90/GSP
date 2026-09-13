@@ -1911,10 +1911,18 @@ const updateTicketByAdmin = async (req, res) => {
     }
 
     // Custom Fees overrides if provided
-    if (technicianEarning !== undefined && technicianEarning !== '') ticket.technicianEarning = Number(technicianEarning);
-    if (technicianFee !== undefined && technicianFee !== '') ticket.technicianFee = Number(technicianFee);
-    if (dealerExpense !== undefined && dealerExpense !== '') ticket.dealerExpense = Number(dealerExpense);
-    if (customerFee !== undefined && customerFee !== '') ticket.customerFee = Number(customerFee);
+    if (technicianEarning !== undefined && technicianEarning !== '' && !isNaN(Number(technicianEarning))) {
+      ticket.technicianEarning = Number(technicianEarning);
+    }
+    if (technicianFee !== undefined && technicianFee !== '' && !isNaN(Number(technicianFee))) {
+      ticket.technicianFee = Number(technicianFee);
+    }
+    if (dealerExpense !== undefined && dealerExpense !== '' && !isNaN(Number(dealerExpense))) {
+      ticket.dealerExpense = Number(dealerExpense);
+    }
+    if (customerFee !== undefined && customerFee !== '' && !isNaN(Number(customerFee))) {
+      ticket.customerFee = Number(customerFee);
+    }
 
     // Invoice Image upload
     if (req.file) {
