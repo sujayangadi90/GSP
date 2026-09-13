@@ -751,11 +751,20 @@ export default function App() {
   // Technician Wallet States
   const [selectedTechWallet, setSelectedTechWallet] = useState(null);
   const [techWalletLoading, setTechWalletLoading] = useState(false);
+  const [walletFromDate, setWalletFromDate] = useState('');
+  const [walletToDate, setWalletToDate] = useState('');
+  const [walletTypeFilter, setWalletTypeFilter] = useState('');
 
-  const openTechWalletModal = async (techId) => {
+  const openTechWalletModal = async (techId, fromDate = '', toDate = '', type = '') => {
     try {
       setTechWalletLoading(true);
-      const data = await apiFetch(`/technicians/${techId}/wallet`);
+      const queryParams = new URLSearchParams();
+      if (fromDate) queryParams.append('fromDate', fromDate);
+      if (toDate) queryParams.append('toDate', toDate);
+      if (type) queryParams.append('type', type);
+
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      const data = await apiFetch(`/technicians/${techId}/wallet${queryString}`);
       if (data) {
         setSelectedTechWallet(data);
       }
@@ -11140,6 +11149,70 @@ export default function App() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
+              {/* Date & Type Filter Bar */}
+              <div className="bg-slate-950/60 border border-slate-800 p-3.5 rounded-xl mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-400 font-semibold">From:</span>
+                    <input 
+                      type="date"
+                      value={walletFromDate}
+                      onChange={(e) => setWalletFromDate(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs focus:outline-hidden focus:border-violet-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-400 font-semibold">To:</span>
+                    <input 
+                      type="date"
+                      value={walletToDate}
+                      onChange={(e) => setWalletToDate(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs focus:outline-hidden focus:border-violet-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-400 font-semibold">Type:</span>
+                    <select
+                      value={walletTypeFilter}
+                      onChange={(e) => setWalletTypeFilter(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs focus:outline-hidden focus:border-violet-500 cursor-pointer"
+                    >
+                      <option value="">All Transactions</option>
+                      <option value="credit">Credits (+)</option>
+                      <option value="debit">Debits (-)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (selectedTechWallet?.technician?._id) {
+                        openTechWalletModal(selectedTechWallet.technician._id, walletFromDate, walletToDate, walletTypeFilter);
+                      }
+                    }}
+                    className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1"
+                  >
+                    Filter
+                  </button>
+                  {(walletFromDate || walletToDate || walletTypeFilter) && (
+                    <button
+                      onClick={() => {
+                        setWalletFromDate('');
+                        setWalletToDate('');
+                        setWalletTypeFilter('');
+                        if (selectedTechWallet?.technician?._id) {
+                          openTechWalletModal(selectedTechWallet.technician._id, '', '', '');
+                        }
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <h4 className="font-bold text-white mb-3 text-sm flex items-center justify-between">
                 <span>Transaction History</span>
                 <span className="text-xs text-slate-400 font-normal">

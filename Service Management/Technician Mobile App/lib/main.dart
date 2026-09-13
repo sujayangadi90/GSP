@@ -5654,6 +5654,9 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
   bool _isLoading = true;
   double _walletBalance = 0.0;
   List<dynamic> _transactions = [];
+  DateTime? _fromDate;
+  DateTime? _toDate;
+  String _selectedType = ''; // '', 'credit', 'debit'
 
   @override
   void initState() {
@@ -5664,8 +5667,20 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
   Future<void> _fetchWallet() async {
     setState(() => _isLoading = true);
     try {
+      final queryParams = <String, String>{};
+      if (_fromDate != null) {
+        queryParams['fromDate'] = '${_fromDate!.year}-${_fromDate!.month.toString().padLeft(2, '0')}-${_fromDate!.day.toString().padLeft(2, '0')}';
+      }
+      if (_toDate != null) {
+        queryParams['toDate'] = '${_toDate!.year}-${_toDate!.month.toString().padLeft(2, '0')}-${_toDate!.day.toString().padLeft(2, '0')}';
+      }
+      if (_selectedType.isNotEmpty) {
+        queryParams['type'] = _selectedType;
+      }
+
+      final uri = Uri.parse('${widget.apiUrl}/technicians/me/wallet').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
       final res = await http.get(
-        Uri.parse('${widget.apiUrl}/technicians/me/wallet'),
+        uri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
@@ -5685,6 +5700,36 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _selectDateRange() async {
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDateRange: (_fromDate != null && _toDate != null) ? DateTimeRange(start: _fromDate!, end: _toDate!) : null,
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF10B981),
+              onPrimary: Colors.white,
+              surface: Color(0xFF1E293B),
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _fromDate = picked.start;
+        _toDate = picked.end;
+      });
+      _fetchWallet();
     }
   }
 
@@ -5777,6 +5822,88 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
                 ],
               ),
             ),
+
+            // Date & Filter Controls
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Container(
+                padding: const EdgeInsets.all(10.0),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B).withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: _selectDateRange,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.white24),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.date_range, size: 16, color: Color(0xFF34D399)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      (_fromDate != null && _toDate != null)
+                                          ? '${_fromDate!.day}/${_fromDate!.month} - ${_toDate!.day}/${_toDate!.month}/${_toDate!.year}'
+                                          : 'Filter by Date Range',
+                                      style: const TextStyle(fontSize: 11, color: Colors.white),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (_fromDate != null || _toDate != null || _selectedType.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _fromDate = null;
+                                _toDate = null;
+                                _selectedType = '';
+                              });
+                              _fetchWallet();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.rose.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.clear, size: 16, color: Colors.rose),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _buildFilterChip('All', ''),
+                        const SizedBox(width: 6),
+                        _buildFilterChip('Credits (+)', 'credit'),
+                        const SizedBox(width: 6),
+                        _buildFilterChip('Debits (-)', 'debit'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
 
             // Transactions Header Title
             Padding(
@@ -5903,6 +6030,31 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
                         ),
             ),
           ],
+        ),
+      ),
+    );
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _selectedType == value;
+    return InkWell(
+      onTap: () {
+        setState(() => _selectedType = value);
+        _fetchWallet();
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF10B981) : const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? const Color(0xFF10B981) : Colors.white24),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? Colors.white : Colors.white70,
+          ),
         ),
       ),
     );

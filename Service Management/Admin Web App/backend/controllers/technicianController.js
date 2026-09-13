@@ -270,7 +270,24 @@ const getTechnicianWallet = async (req, res) => {
       return res.status(404).json({ message: 'Technician not found' });
     }
 
-    const transactions = await WalletTransaction.find({ technician: req.params.id })
+    const { fromDate, toDate, type } = req.query;
+    const query = { technician: req.params.id };
+
+    if (type && ['credit', 'debit'].includes(type)) {
+      query.type = type;
+    }
+
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) {
+        query.createdAt.$gte = new Date(`${fromDate}T00:00:00`);
+      }
+      if (toDate) {
+        query.createdAt.$lte = new Date(`${toDate}T23:59:59.999`);
+      }
+    }
+
+    const transactions = await WalletTransaction.find(query)
       .populate('ticket', 'ticketNumber type status')
       .populate('payout', 'month year amount status paymentMode referenceNumber')
       .sort({ createdAt: -1 });
@@ -296,7 +313,24 @@ const getTechnicianWalletSelf = async (req, res) => {
       return res.status(404).json({ message: 'Technician not found' });
     }
 
-    const transactions = await WalletTransaction.find({ technician: technicianId })
+    const { fromDate, toDate, type } = req.query;
+    const query = { technician: technicianId };
+
+    if (type && ['credit', 'debit'].includes(type)) {
+      query.type = type;
+    }
+
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) {
+        query.createdAt.$gte = new Date(`${fromDate}T00:00:00`);
+      }
+      if (toDate) {
+        query.createdAt.$lte = new Date(`${toDate}T23:59:59.999`);
+      }
+    }
+
+    const transactions = await WalletTransaction.find(query)
       .populate('ticket', 'ticketNumber type status')
       .populate('payout', 'month year amount status paymentMode referenceNumber')
       .sort({ createdAt: -1 });
