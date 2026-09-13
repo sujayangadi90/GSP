@@ -5880,10 +5880,10 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: Colors.rose.withOpacity(0.2),
+                                color: const Color(0xFFF43F5E).withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(Icons.clear, size: 16, color: Colors.rose),
+                              child: const Icon(Icons.clear, size: 16, color: Color(0xFFF43F5E)),
                             ),
                           ),
                         ],
@@ -6033,6 +6033,8 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
         ),
       ),
     );
+  }
+
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _selectedType == value;
     return InkWell(
