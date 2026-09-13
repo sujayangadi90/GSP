@@ -2337,7 +2337,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                         const Text('Special Incentive Bonus:', style: TextStyle(fontSize: 13, color: Colors.white70)),
                         Text(
                           '₹${(_job!['technicianIncentive'] as num).toStringAsFixed(0)}',
-                          style: const TextStyle(fontWeight: FontWeight.extrabold, fontSize: 16, color: Colors.greenAccent),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.greenAccent),
                         ),
                       ],
                     ),
