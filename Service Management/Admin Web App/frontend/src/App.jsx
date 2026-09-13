@@ -754,6 +754,8 @@ export default function App() {
   // Technician Wallet States
   const [selectedTechWallet, setSelectedTechWallet] = useState(null);
   const [techWalletLoading, setTechWalletLoading] = useState(false);
+  const [loadingMoreTechWallet, setLoadingMoreTechWallet] = useState(false);
+  const [walletPage, setWalletPage] = useState(1);
   const [syncingWallets, setSyncingWallets] = useState(false);
   const [walletFromDate, setWalletFromDate] = useState('');
   const [walletToDate, setWalletToDate] = useState('');
@@ -776,25 +778,43 @@ export default function App() {
     }
   };
 
-  const openTechWalletModal = async (techId, fromDate = '', toDate = '', type = '') => {
+  const openTechWalletModal = async (techId, fromDate = '', toDate = '', type = '', pageNum = 1, isAppend = false) => {
     try {
-      setTechWalletLoading(true);
+      if (isAppend) {
+        setLoadingMoreTechWallet(true);
+      } else {
+        setTechWalletLoading(true);
+        setWalletPage(1);
+      }
+
       const queryParams = new URLSearchParams();
+      queryParams.append('page', pageNum.toString());
+      queryParams.append('limit', '10');
       if (fromDate) queryParams.append('fromDate', fromDate);
       if (toDate) queryParams.append('toDate', toDate);
       if (type) queryParams.append('type', type);
 
-      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      const queryString = `?${queryParams.toString()}`;
       const data = await apiFetch(`/technicians/${techId}/wallet${queryString}`);
       if (data) {
-        setSelectedTechWallet(data);
+        if (isAppend && selectedTechWallet) {
+          setSelectedTechWallet({
+            ...data,
+            transactions: [...(selectedTechWallet.transactions || []), ...(data.transactions || [])]
+          });
+          setWalletPage(pageNum);
+        } else {
+          setSelectedTechWallet(data);
+          setWalletPage(1);
+        }
       }
     } catch (err) {
       console.error('Error fetching technician wallet:', err);
       alert('Failed to load technician wallet details');
-      setSelectedTechWallet(null);
+      if (!isAppend) setSelectedTechWallet(null);
     } finally {
       setTechWalletLoading(false);
+      setLoadingMoreTechWallet(false);
     }
   };
 
@@ -11325,62 +11345,96 @@ export default function App() {
               <h4 className="font-bold text-white mb-3 text-sm flex items-center justify-between">
                 <span>Transaction History</span>
                 <span className="text-xs text-slate-400 font-normal">
-                  {selectedTechWallet.transactions ? selectedTechWallet.transactions.length : 0} transactions recorded
+                  Showing {selectedTechWallet.transactions ? selectedTechWallet.transactions.length : 0} of {selectedTechWallet.total || (selectedTechWallet.transactions ? selectedTechWallet.transactions.length : 0)} transactions recorded
                 </span>
               </h4>
 
               {(!selectedTechWallet.transactions || selectedTechWallet.transactions.length === 0) ? (
                 <p className="text-center text-slate-500 py-10 text-sm italic">No wallet transactions recorded for this technician yet.</p>
               ) : (
-                <div className="bg-slate-950/20 border border-slate-800 rounded-xl overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-800/40 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider">
-                        <th className="p-3">Date & Time</th>
-                        <th className="p-3">Type</th>
-                        <th className="p-3 text-right">Amount</th>
-                        <th className="p-3 text-right">Balance After</th>
-                        <th className="p-3">Description / Reference</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800 text-slate-300">
-                      {selectedTechWallet.transactions.map((tx) => (
-                        <tr key={tx._id} className="hover:bg-slate-800/30 transition duration-150">
-                          <td className="p-3 text-slate-400 whitespace-nowrap">
-                            {new Date(tx.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                          </td>
-                          <td className="p-3">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide border ${
-                              tx.type === 'credit'
-                                ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/50'
-                                : 'bg-rose-950/80 text-rose-400 border-rose-800/50'
-                            }`}>
-                              {tx.type === 'credit' ? '+ CREDIT' : '- DEBIT'}
-                            </span>
-                          </td>
-                          <td className={`p-3 text-right font-bold font-mono text-sm ${tx.type === 'credit' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {tx.type === 'credit' ? '+' : '-'}₹ {tx.amount}
-                          </td>
-                          <td className="p-3 text-right font-mono font-semibold text-slate-200">
-                            ₹ {tx.balanceAfter}
-                          </td>
-                          <td className="p-3">
-                            <p className="font-medium text-slate-200">{tx.description}</p>
-                            {tx.ticket && (
-                              <p className="text-[10px] text-violet-400 font-mono mt-0.5">
-                                Ref Ticket: #{tx.ticket.ticketNumber || tx.ticket._id}
-                              </p>
-                            )}
-                            {tx.payout && (
-                              <p className="text-[10px] text-amber-400 font-mono mt-0.5">
-                                Ref Payout: {tx.payout.month}/{tx.payout.year} ({tx.payout.paymentMode || 'Paid'})
-                              </p>
-                            )}
-                          </td>
+                <div className="space-y-4">
+                  <div className="bg-slate-950/20 border border-slate-800 rounded-xl overflow-hidden">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-800/40 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider">
+                          <th className="p-3">Date & Time</th>
+                          <th className="p-3">Type</th>
+                          <th className="p-3 text-right">Amount</th>
+                          <th className="p-3 text-right">Balance After</th>
+                          <th className="p-3">Description / Reference</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 text-slate-300">
+                        {selectedTechWallet.transactions.map((tx) => (
+                          <tr key={tx._id} className="hover:bg-slate-800/30 transition duration-150">
+                            <td className="p-3 text-slate-400 whitespace-nowrap">
+                              {new Date(tx.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                            </td>
+                            <td className="p-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide border ${
+                                tx.type === 'credit'
+                                  ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/50'
+                                  : 'bg-rose-950/80 text-rose-400 border-rose-800/50'
+                              }`}>
+                                {tx.type === 'credit' ? '+ CREDIT' : '- DEBIT'}
+                              </span>
+                            </td>
+                            <td className={`p-3 text-right font-bold font-mono text-sm ${tx.type === 'credit' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {tx.type === 'credit' ? '+' : '-'}₹ {tx.amount}
+                            </td>
+                            <td className="p-3 text-right font-mono font-semibold text-slate-200">
+                              ₹ {tx.balanceAfter}
+                            </td>
+                            <td className="p-3">
+                              <p className="font-medium text-slate-200">{tx.description}</p>
+                              {tx.ticket && (
+                                <p className="text-[10px] text-violet-400 font-mono mt-0.5">
+                                  Ref Ticket: #{tx.ticket.ticketNumber || tx.ticket._id}
+                                </p>
+                              )}
+                              {tx.payout && (
+                                <p className="text-[10px] text-amber-400 font-mono mt-0.5">
+                                  Ref Payout: {tx.payout.month}/{tx.payout.year} ({tx.payout.paymentMode || 'Paid'})
+                                </p>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Load More Button */}
+                  {selectedTechWallet.transactions.length < (selectedTechWallet.total || 0) && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        onClick={() => {
+                          if (selectedTechWallet?.technician?._id) {
+                            openTechWalletModal(
+                              selectedTechWallet.technician._id,
+                              walletFromDate,
+                              walletToDate,
+                              walletTypeFilter,
+                              walletPage + 1,
+                              true
+                            );
+                          }
+                        }}
+                        disabled={loadingMoreTechWallet}
+                        className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs px-5 py-2 rounded-xl shadow-md transition duration-150 flex items-center gap-2 cursor-pointer"
+                      >
+                        {loadingMoreTechWallet ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading more...
+                          </>
+                        ) : (
+                          <>
+                            <span>👇</span> Load More (+{Math.min(10, (selectedTechWallet.total || 0) - selectedTechWallet.transactions.length)})
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
