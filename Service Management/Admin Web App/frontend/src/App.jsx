@@ -1335,18 +1335,18 @@ export default function App() {
     }
   };
 
-  const handleCalculatePayout = async () => {
-    if (!payoutSelectedTech) {
-      alert('Please select a technician.');
+  const handleCalculatePayout = async (techId) => {
+    const targetTechId = techId || payoutSelectedTech;
+    if (!targetTechId) {
       return;
     }
     setLoadingPayoutCalc(true);
     setPayoutCalcResult(null);
     try {
-      const data = await apiFetch(`/payouts/calculate?technicianId=${payoutSelectedTech}&month=${payoutSelectedMonth}&year=${payoutSelectedYear}`);
+      const data = await apiFetch(`/payouts/calculate?technicianId=${targetTechId}&month=${payoutSelectedMonth}&year=${payoutSelectedYear}`);
       setPayoutCalcResult(data);
     } catch (err) {
-      alert(err.message || 'Failed to calculate payout');
+      console.error('Error calculating payout:', err);
     } finally {
       setLoadingPayoutCalc(false);
     }
@@ -9167,7 +9167,7 @@ export default function App() {
                         const tId = e.target.value;
                         setPayoutSelectedTech(tId);
                         if (tId) {
-                          handleCalculatePayout();
+                          handleCalculatePayout(tId);
                           fetchWalletTransactions(tId);
                         } else {
                           setPayoutCalcResult(null);
