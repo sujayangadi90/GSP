@@ -518,7 +518,8 @@ export default function App() {
   const [showMarkPaidModal, setShowMarkPaidModal] = useState(false);
   const [markPaidForm, setMarkPaidForm] = useState({
     paymentMode: 'Cash',
-    referenceNumber: ''
+    referenceNumber: '',
+    amount: ''
   });
   const [savingPayout, setSavingPayout] = useState(false);
 
@@ -1356,6 +1357,11 @@ export default function App() {
       alert('Please select a payment mode.');
       return;
     }
+    const payAmount = Number(markPaidForm.amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      alert('Please enter a valid payment amount greater than ₹0.');
+      return;
+    }
     setSavingPayout(true);
     try {
       const res = await apiFetch('/payouts', {
@@ -1367,12 +1373,12 @@ export default function App() {
           year: payoutCalcResult.year,
           paymentMode: markPaidForm.paymentMode,
           referenceNumber: markPaidForm.referenceNumber,
-          amount: payoutCalcResult.totalEarnings
+          amount: payAmount
         })
       });
       alert(res.message || 'Payout marked as Paid successfully');
       setShowMarkPaidModal(false);
-      setMarkPaidForm({ paymentMode: 'Cash', referenceNumber: '' });
+      setMarkPaidForm({ paymentMode: 'Cash', referenceNumber: '', amount: '' });
       handleCalculatePayout();
       fetchPayouts();
     } catch (err) {
@@ -9121,7 +9127,7 @@ export default function App() {
                   <div className="mt-6 border-t border-slate-800 pt-6">
                     <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <span className="text-lg font-bold text-white">{payoutCalcResult.technician.name}</span>
                           <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-700 text-slate-300">
                             {payoutCalcResult.technician.code || payoutCalcResult.technician.mobile}
@@ -9130,6 +9136,9 @@ export default function App() {
                             payoutCalcResult.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                           }`}>
                             {payoutCalcResult.status}
+                          </span>
+                          <span className="text-xs font-bold px-3 py-1 rounded-full bg-violet-950/80 text-violet-300 border border-violet-700/50 flex items-center gap-1.5">
+                            👛 Wallet Balance: ₹{payoutCalcResult.walletBalance !== undefined ? payoutCalcResult.walletBalance : 0}
                           </span>
                         </div>
 
@@ -9173,7 +9182,14 @@ export default function App() {
                           </div>
                         ) : (
                           <button
-                            onClick={() => setShowMarkPaidModal(true)}
+                            onClick={() => {
+                              setMarkPaidForm({
+                                paymentMode: 'Cash',
+                                referenceNumber: '',
+                                amount: payoutCalcResult.totalEarnings
+                              });
+                              setShowMarkPaidModal(true);
+                            }}
                             className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
                           >
                             <CheckCircle className="w-4 h-4" />
@@ -9330,11 +9346,17 @@ export default function App() {
                     </h3>
 
                     <div className="bg-slate-800/80 rounded-xl p-4 space-y-2 text-sm">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-slate-400">Technician:</span>
                         <strong className="text-white">{payoutCalcResult.technician.name}</strong>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-400">Current Wallet Balance:</span>
+                        <span className="font-bold text-violet-300 font-mono bg-violet-950/80 px-2 py-0.5 rounded border border-violet-700/40">
+                          👛 ₹{payoutCalcResult.walletBalance !== undefined ? payoutCalcResult.walletBalance : 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
                         <span className="text-slate-400">Month / Year:</span>
                         <strong className="text-white">{MONTHS_LIST[payoutCalcResult.month - 1]} {payoutCalcResult.year}</strong>
                       </div>
@@ -9346,13 +9368,39 @@ export default function App() {
                         <span>Installation ({payoutCalcResult.completedInstallationJobsCount || 0} Tickets):</span>
                         <strong className="font-mono">₹{(payoutCalcResult.installationEarnings || 0).toLocaleString('en-IN')}</strong>
                       </div>
-                      <div className="flex justify-between border-t border-slate-700/60 pt-2">
-                        <span className="text-slate-400 font-bold">Total Payout Amount:</span>
+                      <div className="flex justify-between items-center border-t border-slate-700/60 pt-2">
+                        <span className="text-slate-400 font-bold">Total Earnings Outstanding:</span>
                         <strong className="text-emerald-400 text-base font-mono">₹{payoutCalcResult.totalEarnings.toLocaleString('en-IN')}</strong>
                       </div>
                     </div>
 
                     <div className="space-y-4">
+                      <div>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                            Payment Amount (Part/Full) <span className="text-red-400">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setMarkPaidForm({ ...markPaidForm, amount: payoutCalcResult.totalEarnings })}
+                            className="text-[11px] font-bold text-violet-400 hover:underline cursor-pointer"
+                          >
+                            Pay Full (₹{payoutCalcResult.totalEarnings})
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">₹</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={markPaidForm.amount}
+                            onChange={(e) => setMarkPaidForm({ ...markPaidForm, amount: e.target.value })}
+                            placeholder={`Enter amount to pay (e.g. ${payoutCalcResult.totalEarnings})`}
+                            className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-8 pr-4 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-violet-500"
+                          />
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
                           Payment Mode <span className="text-red-400">*</span>

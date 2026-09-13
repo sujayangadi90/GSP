@@ -60,8 +60,8 @@ const calculateTechnicianPayout = async (req, res) => {
     const m = parseInt(month, 10);
     const y = parseInt(year, 10);
 
-    const technicianUser = await User.findById(technicianId).select('name code mobile email role');
-    if (!technicianUser || technicianUser.role !== 'technician') {
+    const technicianUser = await User.findById(technicianId).select('name code mobile email role walletBalance');
+    if (!technicianUser) {
       return res.status(404).json({ message: 'Technician not found.' });
     }
 
@@ -109,6 +109,7 @@ const calculateTechnicianPayout = async (req, res) => {
 
     return res.json({
       technician: technicianUser,
+      walletBalance: technicianUser.walletBalance || 0,
       month: m,
       year: y,
       totalEarnings,
@@ -141,7 +142,7 @@ const createPayout = async (req, res) => {
     const y = parseInt(year, 10);
 
     const technicianUser = await User.findById(technicianId);
-    if (!technicianUser || technicianUser.role !== 'technician') {
+    if (!technicianUser) {
       return res.status(404).json({ message: 'Technician not found.' });
     }
 
