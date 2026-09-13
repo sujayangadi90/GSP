@@ -748,6 +748,26 @@ export default function App() {
   const [historyPage, setHistoryPage] = useState(1);
   const [amcPage, setAmcPage] = useState(1);
 
+  // Technician Wallet States
+  const [selectedTechWallet, setSelectedTechWallet] = useState(null);
+  const [techWalletLoading, setTechWalletLoading] = useState(false);
+
+  const openTechWalletModal = async (techId) => {
+    try {
+      setTechWalletLoading(true);
+      const data = await apiFetch(`/technicians/${techId}/wallet`);
+      if (data) {
+        setSelectedTechWallet(data);
+      }
+    } catch (err) {
+      console.error('Error fetching technician wallet:', err);
+      alert('Failed to load technician wallet details');
+      setSelectedTechWallet(null);
+    } finally {
+      setTechWalletLoading(false);
+    }
+  };
+
   // Dealer Video States
   const [dealerVideos, setDealerVideos] = useState([]);
   const [dealerVideosLoading, setDealerVideosLoading] = useState(false);
@@ -4620,6 +4640,10 @@ export default function App() {
                           </div>
                           
                           <div className="mt-4 space-y-2 text-sm text-slate-300">
+                            <p className="flex items-center gap-2 text-xs font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-900/50 px-2.5 py-1 rounded-lg w-fit mt-1">
+                              <span>👛 Wallet Balance:</span>
+                              <span className="font-mono font-bold text-white">₹ {tech.walletBalance !== undefined ? tech.walletBalance : 0}</span>
+                            </p>
                             <p className="flex items-center gap-2">
                               <span className="text-slate-500">Mob:</span> {tech.mobile}
                             </p>
@@ -4707,6 +4731,13 @@ export default function App() {
                             className="text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer"
                           >
                             Edit Details
+                          </button>
+                          <button
+                            onClick={() => openTechWalletModal(tech._id)}
+                            className="text-xs text-emerald-400 hover:text-emerald-300 font-bold cursor-pointer flex items-center gap-1 bg-emerald-950/40 px-2 py-1 rounded-md border border-emerald-900/50"
+                            title="View Wallet & Transactions"
+                          >
+                            👛 Wallet
                           </button>
                           <button
                             onClick={() => viewHistory('technician', tech, 'technicians')}
@@ -11060,6 +11091,124 @@ export default function App() {
                 className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer shadow-md transition"
               >
                 Close History
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Technician Wallet & Transaction History Modal */}
+      {selectedTechWallet && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-700/50 flex items-center justify-center text-emerald-400 font-bold text-lg shadow-md shrink-0">
+                  👛
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-lg">
+                    {selectedTechWallet.technician?.name || 'Technician'} Wallet & Transactions
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Code: {selectedTechWallet.technician?.code || 'N/A'} • Mobile: {selectedTechWallet.technician?.mobile || 'N/A'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedTechWallet(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 border-b border-slate-800 bg-slate-950/40">
+              <div className="bg-gradient-to-r from-emerald-950/80 via-slate-900 to-slate-900 border border-emerald-900/60 p-5 rounded-2xl flex items-center justify-between shadow-lg">
+                <div>
+                  <p className="text-xs text-emerald-400 font-bold uppercase tracking-wider">Current Wallet Balance</p>
+                  <h2 className="text-3xl font-extrabold text-white mt-1 font-mono">
+                    ₹ {selectedTechWallet.walletBalance !== undefined ? selectedTechWallet.walletBalance : 0}
+                  </h2>
+                  <p className="text-[11px] text-slate-400 mt-1">Automatic ticket earnings credits & payout deductions</p>
+                </div>
+                <div className="bg-emerald-900/30 border border-emerald-800/40 px-4 py-2 rounded-xl text-right">
+                  <span className="text-xs text-emerald-300 font-semibold block">Wallet Status</span>
+                  <span className="text-xs font-bold text-white uppercase">Active</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <h4 className="font-bold text-white mb-3 text-sm flex items-center justify-between">
+                <span>Transaction History</span>
+                <span className="text-xs text-slate-400 font-normal">
+                  {selectedTechWallet.transactions ? selectedTechWallet.transactions.length : 0} transactions recorded
+                </span>
+              </h4>
+
+              {(!selectedTechWallet.transactions || selectedTechWallet.transactions.length === 0) ? (
+                <p className="text-center text-slate-500 py-10 text-sm italic">No wallet transactions recorded for this technician yet.</p>
+              ) : (
+                <div className="bg-slate-950/20 border border-slate-800 rounded-xl overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-800/40 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider">
+                        <th className="p-3">Date & Time</th>
+                        <th className="p-3">Type</th>
+                        <th className="p-3 text-right">Amount</th>
+                        <th className="p-3 text-right">Balance After</th>
+                        <th className="p-3">Description / Reference</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {selectedTechWallet.transactions.map((tx) => (
+                        <tr key={tx._id} className="hover:bg-slate-800/30 transition duration-150">
+                          <td className="p-3 text-slate-400 whitespace-nowrap">
+                            {new Date(tx.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </td>
+                          <td className="p-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide border ${
+                              tx.type === 'credit'
+                                ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/50'
+                                : 'bg-rose-950/80 text-rose-400 border-rose-800/50'
+                            }`}>
+                              {tx.type === 'credit' ? '+ CREDIT' : '- DEBIT'}
+                            </span>
+                          </td>
+                          <td className={`p-3 text-right font-bold font-mono text-sm ${tx.type === 'credit' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {tx.type === 'credit' ? '+' : '-'}₹ {tx.amount}
+                          </td>
+                          <td className="p-3 text-right font-mono font-semibold text-slate-200">
+                            ₹ {tx.balanceAfter}
+                          </td>
+                          <td className="p-3">
+                            <p className="font-medium text-slate-200">{tx.description}</p>
+                            {tx.ticket && (
+                              <p className="text-[10px] text-violet-400 font-mono mt-0.5">
+                                Ref Ticket: #{tx.ticket.ticketNumber || tx.ticket._id}
+                              </p>
+                            )}
+                            {tx.payout && (
+                              <p className="text-[10px] text-amber-400 font-mono mt-0.5">
+                                Ref Payout: {tx.payout.month}/{tx.payout.year} ({tx.payout.paymentMode || 'Paid'})
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-end border-t border-slate-800">
+              <button 
+                onClick={() => setSelectedTechWallet(null)} 
+                className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-5 rounded-xl text-xs transition cursor-pointer"
+              >
+                Close Wallet
               </button>
             </div>
           </div>

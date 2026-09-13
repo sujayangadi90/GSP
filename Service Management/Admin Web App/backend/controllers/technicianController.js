@@ -198,18 +198,128 @@ const toggleTechnicianStatus = async (req, res) => {
   }
 };
 
-// Manually trigger 10 AM daily assigned ticket notifications
-const triggerDailyAssignedNotifications = async (req, res) => {
+const WalletTransaction = require('../models/WalletTransaction');
+
+// Helper to credit technician wallet (addition)
+const creditTechnicianWallet = async (technicianId, amount, ticketId, description, createdByName = 'System') => {
+  if (!technicianId || !amount || amount <= 0) return null;
+  
+  // Idempotency check: avoid crediting twice for same ticket
+  if (ticketId) {
+    const existing = await WalletTransaction.findOne({ ticket: ticketId, type: 'credit' });
+    if (existing) return existing;
+  }
+
+  const user = await User.findByIdAndUpdate(
+    technicianId,
+    { $inc: { walletBalance: amount } },
+    { new: true }
+  );
+
+  const tx = await WalletTransaction.create({
+    technician: technicianId,
+    type: 'credit',
+    amount: Number(amount),
+    balanceAfter: user ? user.walletBalance : amount,
+    source: 'ticket_earning',
+    ticket: ticketId || null,
+    description: description || `Job earnings credited`,
+    createdByName
+  });
+
+  return tx;
+};
+
+// Helper to debit technician wallet (deduction)
+const debitTechnicianWallet = async (technicianId, amount, payoutId, description, createdByName = 'System') => {
+  if (!technicianId || !amount || amount <= 0) return null;
+
+  // Idempotency check: avoid debiting twice for same payout
+  if (payoutId) {
+    const existing = await WalletTransaction.findOne({ payout: payoutId, type: 'debit' });
+    if (existing) return existing;
+  }
+
+  const user = await User.findByIdAndUpdate(
+    technicianId,
+    { $inc: { walletBalance: -amount } },
+    { new: true }
+  );
+
+  const tx = await WalletTransaction.create({
+    technician: technicianId,
+    type: 'debit',
+    amount: Number(amount),
+    balanceAfter: user ? user.walletBalance : 0,
+    source: 'payout',
+    payout: payoutId || null,
+    description: description || `Payout amount deducted`,
+    createdByName
+  });
+
+  return tx;
+};
+
+// @desc    Get technician wallet details & transaction history (Admin)
+// @route   GET /api/technicians/:id/wallet
+// @access  Private (Admin)
+const getTechnicianWallet = async (req, res) => {
   try {
-    const { sendDailyAssignedTicketNotifications } = require('../utils/cronService');
-    const result = await sendDailyAssignedTicketNotifications();
+    const technician = await User.findById(req.params.id).select('name code email mobile walletBalance status');
+    if (!technician || technician.role !== 'technician') {
+      return res.status(404).json({ message: 'Technician not found' });
+    }
+
+    const transactions = await WalletTransaction.find({ technician: req.params.id })
+      .populate('ticket', 'ticketNumber type status')
+      .populate('payout', 'month year amount status paymentMode referenceNumber')
+      .sort({ createdAt: -1 });
+
     res.json({
-      message: 'Daily assigned ticket notifications trigger executed successfully',
-      result
+      technician,
+      walletBalance: technician.walletBalance || 0,
+      transactions
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-module.exports = { getTechnicians, addTechnician, getTechnicianById, updateTechnician, toggleTechnicianStatus, triggerDailyAssignedNotifications };
+// @desc    Get logged in technician wallet details & history (Mobile App / Self)
+// @route   GET /api/technicians/me/wallet
+// @access  Private (Technician)
+const getTechnicianWalletSelf = async (req, res) => {
+  try {
+    const technicianId = req.user._id;
+    const technician = await User.findById(technicianId).select('name code email mobile walletBalance');
+    if (!technician) {
+      return res.status(404).json({ message: 'Technician not found' });
+    }
+
+    const transactions = await WalletTransaction.find({ technician: technicianId })
+      .populate('ticket', 'ticketNumber type status')
+      .populate('payout', 'month year amount status paymentMode referenceNumber')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      walletBalance: technician.walletBalance || 0,
+      transactions
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = {
+  getTechnicians,
+  addTechnician,
+  getTechnicianById,
+  updateTechnician,
+  toggleTechnicianStatus,
+  triggerDailyAssignedNotifications,
+  creditTechnicianWallet,
+  debitTechnicianWallet,
+  getTechnicianWallet,
+  getTechnicianWalletSelf
+};
+

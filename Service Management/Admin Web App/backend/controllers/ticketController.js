@@ -1064,6 +1064,29 @@ const verifyWork = async (req, res) => {
     }
 
     const updatedTicket = await ticket.save();
+
+    // Automatically credit technician wallet if work approved
+    if (approvalStatus === 'approved' && updatedTicket.assignedTechnician) {
+      try {
+        const { creditTechnicianWallet } = require('./technicianController');
+        const earningAmount = typeof updatedTicket.technicianEarning === 'number' && updatedTicket.technicianEarning > 0
+          ? updatedTicket.technicianEarning
+          : (typeof updatedTicket.technicianFee === 'number' ? updatedTicket.technicianFee : 0);
+        
+        if (earningAmount > 0) {
+          await creditTechnicianWallet(
+            updatedTicket.assignedTechnician,
+            earningAmount,
+            updatedTicket._id,
+            `Earnings credited for Ticket #${updatedTicket.ticketNumber || updatedTicket._id}`,
+            req.user ? req.user.name : 'Admin'
+          );
+        }
+      } catch (walletErr) {
+        console.error('Error crediting technician wallet on job approval:', walletErr);
+      }
+    }
+
     res.json(updatedTicket);
 
     // Trigger Notification
@@ -1123,6 +1146,28 @@ const closeTicket = async (req, res) => {
     });
 
     const updatedTicket = await ticket.save();
+
+    // Automatically credit technician wallet on ticket closure
+    if (updatedTicket.assignedTechnician) {
+      try {
+        const { creditTechnicianWallet } = require('./technicianController');
+        const earningAmount = typeof updatedTicket.technicianEarning === 'number' && updatedTicket.technicianEarning > 0
+          ? updatedTicket.technicianEarning
+          : (typeof updatedTicket.technicianFee === 'number' ? updatedTicket.technicianFee : 0);
+
+        if (earningAmount > 0) {
+          await creditTechnicianWallet(
+            updatedTicket.assignedTechnician,
+            earningAmount,
+            updatedTicket._id,
+            `Earnings credited for Ticket #${updatedTicket.ticketNumber || updatedTicket._id}`,
+            req.user ? req.user.name : 'Admin'
+          );
+        }
+      } catch (walletErr) {
+        console.error('Error crediting technician wallet on ticket closure:', walletErr);
+      }
+    }
 
     // Auto-generate follow-up record
     try {

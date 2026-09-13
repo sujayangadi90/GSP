@@ -175,6 +175,22 @@ const createPayout = async (req, res) => {
 
     await payout.save();
 
+    // Automatically deduct payout amount from technician wallet
+    if (payout.amount > 0) {
+      try {
+        const { debitTechnicianWallet } = require('./technicianController');
+        await debitTechnicianWallet(
+          technicianId,
+          payout.amount,
+          payout._id,
+          `Payout disbursed for ${m}/${y} via ${paymentMode}${referenceNumber ? ` (Ref: ${referenceNumber})` : ''}`,
+          req.user ? req.user.name : 'Admin'
+        );
+      } catch (walletErr) {
+        console.error('Error debiting technician wallet on payout:', walletErr);
+      }
+    }
+
     const savedPayout = await Payout.findById(payout._id)
       .populate('technician', 'name code mobile email')
       .populate('paidBy', 'name code email');

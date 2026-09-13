@@ -399,6 +399,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _pendingCount = 0;
   int _completedCount = 0;
   double _earnings = 0.0;
+  double _walletBalance = 0.0;
   bool _isLoading = false;
   List _jobs = [];
   String _selectedFilterType = 'this_month'; // 'this_month', 'last_2_months', 'custom'
@@ -583,6 +584,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _earnings = earnings;
         });
       }
+
+      try {
+        final walletRes = await http.get(
+          Uri.parse('${widget.apiUrl}/technicians/me/wallet'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${widget.token}',
+          },
+        );
+        if (walletRes.statusCode == 200) {
+          final wData = jsonDecode(walletRes.body);
+          if (wData['walletBalance'] is num) {
+            setState(() {
+              _walletBalance = (wData['walletBalance'] as num).toDouble();
+            });
+          }
+        }
+      } catch (wErr) {
+        debugPrint('Error fetching wallet in dashboard: $wErr');
+      }
     } catch (e) {
       print('Error fetching jobs: $e');
     } finally {
@@ -650,7 +671,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 8),
+              // Technician Wallet Card
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TechnicianWalletScreen(
+                        token: widget.token,
+                        apiUrl: widget.apiUrl,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF064E3B), Color(0xFF022C22)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF059669).withOpacity(0.5)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF047857).withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.account_balance_wallet, color: Color(0xFF34D399), size: 24),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'My Wallet Balance',
+                                style: TextStyle(color: Color(0xFFA7F3D0), fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '₹${_walletBalance.toStringAsFixed(0)}',
+                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.extrabold, fontFamily: 'monospace'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const Row(
+                        children: [
+                          Text('History', style: TextStyle(color: Color(0xFF34D399), fontSize: 12, fontWeight: FontWeight.bold)),
+                          SizedBox(width: 2),
+                          Icon(Icons.chevron_right, color: Color(0xFF34D399), size: 18),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -5541,3 +5635,277 @@ class _PayoutHistoryScreenState extends State<PayoutHistoryScreen> {
     );
   }
 }
+
+class TechnicianWalletScreen extends StatefulWidget {
+  final String token;
+  final String apiUrl;
+
+  const TechnicianWalletScreen({
+    super.key,
+    required this.token,
+    required this.apiUrl,
+  });
+
+  @override
+  State<TechnicianWalletScreen> createState() => _TechnicianWalletScreenState();
+}
+
+class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
+  bool _isLoading = true;
+  double _walletBalance = 0.0;
+  List<dynamic> _transactions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchWallet();
+  }
+
+  Future<void> _fetchWallet() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/technicians/me/wallet'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(res.body);
+        setState(() {
+          _walletBalance = (data['walletBalance'] is num) ? (data['walletBalance'] as num).toDouble() : 0.0;
+          _transactions = List.from(data['transactions'] ?? []);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching technician wallet: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Wallet & Transactions', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchWallet,
+            tooltip: 'Refresh Wallet',
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _fetchWallet,
+        child: Column(
+          children: [
+            // Wallet Balance Header Card
+            Container(
+              margin: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(20.0),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF064E3B), Color(0xFF022C22)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF059669).withOpacity(0.5)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.account_balance_wallet, color: Color(0xFF34D399), size: 22),
+                          SizedBox(width: 8),
+                          Text(
+                            'CURRENT WALLET BALANCE',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFA7F3D0),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF047857).withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'ACTIVE',
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '₹${_walletBalance.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Earnings automatically credited on job approval • Payouts automatically deducted',
+                    style: TextStyle(fontSize: 11, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+
+            // Transactions Header Title
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Wallet Transactions',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  Text(
+                    '${_transactions.length} Entry${_transactions.length == 1 ? '' : 'ies'}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // Transactions List
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF34D399)))
+                  : _transactions.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.history_rounded, size: 54, color: Colors.grey.shade700),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'No wallet transactions recorded yet',
+                                style: TextStyle(color: Colors.grey, fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          itemCount: _transactions.length,
+                          itemBuilder: (context, index) {
+                            final tx = _transactions[index];
+                            final isCredit = tx['type'] == 'credit';
+                            final amount = (tx['amount'] is num) ? (tx['amount'] as num).toDouble() : 0.0;
+                            final balanceAfter = (tx['balanceAfter'] is num) ? (tx['balanceAfter'] as num).toDouble() : 0.0;
+                            final description = tx['description'] ?? (isCredit ? 'Job Earnings Credited' : 'Payout Amount Deducted');
+                            
+                            String dateStr = '—';
+                            if (tx['createdAt'] != null) {
+                              try {
+                                final dt = DateTime.parse(tx['createdAt']).toLocal();
+                                dateStr = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                              } catch (_) {
+                                dateStr = tx['createdAt'].toString();
+                              }
+                            }
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10.0),
+                              padding: const EdgeInsets.all(14.0),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B).withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isCredit ? Colors.emerald.withOpacity(0.3) : Colors.rose.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: isCredit ? const Color(0xFF064E3B) : const Color(0xFF881337),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          isCredit ? '+ CREDIT' : '- DEBIT',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: isCredit ? const Color(0xFF34D399) : const Color(0xFFFB7185),
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        '${isCredit ? '+' : '-'}₹${amount.toStringAsFixed(0)}',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'monospace',
+                                          color: isCredit ? const Color(0xFF34D399) : const Color(0xFFFB7185),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    description,
+                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        dateStr,
+                                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      ),
+                                      Text(
+                                        'Bal After: ₹${balanceAfter.toStringAsFixed(0)}',
+                                        style: const TextStyle(fontSize: 11, color: Colors.white70, fontFamily: 'monospace'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
