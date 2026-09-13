@@ -420,6 +420,7 @@ export default function App() {
   const [uploadingInventoryImage, setUploadingInventoryImage] = useState(false);
   const [showStockAdjustment, setShowStockAdjustment] = useState(null); // null or { id, name, sku, mode, quantity, technicianId, technicianName }
   const [selectedItemTransactions, setSelectedItemTransactions] = useState(null); // null or item object
+  const [txHistoryPage, setTxHistoryPage] = useState(1);
   const [inventoryPage, setInventoryPage] = useState(1);
 
   // Item Hold states
@@ -8336,7 +8337,7 @@ export default function App() {
                                     Edit
                                   </button>
                                   <button
-                                    onClick={() => setSelectedItemTransactions(item)}
+                                    onClick={() => { setSelectedItemTransactions(item); setTxHistoryPage(1); }}
                                     className="bg-violet-955/40 hover:bg-violet-900/50 text-violet-400 border border-violet-900/30 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-xs"
                                   >
                                     History ({item.transactions?.length || 0})
@@ -11633,8 +11634,8 @@ export default function App() {
       {/* Transaction History Modal */}
       {selectedItemTransactions && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl lg:max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
                   {selectedItemTransactions.image ? (
@@ -11648,7 +11649,12 @@ export default function App() {
                   )}
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-white text-lg">Stock Transaction History</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-white text-lg">Stock Transaction History</h3>
+                    <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-0.5 rounded-full font-mono font-bold">
+                      {selectedItemTransactions.transactions?.length || 0} total
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-400 mt-0.5">{selectedItemTransactions.name} ({selectedItemTransactions.sku})</p>
                 </div>
               </div>
@@ -11663,64 +11669,119 @@ export default function App() {
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {(!selectedItemTransactions.transactions || selectedItemTransactions.transactions.length === 0) ? (
                 <p className="text-center text-slate-500 py-8 text-sm italic">No transaction history recorded yet.</p>
-              ) : (
-                <div className="bg-slate-950/20 border border-slate-800 rounded-xl overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-800/40 border-b border-slate-800 text-slate-450 font-bold uppercase tracking-wider">
-                        <th className="p-3">Date</th>
-                        <th className="p-3">Type</th>
-                        <th className="p-3 text-right">Qty</th>
-                        <th className="p-3">User</th>
-                        <th className="p-3">Technician / Recipient</th>
-                        <th className="p-3">Ref Ticket</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800 text-slate-300">
-                      {[...selectedItemTransactions.transactions].reverse().map((t, idx) => (
-                        <tr key={t._id || idx} className="hover:bg-slate-800/10">
-                          <td className="p-3">
-                            {new Date(t.date).toLocaleString('en-GB')}
-                          </td>
-                          <td className="p-3 font-semibold uppercase">
-                            {t.type === 'stock_in' && <span className="text-emerald-400">Stock In</span>}
-                            {t.type === 'stock_out' && <span className="text-rose-400">Stock Out</span>}
-                            {t.type === 'ticket_use' && <span className="text-cyan-400">Ticket Use</span>}
-                          </td>
-                          <td className="p-3 text-right font-mono font-bold text-slate-200">
-                            {t.type === 'stock_in' ? `+${t.quantity}` : `-${t.quantity}`}
-                          </td>
-                          <td className="p-3 text-slate-400">
-                            {t.user}
-                          </td>
-                          <td className="p-3">
-                            {t.technicianName ? (
-                              <span className="font-semibold text-violet-400 bg-violet-950/50 border border-violet-800/50 px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1">
-                                <UserCheck className="w-3 h-3 text-violet-400" />
-                                {t.technicianName}
-                              </span>
-                            ) : (
-                              <span className="text-slate-500">-</span>
-                            )}
-                          </td>
-                          <td className="p-3 font-mono text-[11px] text-slate-450">
-                            {t.ticketNumber || '-'}
-                          </td>
+              ) : (() => {
+                const allTx = [...selectedItemTransactions.transactions].reverse();
+                const pageSize = 10;
+                const totalPages = Math.max(1, Math.ceil(allTx.length / pageSize));
+                const currentPage = Math.min(txHistoryPage, totalPages);
+                const pagedTx = allTx.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+                return (
+                  <div className="bg-slate-950/20 border border-slate-800 rounded-xl overflow-hidden shadow-inner">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-850/70 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider">
+                          <th className="p-3.5">Date</th>
+                          <th className="p-3.5">Type</th>
+                          <th className="p-3.5 text-right">Qty</th>
+                          <th className="p-3.5">User</th>
+                          <th className="p-3.5">Technician / Recipient</th>
+                          <th className="p-3.5">Ref Ticket</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 text-slate-300">
+                        {pagedTx.map((t, idx) => (
+                          <tr key={t._id || idx} className="hover:bg-slate-800/30 transition duration-150">
+                            <td className="p-3.5 font-medium">
+                              {new Date(t.date).toLocaleString('en-GB')}
+                            </td>
+                            <td className="p-3.5 font-bold uppercase">
+                              {t.type === 'stock_in' && <span className="text-emerald-400 bg-emerald-950/40 border border-emerald-900/40 px-2 py-0.5 rounded">Stock In</span>}
+                              {t.type === 'stock_out' && <span className="text-rose-400 bg-rose-950/40 border border-rose-900/40 px-2 py-0.5 rounded">Stock Out</span>}
+                              {t.type === 'ticket_use' && <span className="text-cyan-400 bg-cyan-950/40 border border-cyan-900/40 px-2 py-0.5 rounded">Ticket Use</span>}
+                            </td>
+                            <td className="p-3.5 text-right font-mono font-bold text-slate-100 text-sm">
+                              {t.type === 'stock_in' ? `+${t.quantity}` : `-${t.quantity}`}
+                            </td>
+                            <td className="p-3.5 text-slate-400 font-medium">
+                              {t.user}
+                            </td>
+                            <td className="p-3.5">
+                              {t.technicianName ? (
+                                <span className="font-semibold text-violet-400 bg-violet-950/50 border border-violet-800/50 px-2 py-1 rounded text-xs inline-flex items-center gap-1">
+                                  <UserCheck className="w-3.5 h-3.5 text-violet-400" />
+                                  {t.technicianName}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500">-</span>
+                              )}
+                            </td>
+                            <td className="p-3.5 font-mono text-xs text-slate-400">
+                              {t.ticketNumber || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+            
+            {selectedItemTransactions.transactions && selectedItemTransactions.transactions.length > 0 && (() => {
+              const allTx = selectedItemTransactions.transactions;
+              const totalCount = allTx.length;
+              const pageSize = 10;
+              const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+              const currentPage = Math.min(txHistoryPage, totalPages);
+
+              return (
+                <div className="bg-slate-850 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800 shrink-0">
+                  <div className="text-xs text-slate-400">
+                    Showing <span className="font-semibold text-slate-200">{(currentPage - 1) * pageSize + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(currentPage * pageSize, totalCount)}</span> of <span className="font-semibold text-slate-200">{totalCount}</span> transactions
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {totalPages > 1 && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setTxHistoryPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition text-xs font-bold"
+                        >
+                          Previous
+                        </button>
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                          <button
+                            key={p}
+                            onClick={() => setTxHistoryPage(p)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                              p === currentPage
+                                ? 'bg-violet-600 text-white shadow-md'
+                                : 'bg-slate-800 text-slate-350 hover:bg-slate-700 hover:text-white'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setTxHistoryPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition text-xs font-bold"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                    <button 
+                      onClick={() => setSelectedItemTransactions(null)} 
+                      className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer shadow-md transition"
+                    >
+                      Close History
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-            <div className="bg-slate-850 px-6 py-4 flex items-center justify-end border-t border-slate-800">
-              <button 
-                onClick={() => setSelectedItemTransactions(null)} 
-                className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-5 rounded-lg text-sm cursor-pointer shadow-md transition"
-              >
-                Close History
-              </button>
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}
