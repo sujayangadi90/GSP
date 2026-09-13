@@ -51,7 +51,8 @@ import {
   Download,
   FileSpreadsheet,
   AlertTriangle,
-  DollarSign
+  DollarSign,
+  Wallet
 } from 'lucide-react';
 
 
