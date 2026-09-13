@@ -290,10 +290,14 @@ const stockOut = async (req, res) => {
 
 // @desc    Get all active item holds (quantityHeld > 0)
 // @route   GET /api/inventory/item-hold
-// @access  Private/Admin
+// @access  Private/Admin/Technician
 const getItemHolds = async (req, res) => {
   try {
-    const holds = await ItemHold.find({ quantityHeld: { $gt: 0 } })
+    let query = { quantityHeld: { $gt: 0 } };
+    if (req.user && req.user.role === 'technician') {
+      query.technician = req.user._id;
+    }
+    const holds = await ItemHold.find(query)
       .populate('technician', 'name email phone')
       .populate('inventoryItem', 'name sku quantity minStockLevel sellingPrice image')
       .sort({ updatedAt: -1 });

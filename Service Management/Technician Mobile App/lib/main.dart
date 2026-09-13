@@ -629,6 +629,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.inventory_2_outlined),
+            tooltip: 'My Held Stock',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TechnicianItemHoldScreen(
+                    token: widget.token,
+                    apiUrl: widget.apiUrl,
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.video_library_outlined),
             tooltip: 'Video Library',
             onPressed: () {
@@ -4214,6 +4229,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
+                      builder: (context) => TechnicianItemHoldScreen(
+                        token: widget.token!,
+                        apiUrl: widget.apiUrl!,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.inventory_2_outlined, color: Colors.amberAccent),
+                label: const Text('My Held Stock'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E2422),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.amber.withValues(alpha: 0.4)),
+                  ),
+                ),
+              ),
+            ],
+            if (widget.token != null && widget.apiUrl != null) ...[
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
                       builder: (context) => VideoLibraryScreen(
                         token: widget.token!,
                         apiUrl: widget.apiUrl!,
@@ -6163,6 +6205,411 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             color: isSelected ? Colors.white : Colors.white70,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class TechnicianItemHoldScreen extends StatefulWidget {
+  final String token;
+  final String apiUrl;
+
+  const TechnicianItemHoldScreen({
+    super.key,
+    required this.token,
+    required this.apiUrl,
+  });
+
+  @override
+  State<TechnicianItemHoldScreen> createState() => _TechnicianItemHoldScreenState();
+}
+
+class _TechnicianItemHoldScreenState extends State<TechnicianItemHoldScreen> {
+  bool _isLoading = true;
+  String _searchQuery = '';
+  List<dynamic> _itemHolds = [];
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchItemHolds();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchItemHolds() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.apiUrl}/inventory/item-hold'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data is List) {
+          setState(() {
+            _itemHolds = data;
+          });
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to load item holds (${res.statusCode})')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching item holds: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error connecting to server: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  List<dynamic> get _filteredHolds {
+    if (_searchQuery.trim().isEmpty) return _itemHolds;
+    final query = _searchQuery.toLowerCase().trim();
+    return _itemHolds.where((hold) {
+      final item = hold['item'] ?? {};
+      final name = (item['name'] ?? hold['itemName'] ?? '').toString().toLowerCase();
+      final sku = (item['itemCode'] ?? item['sku'] ?? hold['itemCode'] ?? '').toString().toLowerCase();
+      final cat = (item['category'] ?? '').toString().toLowerCase();
+      return name.contains(query) || sku.contains(query) || cat.contains(query);
+    }).toList();
+  }
+
+  int get _totalQuantity {
+    int total = 0;
+    for (var hold in _itemHolds) {
+      if (hold['quantityHeld'] is num) {
+        total += (hold['quantityHeld'] as num).toInt();
+      }
+    }
+    return total;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredList = _filteredHolds;
+    final baseUrl = widget.apiUrl.replaceAll('/api', '');
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Held Stock', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchItemHolds,
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _fetchItemHolds,
+        color: Colors.tealAccent,
+        child: Column(
+          children: [
+            // Search & Summary Header Container
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              color: const Color(0xFF161C1A),
+              child: Column(
+                children: [
+                  // Search Field
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Search items by name or code...',
+                      hintStyle: const TextStyle(color: Colors.grey),
+                      prefixIcon: const Icon(Icons.search, color: Colors.tealAccent),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: Colors.grey),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: const Color(0xFF1E2422),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.teal.withValues(alpha: 0.3)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.teal.withValues(alpha: 0.3)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.tealAccent),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Summary Banner Card
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.teal.shade900.withValues(alpha: 0.6),
+                          const Color(0xFF1E2422),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.teal.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.teal.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.inventory_2, color: Colors.tealAccent, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Total Held Items',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                                Text(
+                                  '${_itemHolds.length} unique items',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.5)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.widgets, color: Colors.amberAccent, size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$_totalQuantity units',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amberAccent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Item List View
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: Colors.tealAccent))
+                  : filteredList.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _searchQuery.isNotEmpty ? Icons.search_off : Icons.inventory_2_outlined,
+                                size: 64,
+                                color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _searchQuery.isNotEmpty
+                                    ? 'No items match "$_searchQuery"'
+                                    : 'You currently hold no inventory items.',
+                                style: const TextStyle(fontSize: 15, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16.0),
+                          itemCount: filteredList.length,
+                          itemBuilder: (context, index) {
+                            final hold = filteredList[index];
+                            final item = hold['item'] ?? {};
+                            final itemName = item['name'] ?? hold['itemName'] ?? 'Unknown Item';
+                            final itemCode = item['itemCode'] ?? item['sku'] ?? hold['itemCode'] ?? 'N/A';
+                            final quantity = hold['quantityHeld'] ?? 0;
+                            final category = item['category'] ?? '';
+                            final imageUrl = item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty
+                                ? (item['imageUrl'].toString().startsWith('http')
+                                    ? item['imageUrl']
+                                    : '$baseUrl/${item['imageUrl']}')
+                                : null;
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              color: const Color(0xFF1E2422),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: BorderSide(color: Colors.grey.shade800),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(14.0),
+                                child: Row(
+                                  children: [
+                                    // Item Image Thumbnail
+                                    Container(
+                                      width: 56,
+                                      height: 56,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF101614),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.grey.shade800),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: imageUrl != null
+                                            ? Image.network(
+                                                imageUrl,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => const Icon(
+                                                  Icons.inventory_2,
+                                                  color: Colors.tealAccent,
+                                                  size: 28,
+                                                ),
+                                              )
+                                            : const Icon(
+                                                Icons.inventory_2,
+                                                color: Colors.tealAccent,
+                                                size: 28,
+                                              ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+
+                                    // Item Details
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            itemName,
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade800,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  'CODE: $itemCode',
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontFamily: 'monospace',
+                                                    color: Colors.white70,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (category.isNotEmpty) ...[
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  category,
+                                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Quantity Held Badge
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.teal.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.tealAccent.withValues(alpha: 0.6)),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          const Text(
+                                            'HELD',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w900,
+                                              color: Colors.tealAccent,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                          Text(
+                                            '$quantity',
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+            ),
+          ],
         ),
       ),
     );

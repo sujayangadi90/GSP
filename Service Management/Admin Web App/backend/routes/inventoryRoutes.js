@@ -28,7 +28,7 @@ router.route('/upload')
   });
 
 router.route('/item-hold')
-  .get(authorize('admin', 'owner'), getItemHolds);
+  .get(authorize('admin', 'owner', 'technician'), getItemHolds);
 
 router.route('/item-hold/return')
   .post(authorize('admin', 'owner'), returnItemHold);
