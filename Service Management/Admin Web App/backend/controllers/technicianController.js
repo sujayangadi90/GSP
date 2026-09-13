@@ -316,7 +316,6 @@ module.exports = {
   getTechnicianById,
   updateTechnician,
   toggleTechnicianStatus,
-  triggerDailyAssignedNotifications,
   creditTechnicianWallet,
   debitTechnicianWallet,
   getTechnicianWallet,
