@@ -1293,6 +1293,34 @@ export default function App() {
     }
   };
 
+  // Wallet Transactions State
+  const [walletTransactions, setWalletTransactions] = useState([]);
+  const [loadingWalletTx, setLoadingWalletTx] = useState(false);
+  const [walletTechDetail, setWalletTechDetail] = useState(null);
+  const [payoutSubTab, setPayoutSubTab] = useState('payout_history'); // 'payout_history' | 'wallet_transactions'
+
+  const fetchWalletTransactions = async (techId) => {
+    const targetTechId = techId || payoutSelectedTech;
+    if (!targetTechId || targetTechId === 'ALL') {
+      setWalletTransactions([]);
+      setWalletTechDetail(null);
+      return;
+    }
+    setLoadingWalletTx(true);
+    try {
+      const data = await apiFetch(`/technicians/${targetTechId}/wallet`);
+      setWalletTransactions(data.transactions || []);
+      setWalletTechDetail({
+        walletBalance: data.walletBalance || 0,
+        technician: data.technician
+      });
+    } catch (err) {
+      console.error('Error fetching wallet transactions:', err);
+    } finally {
+      setLoadingWalletTx(false);
+    }
+  };
+
   const fetchPayouts = async () => {
     try {
       let queryStr = `/payouts?technicianId=${payoutFilters.technicianId}&month=${payoutFilters.month}&year=${payoutFilters.year}&paymentMode=${payoutFilters.paymentMode}&status=${payoutFilters.status}`;
@@ -1369,6 +1397,46 @@ export default function App() {
     return list;
   };
 
+  const handleAnytimePayout = async () => {
+    if (!payoutSelectedTech) {
+      alert('Please select a technician first.');
+      return;
+    }
+    if (!markPaidForm.paymentMode) {
+      alert('Please select a payment mode.');
+      return;
+    }
+    const payAmount = Number(markPaidForm.amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      alert('Please enter a valid payment amount greater than ₹0.');
+      return;
+    }
+    setSavingPayout(true);
+    try {
+      const res = await apiFetch('/payouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          technicianId: payoutSelectedTech,
+          month: payoutSelectedMonth,
+          year: payoutSelectedYear,
+          paymentMode: markPaidForm.paymentMode,
+          referenceNumber: markPaidForm.referenceNumber,
+          amount: payAmount
+        })
+      });
+      alert(res.message || 'Anytime Payout processed successfully!');
+      setMarkPaidForm({ paymentMode: 'Cash', referenceNumber: '', amount: '' });
+      fetchPayouts();
+      fetchWalletTransactions(payoutSelectedTech);
+      if (payoutSelectedTech) handleCalculatePayout();
+    } catch (err) {
+      alert(err.message || 'Failed to process anytime payout');
+    } finally {
+      setSavingPayout(false);
+    }
+  };
+
   const handleSavePayout = async () => {
     if (!payoutCalcResult) return;
     if (!markPaidForm.paymentMode) {
@@ -1399,6 +1467,7 @@ export default function App() {
       setMarkPaidForm({ paymentMode: 'Cash', referenceNumber: '', amount: '' });
       handleCalculatePayout();
       fetchPayouts();
+      if (payoutSelectedTech) fetchWalletTransactions(payoutSelectedTech);
     } catch (err) {
       alert(err.message || 'Failed to record payout');
     } finally {
@@ -9069,23 +9138,23 @@ export default function App() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-                    <FileSpreadsheet className="w-8 h-8 text-emerald-400" />
-                    Technician Payout Management
+                    <Wallet className="w-8 h-8 text-emerald-400" />
+                    Technician Payout & Wallet Management
                   </h1>
                   <p className="text-slate-400 mt-1">
-                    Accounting module to calculate technician monthly earnings and record payouts.
+                    Disburse anytime payouts to technicians and monitor live wallet balance & transaction history.
                   </p>
                 </div>
               </div>
 
-              {/* Section 1: Calculate & Mark Payout */}
+              {/* Section 1: Disburse Anytime Payout & Live Wallet Overview */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-violet-400" />
-                  Calculate Technician Earnings
+                  <DollarSign className="w-5 h-5 text-emerald-400" />
+                  Disburse Anytime Payout
                 </h2>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                       Select Technician <span className="text-red-400">*</span>
@@ -9093,7 +9162,18 @@ export default function App() {
                     <select
                       value={payoutSelectedTech}
                       onFocus={() => { if (!technicians || technicians.length === 0) fetchTechnicians(); }}
-                      onChange={(e) => setPayoutSelectedTech(e.target.value)}
+                      onChange={(e) => {
+                        const tId = e.target.value;
+                        setPayoutSelectedTech(tId);
+                        if (tId) {
+                          handleCalculatePayout();
+                          fetchWalletTransactions(tId);
+                        } else {
+                          setPayoutCalcResult(null);
+                          setWalletTransactions([]);
+                          setWalletTechDetail(null);
+                        }
+                      }}
                       className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
                     >
                       <option value="">-- Choose Technician --</option>
@@ -9107,387 +9187,332 @@ export default function App() {
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                      Select Month <span className="text-red-400">*</span>
+                      Payout Amount (₹) <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 2000"
+                      value={markPaidForm.amount}
+                      onChange={(e) => setMarkPaidForm({ ...markPaidForm, amount: e.target.value })}
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                      Payment Mode <span className="text-red-400">*</span>
                     </label>
                     <select
-                      value={payoutSelectedMonth}
-                      onChange={(e) => setPayoutSelectedMonth(Number(e.target.value))}
+                      value={markPaidForm.paymentMode}
+                      onChange={(e) => setMarkPaidForm({ ...markPaidForm, paymentMode: e.target.value })}
                       className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
                     >
-                      {MONTHS_LIST.map((m, idx) => (
-                        <option key={idx} value={idx + 1}>
-                          {m}
-                        </option>
+                      {[
+                        'Cash', 'UPI', 'Bank Transfer / NEFT', 'IMPS', 'RTGS',
+                        'Cheque', 'Credit Card', 'Debit Card', 'Net Banking'
+                      ].map((mode) => (
+                        <option key={mode} value={mode}>{mode}</option>
                       ))}
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                      Select Year <span className="text-red-400">*</span>
+                      Ref Number / Note
                     </label>
-                    <select
-                      value={payoutSelectedYear}
-                      onChange={(e) => setPayoutSelectedYear(Number(e.target.value))}
+                    <input
+                      type="text"
+                      placeholder="e.g. UPI Ref / Txn ID"
+                      value={markPaidForm.referenceNumber}
+                      onChange={(e) => setMarkPaidForm({ ...markPaidForm, referenceNumber: e.target.value })}
                       className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
-                    >
-                      {YEARS_LIST.map((y) => (
-                        <option key={y} value={y}>
-                          {y}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                 </div>
 
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleCalculatePayout}
-                    disabled={!payoutSelectedTech || loadingPayoutCalc}
-                    className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
-                  >
-                    {loadingPayoutCalc ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    Calculate Earnings
-                  </button>
-                </div>
-
-                {payoutCalcResult && (
-                  <div className="mt-6 border-t border-slate-800 pt-6">
-                    <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className="text-lg font-bold text-white">{payoutCalcResult.technician.name}</span>
-                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-700 text-slate-300">
-                            {payoutCalcResult.technician.code || payoutCalcResult.technician.mobile}
-                          </span>
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
-                            payoutCalcResult.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                          }`}>
-                            {payoutCalcResult.status}
-                          </span>
-                          <span className="text-xs font-bold px-3 py-1 rounded-full bg-violet-950/80 text-violet-300 border border-violet-700/50 flex items-center gap-1.5">
-                            👛 Wallet Balance: ₹{payoutCalcResult.walletBalance !== undefined ? payoutCalcResult.walletBalance : 0}
-                          </span>
-                        </div>
-
-                        <div className="text-sm text-slate-400 flex flex-wrap items-center gap-x-6 gap-y-1">
-                          <span>Month: <strong className="text-slate-200">{MONTHS_LIST[payoutCalcResult.month - 1]} {payoutCalcResult.year}</strong></span>
-                          <span>Total Completed Jobs: <strong className="text-slate-200">{payoutCalcResult.completedJobsCount}</strong></span>
+                {/* Wallet balance highlight card when tech selected */}
+                {payoutSelectedTech && (
+                  <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-violet-600/20 border border-violet-500/30 rounded-xl text-violet-400">
+                        <Wallet className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-400 uppercase font-semibold">Selected Technician Wallet Balance</div>
+                        <div className="text-2xl font-black text-emerald-400 font-mono">
+                          ₹{(walletTechDetail?.walletBalance !== undefined ? walletTechDetail.walletBalance : (payoutCalcResult?.walletBalance || 0)).toLocaleString('en-IN')}
                         </div>
                       </div>
+                    </div>
 
-                      {/* Service & Installation Breakdown */}
-                      <div className="flex flex-wrap items-center gap-3 bg-slate-900/90 border border-slate-700/70 p-3 rounded-xl">
-                        <div className="px-3.5 py-2 rounded-lg bg-indigo-950/60 border border-indigo-800/60">
-                          <div className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider">Service Jobs</div>
-                          <div className="text-xs font-extrabold text-white flex items-center gap-2 mt-0.5">
-                            <span>{payoutCalcResult.completedServiceJobsCount || 0} Tickets</span>
-                            <span className="text-indigo-400 font-mono font-bold">₹{(payoutCalcResult.serviceEarnings || 0).toLocaleString('en-IN')}</span>
-                          </div>
-                        </div>
-
-                        <div className="px-3.5 py-2 rounded-lg bg-emerald-950/60 border border-emerald-800/60">
-                          <div className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider">Installation Jobs</div>
-                          <div className="text-xs font-extrabold text-white flex items-center gap-2 mt-0.5">
-                            <span>{payoutCalcResult.completedInstallationJobsCount || 0} Tickets</span>
-                            <span className="text-emerald-400 font-mono font-bold">₹{(payoutCalcResult.installationEarnings || 0).toLocaleString('en-IN')}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col lg:items-end gap-3">
-                        <div className="text-left lg:text-right">
-                          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Earnings / Payout Amount</div>
-                          <div className="text-3xl font-black text-emerald-400 font-mono">₹{payoutCalcResult.totalEarnings.toLocaleString('en-IN')}</div>
-                        </div>
-
-                        {payoutCalcResult.status === 'paid' ? (
-                          <div className="bg-emerald-950/40 border border-emerald-800/50 rounded-lg p-3 text-xs text-emerald-300">
-                            <div className="font-bold flex items-center gap-1.5"><CheckCircle className="w-4 h-4 text-emerald-400" /> Already Marked as Paid</div>
-                            <div>Payment Mode: <strong>{payoutCalcResult.payout?.paymentMode}</strong></div>
-                            {payoutCalcResult.payout?.referenceNumber && <div>Ref: <strong>{payoutCalcResult.payout.referenceNumber}</strong></div>}
-                            <div>Paid Date: {new Date(payoutCalcResult.payout?.paidAt).toLocaleDateString()}</div>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setMarkPaidForm({
-                                paymentMode: 'Cash',
-                                referenceNumber: '',
-                                amount: payoutCalcResult.totalEarnings
-                              });
-                              setShowMarkPaidModal(true);
-                            }}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Mark as Paid
-                          </button>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <button
+                        onClick={handleAnytimePayout}
+                        disabled={savingPayout || !markPaidForm.amount || Number(markPaidForm.amount) <= 0}
+                        className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg transition text-sm flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {savingPayout ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                        Pay Anytime
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Section 2: Payout Records History Table */}
+              {/* Section 2: Tabbed Records History (Payout History & Wallet Transactions) */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-indigo-400" />
-                    Payout Records History
-                  </h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setPayoutSubTab('payout_history')}
+                      className={`px-4 py-2 rounded-xl font-bold text-sm transition cursor-pointer flex items-center gap-2 ${
+                        payoutSubTab === 'payout_history'
+                          ? 'bg-indigo-600 text-white shadow-md'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4" /> Payout History
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPayoutSubTab('wallet_transactions');
+                        if (payoutSelectedTech) fetchWalletTransactions(payoutSelectedTech);
+                      }}
+                      className={`px-4 py-2 rounded-xl font-bold text-sm transition cursor-pointer flex items-center gap-2 ${
+                        payoutSubTab === 'wallet_transactions'
+                          ? 'bg-violet-600 text-white shadow-md'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      <Wallet className="w-4 h-4" /> Wallet Transactions
+                    </button>
+                  </div>
+
                   <button
-                    onClick={fetchPayouts}
+                    onClick={() => {
+                      fetchPayouts();
+                      if (payoutSelectedTech) fetchWalletTransactions(payoutSelectedTech);
+                    }}
                     className="text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> Refresh Records
                   </button>
                 </div>
 
-                {/* Filters bar */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-                  <select
-                    value={payoutFilters.technicianId}
-                    onFocus={() => { if (!technicians || technicians.length === 0) fetchTechnicians(); }}
-                    onChange={(e) => setPayoutFilters({ ...payoutFilters, technicianId: e.target.value })}
-                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
-                  >
-                    <option value="ALL">All Technicians</option>
-                    {(Array.isArray(technicians) ? technicians : []).map((t) => (
-                      <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>
-                    ))}
-                  </select>
+                {/* Payout Records Sub-Tab */}
+                {payoutSubTab === 'payout_history' && (
+                  <div className="space-y-4">
+                    {/* Filters bar */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                      <select
+                        value={payoutFilters.technicianId}
+                        onFocus={() => { if (!technicians || technicians.length === 0) fetchTechnicians(); }}
+                        onChange={(e) => setPayoutFilters({ ...payoutFilters, technicianId: e.target.value })}
+                        className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                      >
+                        <option value="ALL">All Technicians</option>
+                        {(Array.isArray(technicians) ? technicians : []).map((t) => (
+                          <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>
+                        ))}
+                      </select>
 
-                  <select
-                    value={payoutFilters.month}
-                    onChange={(e) => setPayoutFilters({ ...payoutFilters, month: e.target.value })}
-                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
-                  >
-                    {MONTHS_LIST.map((m, idx) => (
-                      <option key={idx} value={idx + 1}>{m}</option>
-                    ))}
-                  </select>
+                      <select
+                        value={payoutFilters.month}
+                        onChange={(e) => setPayoutFilters({ ...payoutFilters, month: e.target.value })}
+                        className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                      >
+                        {MONTHS_LIST.map((m, idx) => (
+                          <option key={idx} value={idx + 1}>{m}</option>
+                        ))}
+                      </select>
 
-                  <select
-                    value={payoutFilters.year}
-                    onChange={(e) => setPayoutFilters({ ...payoutFilters, year: e.target.value })}
-                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
-                  >
-                    {YEARS_LIST.map((y) => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
+                      <select
+                        value={payoutFilters.year}
+                        onChange={(e) => setPayoutFilters({ ...payoutFilters, year: e.target.value })}
+                        className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                      >
+                        {YEARS_LIST.map((y) => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
 
-                  <select
-                    value={payoutFilters.paymentMode}
-                    onChange={(e) => setPayoutFilters({ ...payoutFilters, paymentMode: e.target.value })}
-                    className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
-                  >
-                    <option value="ALL">All Payment Modes</option>
-                    {[
-                      'Cash', 'UPI', 'Credit Card', 'Debit Card', 'Net Banking',
-                      'Bank Transfer / NEFT', 'RTGS', 'IMPS', 'Cheque', 'Demand Draft (DD)'
-                    ].map((mode) => (
-                      <option key={mode} value={mode}>{mode}</option>
-                    ))}
-                  </select>
+                      <select
+                        value={payoutFilters.paymentMode}
+                        onChange={(e) => setPayoutFilters({ ...payoutFilters, paymentMode: e.target.value })}
+                        className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                      >
+                        <option value="ALL">All Payment Modes</option>
+                        {[
+                          'Cash', 'UPI', 'Credit Card', 'Debit Card', 'Net Banking',
+                          'Bank Transfer / NEFT', 'RTGS', 'IMPS', 'Cheque', 'Demand Draft (DD)'
+                        ].map((mode) => (
+                          <option key={mode} value={mode}>{mode}</option>
+                        ))}
+                      </select>
 
-                  <button
-                    onClick={() => setPayoutFilters({ technicianId: 'ALL', month: new Date().getMonth() + 1, year: new Date().getFullYear(), paymentMode: 'ALL', status: 'ALL', fromDate: '', toDate: '' })}
-                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
-                  </button>
-                </div>
-
-                {/* Records table */}
-                <div className="overflow-x-auto rounded-xl border border-slate-800">
-                  <table className="w-full text-left text-sm text-slate-300">
-                    <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 font-bold tracking-wider">
-                      <tr>
-                        <th className="px-4 py-3">Technician</th>
-                        <th className="px-4 py-3">Month & Year</th>
-                        <th className="px-4 py-3">Amount Paid</th>
-                        <th className="px-4 py-3">Payment Mode</th>
-                        <th className="px-4 py-3">Ref Number</th>
-                        <th className="px-4 py-3">Paid Date</th>
-                        <th className="px-4 py-3">Recorded By</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {payouts.length === 0 ? (
-                        <tr>
-                          <td colSpan="7" className="px-4 py-8 text-center text-slate-500 font-medium">
-                            No payout records found.
-                          </td>
-                        </tr>
-                      ) : (
-                        payouts.map((rec) => (
-                          <tr key={rec._id} className="hover:bg-slate-800/40 transition">
-                            <td className="px-4 py-3 font-semibold text-white">
-                              {rec.technician?.name || 'N/A'}
-                              <div className="text-xs text-slate-500 font-mono">{rec.technician?.code || rec.technician?.mobile}</div>
-                            </td>
-                            <td className="px-4 py-3 font-medium">
-                              {MONTHS_LIST[rec.month - 1]} {rec.year}
-                            </td>
-                            <td className="px-4 py-3 font-bold text-emerald-400 font-mono">
-                              ₹{rec.amount?.toLocaleString('en-IN') || 0}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-lg font-medium">
-                                {rec.paymentMode}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-xs font-mono text-slate-400">
-                              {rec.referenceNumber || '-'}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-slate-400">
-                              {rec.paidAt ? new Date(rec.paidAt).toLocaleDateString() + ' ' + new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-slate-400">
-                              {rec.paidBy?.name || 'Admin'}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Mark as Paid Modal */}
-              {showMarkPaidModal && payoutCalcResult && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 relative">
-                    <button
-                      onClick={() => setShowMarkPaidModal(false)}
-                      className="absolute top-4 right-4 text-slate-400 hover:text-white transition"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-
-                    <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
-                      <CheckCircle className="w-6 h-6 text-emerald-400" />
-                      Mark Payout as Paid
-                    </h3>
-
-                    <div className="bg-slate-800/80 rounded-xl p-4 space-y-2 text-sm">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400">Technician:</span>
-                        <strong className="text-white">{payoutCalcResult.technician.name}</strong>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-400">Current Wallet Balance:</span>
-                        <span className="font-bold text-violet-300 font-mono bg-violet-950/80 px-2 py-0.5 rounded border border-violet-700/40">
-                          👛 ₹{payoutCalcResult.walletBalance !== undefined ? payoutCalcResult.walletBalance : 0}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400">Month / Year:</span>
-                        <strong className="text-white">{MONTHS_LIST[payoutCalcResult.month - 1]} {payoutCalcResult.year}</strong>
-                      </div>
-                      <div className="flex justify-between text-xs text-indigo-300 pt-1.5 border-t border-slate-700/50">
-                        <span>Service ({payoutCalcResult.completedServiceJobsCount || 0} Tickets):</span>
-                        <strong className="font-mono">₹{(payoutCalcResult.serviceEarnings || 0).toLocaleString('en-IN')}</strong>
-                      </div>
-                      <div className="flex justify-between text-xs text-emerald-300">
-                        <span>Installation ({payoutCalcResult.completedInstallationJobsCount || 0} Tickets):</span>
-                        <strong className="font-mono">₹{(payoutCalcResult.installationEarnings || 0).toLocaleString('en-IN')}</strong>
-                      </div>
-                      <div className="flex justify-between items-center border-t border-slate-700/60 pt-2">
-                        <span className="text-slate-400 font-bold">Total Earnings Outstanding:</span>
-                        <strong className="text-emerald-400 text-base font-mono">₹{payoutCalcResult.totalEarnings.toLocaleString('en-IN')}</strong>
-                      </div>
+                      <button
+                        onClick={() => setPayoutFilters({ technicianId: 'ALL', month: new Date().getMonth() + 1, year: new Date().getFullYear(), paymentMode: 'ALL', status: 'ALL', fromDate: '', toDate: '' })}
+                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
+                      </button>
                     </div>
 
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between items-center mb-1.5">
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                            Payment Amount (Part/Full) <span className="text-red-400">*</span>
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setMarkPaidForm({ ...markPaidForm, amount: payoutCalcResult.totalEarnings })}
-                            className="text-[11px] font-bold text-violet-400 hover:underline cursor-pointer"
-                          >
-                            Pay Full (₹{payoutCalcResult.totalEarnings})
-                          </button>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">₹</span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={markPaidForm.amount}
-                            onChange={(e) => setMarkPaidForm({ ...markPaidForm, amount: e.target.value })}
-                            placeholder={`Enter amount to pay (e.g. ${payoutCalcResult.totalEarnings})`}
-                            className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-8 pr-4 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-violet-500"
-                          />
-                        </div>
-                      </div>
+                    {/* Payout Records Table */}
+                    <div className="overflow-x-auto rounded-xl border border-slate-800">
+                      <table className="w-full text-left text-sm text-slate-300">
+                        <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 font-bold tracking-wider">
+                          <tr>
+                            <th className="px-4 py-3">Technician</th>
+                            <th className="px-4 py-3">Month & Year</th>
+                            <th className="px-4 py-3">Amount Paid</th>
+                            <th className="px-4 py-3">Payment Mode</th>
+                            <th className="px-4 py-3">Ref Number</th>
+                            <th className="px-4 py-3">Paid Date</th>
+                            <th className="px-4 py-3">Recorded By</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                          {payouts.length === 0 ? (
+                            <tr>
+                              <td colSpan="7" className="px-4 py-8 text-center text-slate-500 font-medium">
+                                No payout records found.
+                              </td>
+                            </tr>
+                          ) : (
+                            payouts.map((rec) => (
+                              <tr key={rec._id} className="hover:bg-slate-800/40 transition">
+                                <td className="px-4 py-3 font-semibold text-white">
+                                  {rec.technician?.name || 'N/A'}
+                                  <div className="text-xs text-slate-500 font-mono">{rec.technician?.code || rec.technician?.mobile}</div>
+                                </td>
+                                <td className="px-4 py-3 font-medium">
+                                  {MONTHS_LIST[rec.month - 1]} {rec.year}
+                                </td>
+                                <td className="px-4 py-3 font-bold text-emerald-400 font-mono">
+                                  ₹{rec.amount?.toLocaleString('en-IN') || 0}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className="bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-lg font-medium">
+                                    {rec.paymentMode}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-slate-400">
+                                  {rec.referenceNumber || '-'}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-slate-400">
+                                  {rec.paidAt ? new Date(rec.paidAt).toLocaleDateString() + ' ' + new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-slate-400">
+                                  {rec.paidBy?.name || 'Admin'}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-                          Payment Mode <span className="text-red-400">*</span>
-                        </label>
+                {/* Wallet Transactions Sub-Tab */}
+                {payoutSubTab === 'wallet_transactions' && (
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-800/60 p-4 rounded-xl border border-slate-700/60">
+                      <div className="flex items-center gap-3 w-full sm:w-72">
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Filter Tech:</label>
                         <select
-                          value={markPaidForm.paymentMode}
-                          onChange={(e) => setMarkPaidForm({ ...markPaidForm, paymentMode: e.target.value })}
-                          className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                          value={payoutSelectedTech}
+                          onChange={(e) => {
+                            const tId = e.target.value;
+                            setPayoutSelectedTech(tId);
+                            if (tId) fetchWalletTransactions(tId);
+                            else {
+                              setWalletTransactions([]);
+                              setWalletTechDetail(null);
+                            }
+                          }}
+                          className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500"
                         >
-                          {[
-                            'Cash',
-                            'UPI',
-                            'Credit Card',
-                            'Debit Card',
-                            'Net Banking',
-                            'Bank Transfer / NEFT',
-                            'RTGS',
-                            'IMPS',
-                            'Cheque',
-                            'Demand Draft (DD)'
-                          ].map((mode) => (
-                            <option key={mode} value={mode}>{mode}</option>
+                          <option value="">-- Select Technician --</option>
+                          {(Array.isArray(technicians) ? technicians : []).map((t) => (
+                            <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>
                           ))}
                         </select>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-                          Reference Number (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={markPaidForm.referenceNumber}
-                          onChange={(e) => setMarkPaidForm({ ...markPaidForm, referenceNumber: e.target.value })}
-                          placeholder="e.g. UTR / Transaction ID / Cheque No"
-                          className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500"
-                        />
-                      </div>
+                      {walletTechDetail && (
+                        <div className="text-xs text-slate-300 font-medium">
+                          Showing transactions for <strong className="text-white">{walletTechDetail.technician?.name}</strong> | Current Balance: <strong className="text-emerald-400 font-mono">₹{walletTechDetail.walletBalance.toLocaleString('en-IN')}</strong>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
-                      <button
-                        onClick={() => setShowMarkPaidModal(false)}
-                        className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 font-bold text-sm hover:bg-slate-800 transition cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSavePayout}
-                        disabled={savingPayout}
-                        className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
-                      >
-                        {savingPayout ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                        Confirm Payment
-                      </button>
-                    </div>
+                    {!payoutSelectedTech ? (
+                      <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-8 text-center text-slate-400">
+                        Please select a technician above to view their complete live wallet transaction history.
+                      </div>
+                    ) : loadingWalletTx ? (
+                      <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-8 text-center text-slate-400 flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin text-violet-400" /> Loading wallet transactions...
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-xl border border-slate-800">
+                        <table className="w-full text-left text-sm text-slate-300">
+                          <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 font-bold tracking-wider">
+                            <tr>
+                              <th className="px-4 py-3">Date & Time</th>
+                              <th className="px-4 py-3">Type</th>
+                              <th className="px-4 py-3">Amount</th>
+                              <th className="px-4 py-3">Balance After</th>
+                              <th className="px-4 py-3">Description</th>
+                              <th className="px-4 py-3">Reference / Ticket</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800">
+                            {walletTransactions.length === 0 ? (
+                              <tr>
+                                <td colSpan="6" className="px-4 py-8 text-center text-slate-500 font-medium">
+                                  No wallet transactions found for this technician.
+                                </td>
+                              </tr>
+                            ) : (
+                              walletTransactions.map((tx) => (
+                                <tr key={tx._id} className="hover:bg-slate-800/40 transition">
+                                  <td className="px-4 py-3 text-xs text-slate-400">
+                                    {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() + ' ' + new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className={`text-xs font-bold px-2.5 py-1 rounded-lg uppercase ${
+                                      tx.type === 'credit'
+                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                    }`}>
+                                      {tx.type}
+                                    </span>
+                                  </td>
+                                  <td className={`px-4 py-3 font-bold font-mono ${tx.type === 'credit' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {tx.type === 'credit' ? '+' : '-'}₹{tx.amount?.toLocaleString('en-IN') || 0}
+                                  </td>
+                                  <td className="px-4 py-3 font-mono font-medium text-slate-300">
+                                    ₹{tx.balanceAfter?.toLocaleString('en-IN') || 0}
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-slate-300">
+                                    {tx.description}
+                                  </td>
+                                  <td className="px-4 py-3 text-xs font-mono text-slate-400">
+                                    {tx.ticket ? `Ticket #${tx.ticket.ticketNumber || tx.ticket}` : (tx.payout ? `Payout Ref: ${tx.payout.referenceNumber || 'N/A'}` : '-')}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
 

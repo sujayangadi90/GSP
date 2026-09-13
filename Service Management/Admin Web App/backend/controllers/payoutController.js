@@ -127,69 +127,58 @@ const calculateTechnicianPayout = async (req, res) => {
   }
 };
 
-// @desc    Mark payout as paid
+// @desc    Record anytime payout to technician
 // @route   POST /api/payouts
 // @access  Private (Admin)
 const createPayout = async (req, res) => {
   try {
-    const { technicianId, month, year, paymentMode, referenceNumber, amount } = req.body;
+    const { technicianId, month, year, paymentMode, referenceNumber, amount, notes } = req.body;
 
-    if (!technicianId || !month || !year || !paymentMode) {
-      return res.status(400).json({ message: 'Technician, month, year, and payment mode are required.' });
+    if (!technicianId || !paymentMode) {
+      return res.status(400).json({ message: 'Technician and payment mode are required.' });
     }
 
-    const m = parseInt(month, 10);
-    const y = parseInt(year, 10);
+    const payAmount = Number(amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ message: 'Valid payment amount greater than ₹0 is required.' });
+    }
+
+    const currentDate = new Date();
+    const m = month ? parseInt(month, 10) : currentDate.getMonth() + 1;
+    const y = year ? parseInt(year, 10) : currentDate.getFullYear();
 
     const technicianUser = await User.findById(technicianId);
     if (!technicianUser) {
       return res.status(404).json({ message: 'Technician not found.' });
     }
 
-    // Check if payout for this technician and month/year already exists as PAID
-    let payout = await Payout.findOne({
+    // Create a new Payout record for this payout disbursement
+    const payout = new Payout({
       technician: technicianId,
       month: m,
-      year: y
+      year: y,
+      amount: payAmount,
+      status: 'paid',
+      paymentMode,
+      referenceNumber: referenceNumber ? referenceNumber.trim() : (notes || ''),
+      paidAt: new Date(),
+      paidBy: req.user ? req.user._id : null
     });
-
-    if (payout && payout.status === 'paid') {
-      return res.status(400).json({
-        message: `Payout for ${technicianUser.name} for ${m}/${y} has already been marked as Paid.`
-      });
-    }
-
-    if (!payout) {
-      payout = new Payout({
-        technician: technicianId,
-        month: m,
-        year: y
-      });
-    }
-
-    payout.amount = amount !== undefined ? Number(amount) : payout.amount;
-    payout.status = 'paid';
-    payout.paymentMode = paymentMode;
-    payout.referenceNumber = referenceNumber ? referenceNumber.trim() : '';
-    payout.paidAt = new Date();
-    payout.paidBy = req.user._id;
 
     await payout.save();
 
     // Automatically deduct payout amount from technician wallet
-    if (payout.amount > 0) {
-      try {
-        const { debitTechnicianWallet } = require('./technicianController');
-        await debitTechnicianWallet(
-          technicianId,
-          payout.amount,
-          payout._id,
-          `Payout disbursed for ${m}/${y} via ${paymentMode}${referenceNumber ? ` (Ref: ${referenceNumber})` : ''}`,
-          req.user ? req.user.name : 'Admin'
-        );
-      } catch (walletErr) {
-        console.error('Error debiting technician wallet on payout:', walletErr);
-      }
+    try {
+      const { debitTechnicianWallet } = require('./technicianController');
+      await debitTechnicianWallet(
+        technicianId,
+        payAmount,
+        payout._id,
+        `Payout disbursed via ${paymentMode}${referenceNumber ? ` (Ref: ${referenceNumber})` : ''}`,
+        req.user ? req.user.name : 'Admin'
+      );
+    } catch (walletErr) {
+      console.error('Error debiting technician wallet on payout:', walletErr);
     }
 
     const savedPayout = await Payout.findById(payout._id)
@@ -197,14 +186,11 @@ const createPayout = async (req, res) => {
       .populate('paidBy', 'name code email');
 
     return res.status(201).json({
-      message: 'Payout marked as Paid successfully',
+      message: `Payout of ₹${payAmount} successfully processed for ${technicianUser.name}`,
       payout: savedPayout
     });
   } catch (error) {
     console.error('Error in createPayout:', error);
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'A payout record already exists for this technician and month.' });
-    }
     return res.status(500).json({ message: 'Failed to record payout', error: error.message });
   }
 };
