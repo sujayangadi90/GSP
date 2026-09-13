@@ -11256,16 +11256,34 @@ export default function App() {
                       <select
                         className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
                         value={showStockAdjustment.technicianId || ''}
-                        onChange={e => {
+                        onChange={async (e) => {
                           const techId = e.target.value;
                           const tech = technicians.find(t => (t._id === techId || t.id === techId));
-                          setShowStockAdjustment({
-                            ...showStockAdjustment,
+                          setShowStockAdjustment(prev => ({
+                            ...prev,
                             technicianId: techId,
                             technicianName: tech ? tech.name : '',
                             ticketId: '',
-                            ticketNumber: ''
-                          });
+                            ticketNumber: '',
+                            loadingTechTickets: !!techId,
+                            techTickets: []
+                          }));
+
+                          if (techId) {
+                            try {
+                              const tData = await apiFetch(`/tickets?technician=${techId}&status=all`);
+                              const rawList = Array.isArray(tData) ? tData : (tData?.data || tData?.tickets || []);
+                              const activeTkts = rawList.filter(t => t.status !== 'closed' && t.status !== 'cancelled');
+                              setShowStockAdjustment(prev => ({
+                                ...prev,
+                                techTickets: activeTkts,
+                                loadingTechTickets: false
+                              }));
+                            } catch (err) {
+                              console.error('Error fetching tech tickets:', err);
+                              setShowStockAdjustment(prev => ({ ...prev, loadingTechTickets: false }));
+                            }
+                          }
                         }}
                       >
                         <option value="">-- Select Technician (Optional) --</option>
@@ -11286,29 +11304,50 @@ export default function App() {
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
                           Select Ticket Number (Stock Out For Ticket)
                         </label>
-                        <select
-                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
-                          value={showStockAdjustment.ticketNumber || ''}
-                          onChange={e => {
-                            const tktNum = e.target.value;
-                            const tktObj = tickets.find(t => t.ticketNumber === tktNum);
-                            setShowStockAdjustment({
-                              ...showStockAdjustment,
-                              ticketId: tktObj ? tktObj._id : '',
-                              ticketNumber: tktNum
-                            });
-                          }}
-                        >
-                          <option value="">-- Select Ticket Number --</option>
-                          {tickets
-                            .filter(t => (t.assignedTechnician?._id === showStockAdjustment.technicianId || t.assignedTechnician === showStockAdjustment.technicianId) && t.status !== 'closed' && t.status !== 'cancelled')
-                            .map(tkt => (
-                              <option key={tkt._id} value={tkt.ticketNumber}>
-                                #{tkt.ticketNumber} - {tkt.product?.name || tkt.type} ({tkt.customer?.name || 'Customer'})
-                              </option>
-                            ))
-                          }
-                        </select>
+                        {showStockAdjustment.loadingTechTickets ? (
+                          <div className="text-xs text-slate-400 py-2 italic flex items-center gap-2">
+                            <RefreshCw className="w-3 h-3 animate-spin text-violet-400" /> Loading technician assigned tickets...
+                          </div>
+                        ) : (
+                          <select
+                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                            value={showStockAdjustment.ticketNumber || ''}
+                            onChange={e => {
+                              const tktNum = e.target.value;
+                              const availableList = showStockAdjustment.techTickets && showStockAdjustment.techTickets.length > 0
+                                ? showStockAdjustment.techTickets
+                                : (Array.isArray(tickets) ? tickets : (tickets?.data || []));
+                              const tktObj = availableList.find(t => t.ticketNumber === tktNum);
+                              setShowStockAdjustment(prev => ({
+                                ...prev,
+                                ticketId: tktObj ? tktObj._id : '',
+                                ticketNumber: tktNum
+                              }));
+                            }}
+                          >
+                            <option value="">-- Select Ticket Number --</option>
+                            {(() => {
+                              const rawTickets = showStockAdjustment.techTickets && showStockAdjustment.techTickets.length > 0
+                                ? showStockAdjustment.techTickets
+                                : (Array.isArray(tickets) ? tickets : (tickets?.data || []));
+
+                              const filtered = rawTickets.filter(t => {
+                                const techId = t.assignedTechnician?._id || t.assignedTechnician;
+                                return (techId === showStockAdjustment.technicianId || !showStockAdjustment.techTickets) && t.status !== 'closed' && t.status !== 'cancelled';
+                              });
+
+                              if (filtered.length === 0) {
+                                return <option disabled value="">No active tickets assigned to this technician</option>;
+                              }
+
+                              return filtered.map(tkt => (
+                                <option key={tkt._id} value={tkt.ticketNumber}>
+                                  #{tkt.ticketNumber} - {tkt.product?.name || tkt.type || 'Ticket'} ({tkt.customer?.name || 'Customer'})
+                                </option>
+                              ));
+                            })()}
+                          </select>
+                        )}
                       </div>
                     )}
                   </>
