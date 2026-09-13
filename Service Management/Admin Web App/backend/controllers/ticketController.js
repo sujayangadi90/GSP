@@ -147,17 +147,21 @@ const createTicket = async (req, res) => {
 const attachFeesToTickets = async (tickets) => {
   const brandsList = await Brand.find().populate('appliance');
   const brandMap = {};
+  const brandByNameMap = {};
   brandsList.forEach(b => {
     const appName = b.appliance ? b.appliance.name.trim().toLowerCase() : '';
     const bName = b.name.trim().toLowerCase();
     brandMap[`${appName}_${bName}`] = b;
+    if (!brandByNameMap[bName]) {
+      brandByNameMap[bName] = b;
+    }
   });
 
   return tickets.map(t => {
     const ticketObj = t.toObject();
     const appName = t.product.category ? t.product.category.trim().toLowerCase() : '';
     const bName = t.product.name ? t.product.name.trim().toLowerCase() : '';
-    const brandObj = brandMap[`${appName}_${bName}`];
+    const brandObj = brandMap[`${appName}_${bName}`] || brandByNameMap[bName];
     if (brandObj) {
       ticketObj.customerServiceFee = brandObj.customerServiceFee !== undefined ? brandObj.customerServiceFee : (brandObj.serviceFee || 0);
       ticketObj.customerInstallationFee = brandObj.customerInstallationFee !== undefined ? brandObj.customerInstallationFee : (brandObj.installationFee || 0);

@@ -1556,6 +1556,7 @@ export default function App() {
   };
 
   const openTicketDetails = async (ticket) => {
+    if (!ticket) return;
     setSelectedTicket(ticket);
     try {
       const fullTicket = await apiFetch(`/tickets/${ticket._id}`);
@@ -3971,7 +3972,7 @@ export default function App() {
                                 <p className="text-xs text-slate-400 mt-0.5">Technician: {ticket.assignedTechnician?.name || 'N/A'}</p>
                               </div>
                               <button 
-                                onClick={() => setSelectedTicket(ticket)}
+                                onClick={() => openTicketDetails(ticket)}
                                 className="bg-violet-600 hover:bg-violet-500 px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer"
                               >
                                 Verify Work
@@ -4004,7 +4005,7 @@ export default function App() {
                                 <p className="text-xs text-slate-400 mt-0.5">{ticket.customer.city} • {ticket.type}</p>
                               </div>
                               <button 
-                                onClick={() => setSelectedTicket(ticket)}
+                                onClick={() => openTicketDetails(ticket)}
                                 className="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer"
                               >
                                 Assign Tech
@@ -4361,7 +4362,7 @@ export default function App() {
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button 
-                                  onClick={() => setSelectedTicket(ticket)}
+                                  onClick={() => openTicketDetails(ticket)}
                                   className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-3.5 rounded-xl text-xs transition duration-150 cursor-pointer"
                                 >
                                   View Details
