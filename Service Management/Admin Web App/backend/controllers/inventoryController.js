@@ -87,7 +87,7 @@ const createItem = async (req, res) => {
 // @access  Private/Admin
 const getItems = async (req, res) => {
   try {
-    const { search, lowStock } = req.query;
+    const { search, lowStock, technicianId, ticketNumber } = req.query;
 
     let query = {};
     if (search) {
@@ -102,6 +102,39 @@ const getItems = async (req, res) => {
 
     if (lowStock === 'true') {
       items = items.filter(item => item.quantity <= item.minStockLevel);
+    }
+
+    // Filter items and calculate available quantity for a technician/ticket if technicianId or ticketNumber is supplied
+    if (technicianId || ticketNumber) {
+      const filteredItems = [];
+      for (const item of items) {
+        let totalStockOut = 0;
+        let totalUsed = 0;
+
+        for (const tx of item.transactions || []) {
+          if (tx.type === 'stock_out') {
+            const matchesTech = technicianId ? (tx.technician && tx.technician.toString() === technicianId.toString()) : true;
+            const matchesTicket = ticketNumber ? (tx.ticketNumber && tx.ticketNumber.trim().toUpperCase() === ticketNumber.trim().toUpperCase()) : true;
+            if (matchesTech && matchesTicket) {
+              totalStockOut += (tx.quantity || 0);
+            }
+          } else if (tx.type === 'ticket_use') {
+            const matchesTech = technicianId ? (tx.technician && tx.technician.toString() === technicianId.toString()) : true;
+            const matchesTicket = ticketNumber ? (tx.ticketNumber && tx.ticketNumber.trim().toUpperCase() === ticketNumber.trim().toUpperCase()) : true;
+            if (matchesTech && matchesTicket) {
+              totalUsed += (tx.quantity || 0);
+            }
+          }
+        }
+
+        const availForTicket = totalStockOut - totalUsed;
+        if (availForTicket > 0) {
+          const itemObj = item.toObject();
+          itemObj.quantity = availForTicket; // Override item quantity to remaining stocked-out quantity for this ticket/tech
+          filteredItems.push(itemObj);
+        }
+      }
+      return res.json(filteredItems);
     }
 
     res.json(items);
@@ -192,7 +225,7 @@ const stockOut = async (req, res) => {
       return res.status(400).json({ message: `Insufficient stock. Current available: ${item.quantity}` });
     }
 
-    const { technicianId, technicianName } = req.body;
+    const { technicianId, technicianName, ticketId, ticketNumber } = req.body;
     let resolvedTechName = technicianName || '';
     if (technicianId && !resolvedTechName) {
       const tech = await User.findById(technicianId);
@@ -205,7 +238,9 @@ const stockOut = async (req, res) => {
       quantity: qty,
       user: req.user ? req.user.name : 'Admin',
       technician: technicianId || null,
-      technicianName: resolvedTechName
+      technicianName: resolvedTechName,
+      ticket: ticketId || null,
+      ticketNumber: ticketNumber || ''
     });
 
     const updated = await item.save();

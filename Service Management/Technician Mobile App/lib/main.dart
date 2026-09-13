@@ -1559,8 +1559,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
 
   Future<void> _fetchInventory() async {
     try {
+      final tktNum = _job != null ? (_job!['ticketNumber'] ?? '') : '';
+      final urlStr = tktNum.isNotEmpty
+          ? '${widget.apiUrl}/inventory?ticketNumber=$tktNum'
+          : '${widget.apiUrl}/inventory';
       final res = await http.get(
-        Uri.parse('${widget.apiUrl}/inventory'),
+        Uri.parse(urlStr),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}'
@@ -1890,6 +1894,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
             _job = jsonDecode(res.body);
             _isFeeLoading = false;
           });
+          _fetchInventory();
         }
       }
     } catch (e) {

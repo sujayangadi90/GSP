@@ -3006,7 +3006,9 @@ export default function App() {
       const payload = {
         quantity: qty,
         technicianId: showStockAdjustment.technicianId || '',
-        technicianName: showStockAdjustment.technicianName || ''
+        technicianName: showStockAdjustment.technicianName || '',
+        ticketId: showStockAdjustment.ticketId || '',
+        ticketNumber: showStockAdjustment.ticketNumber || ''
       };
       await apiFetch(endpoint, {
         method: 'POST',
@@ -11246,35 +11248,70 @@ export default function App() {
                 </div>
 
                 {showStockAdjustment.mode === 'out' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
-                      Select Technician (Stock Out To)
-                    </label>
-                    <select
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
-                      value={showStockAdjustment.technicianId || ''}
-                      onChange={e => {
-                        const techId = e.target.value;
-                        const tech = technicians.find(t => (t._id === techId || t.id === techId));
-                        setShowStockAdjustment({
-                          ...showStockAdjustment,
-                          technicianId: techId,
-                          technicianName: tech ? tech.name : ''
-                        });
-                      }}
-                    >
-                      <option value="">-- Select Technician (Optional) --</option>
-                      {technicians && technicians.length > 0 ? (
-                        technicians.map(tech => (
-                          <option key={tech._id || tech.id} value={tech._id || tech.id}>
-                            {tech.name} {tech.code ? `(${tech.code})` : ''} {tech.mobile ? `- ${tech.mobile}` : ''}
-                          </option>
-                        ))
-                      ) : (
-                        <option disabled value="">No technicians available</option>
-                      )}
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+                        Select Technician (Stock Out To)
+                      </label>
+                      <select
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                        value={showStockAdjustment.technicianId || ''}
+                        onChange={e => {
+                          const techId = e.target.value;
+                          const tech = technicians.find(t => (t._id === techId || t.id === techId));
+                          setShowStockAdjustment({
+                            ...showStockAdjustment,
+                            technicianId: techId,
+                            technicianName: tech ? tech.name : '',
+                            ticketId: '',
+                            ticketNumber: ''
+                          });
+                        }}
+                      >
+                        <option value="">-- Select Technician (Optional) --</option>
+                        {technicians && technicians.length > 0 ? (
+                          technicians.map(tech => (
+                            <option key={tech._id || tech.id} value={tech._id || tech.id}>
+                              {tech.name} {tech.code ? `(${tech.code})` : ''} {tech.mobile ? `- ${tech.mobile}` : ''}
+                            </option>
+                          ))
+                        ) : (
+                          <option disabled value="">No technicians available</option>
+                        )}
+                      </select>
+                    </div>
+
+                    {showStockAdjustment.technicianId && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+                          Select Ticket Number (Stock Out For Ticket)
+                        </label>
+                        <select
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                          value={showStockAdjustment.ticketNumber || ''}
+                          onChange={e => {
+                            const tktNum = e.target.value;
+                            const tktObj = tickets.find(t => t.ticketNumber === tktNum);
+                            setShowStockAdjustment({
+                              ...showStockAdjustment,
+                              ticketId: tktObj ? tktObj._id : '',
+                              ticketNumber: tktNum
+                            });
+                          }}
+                        >
+                          <option value="">-- Select Ticket Number --</option>
+                          {tickets
+                            .filter(t => (t.assignedTechnician?._id === showStockAdjustment.technicianId || t.assignedTechnician === showStockAdjustment.technicianId) && t.status !== 'closed' && t.status !== 'cancelled')
+                            .map(tkt => (
+                              <option key={tkt._id} value={tkt.ticketNumber}>
+                                #{tkt.ticketNumber} - {tkt.product?.name || tkt.type} ({tkt.customer?.name || 'Customer'})
+                              </option>
+                            ))
+                          }
+                        </select>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="bg-slate-850 px-6 py-4 flex items-center justify-end gap-3 border-t border-slate-800">

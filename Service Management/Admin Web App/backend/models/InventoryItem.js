@@ -18,6 +18,10 @@ const TransactionSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  ticket: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Ticket'
+  },
   ticketNumber: {
     type: String
   },
