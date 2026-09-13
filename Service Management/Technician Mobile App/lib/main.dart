@@ -727,7 +727,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 '₹${_walletBalance.toStringAsFixed(0)}',
-                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.extrabold, fontFamily: 'monospace'),
+                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, fontFamily: 'monospace'),
                               ),
                             ],
                           ),
@@ -5842,7 +5842,7 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
                                 color: const Color(0xFF1E293B).withOpacity(0.6),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: isCredit ? Colors.emerald.withOpacity(0.3) : Colors.rose.withOpacity(0.3),
+                                  color: isCredit ? const Color(0xFF10B981).withOpacity(0.3) : const Color(0xFFF43F5E).withOpacity(0.3),
                                 ),
                               ),
                               child: Column(
