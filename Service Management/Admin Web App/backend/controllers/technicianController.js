@@ -265,8 +265,8 @@ const debitTechnicianWallet = async (technicianId, amount, payoutId, description
 // @access  Private (Admin)
 const getTechnicianWallet = async (req, res) => {
   try {
-    const technician = await User.findById(req.params.id).select('name code email mobile walletBalance status');
-    if (!technician || technician.role !== 'technician') {
+    const technician = await User.findById(req.params.id).select('name code email mobile walletBalance status role');
+    if (!technician) {
       return res.status(404).json({ message: 'Technician not found' });
     }
 
