@@ -1591,6 +1591,20 @@ const getDashboardStats = async (req, res) => {
       console.error('Error counting totalActiveAmcs:', e.message);
     }
 
+    // 6. Total Technicians Wallet Balance (Independent of date range)
+    let totalTechnicianWalletBalance = 0;
+    try {
+      const walletSum = await User.aggregate([
+        { $match: { role: 'technician' } },
+        { $group: { _id: null, totalBalance: { $sum: '$walletBalance' } } }
+      ]);
+      if (walletSum.length > 0 && walletSum[0].totalBalance) {
+        totalTechnicianWalletBalance = walletSum[0].totalBalance;
+      }
+    } catch (e) {
+      console.error('Error calculating totalTechnicianWalletBalance:', e.message);
+    }
+
     // 6. Tickets Graph series (number of tickets over time)
     let ticketsByDate = [];
     try {
@@ -1620,7 +1634,8 @@ const getDashboardStats = async (req, res) => {
         pending: pendingCount,
         closed: closedCount,
         totalCustomers,
-        totalActiveAmcs
+        totalActiveAmcs,
+        totalTechnicianWalletBalance
       },
       topTechnicians,
       dealerPerformance: topDealers,

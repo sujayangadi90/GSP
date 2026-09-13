@@ -4016,7 +4016,7 @@ export default function App() {
               ) : (
                 <>
                   {/* Stat Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                     <div 
                       onClick={() => handleStatClick('')}
                       className="bg-slate-900 border border-slate-800/80 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
@@ -4065,6 +4065,18 @@ export default function App() {
                     >
                       <span className="text-[11px] font-semibold text-teal-400 uppercase tracking-wider">Active AMCs</span>
                       <span className="text-2xl font-black text-teal-400 mt-2">{stats.totalActiveAmcs || 0}</span>
+                    </div>
+                    <div 
+                      onClick={() => { setActiveTab('technician_payout'); }}
+                      className="bg-emerald-950/40 border border-emerald-700/60 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider">Tech Wallets</span>
+                        <span className="text-xs">👛</span>
+                      </div>
+                      <span className="text-2xl font-black text-emerald-400 mt-2 font-mono">
+                        ₹{(stats.totalTechnicianWalletBalance || 0).toLocaleString('en-IN')}
+                      </span>
                     </div>
                   </div>
 
