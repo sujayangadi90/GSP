@@ -5697,8 +5697,13 @@ class TechnicianWalletScreen extends StatefulWidget {
 
 class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   double _walletBalance = 0.0;
   List<dynamic> _transactions = [];
+  int _page = 1;
+  final int _limit = 10;
+  bool _hasMore = false;
+  int _totalCount = 0;
   DateTime? _fromDate;
   DateTime? _toDate;
   String _selectedType = ''; // '', 'credit', 'debit'
@@ -5706,13 +5711,26 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchWallet();
+    _fetchWallet(reset: true);
   }
 
-  Future<void> _fetchWallet() async {
-    setState(() => _isLoading = true);
+  Future<void> _fetchWallet({bool reset = true}) async {
+    if (reset) {
+      setState(() {
+        _isLoading = true;
+        _page = 1;
+        _transactions = [];
+      });
+    } else {
+      setState(() => _isLoadingMore = true);
+    }
+
     try {
-      final queryParams = <String, String>{};
+      final targetPage = reset ? 1 : _page + 1;
+      final queryParams = <String, String>{
+        'page': targetPage.toString(),
+        'limit': _limit.toString(),
+      };
       if (_fromDate != null) {
         queryParams['fromDate'] = '${_fromDate!.year}-${_fromDate!.month.toString().padLeft(2, '0')}-${_fromDate!.day.toString().padLeft(2, '0')}';
       }
@@ -5723,7 +5741,7 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
         queryParams['type'] = _selectedType;
       }
 
-      final uri = Uri.parse('${widget.apiUrl}/technicians/me/wallet').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri = Uri.parse('${widget.apiUrl}/technicians/me/wallet').replace(queryParameters: queryParams);
       final res = await http.get(
         uri,
         headers: {
@@ -5734,16 +5752,29 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
 
       if (res.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(res.body);
+        final newTx = List.from(data['transactions'] ?? []);
+        final total = (data['total'] is num) ? (data['total'] as num).toInt() : newTx.length;
+        
         setState(() {
           _walletBalance = (data['walletBalance'] is num) ? (data['walletBalance'] as num).toDouble() : 0.0;
-          _transactions = List.from(data['transactions'] ?? []);
+          _totalCount = total;
+          _page = targetPage;
+          if (reset) {
+            _transactions = newTx;
+          } else {
+            _transactions.addAll(newTx);
+          }
+          _hasMore = _transactions.length < _totalCount && newTx.isNotEmpty;
         });
       }
     } catch (e) {
       debugPrint('Error fetching technician wallet: $e');
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
       }
     }
   }
@@ -5774,7 +5805,7 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
         _fromDate = picked.start;
         _toDate = picked.end;
       });
-      _fetchWallet();
+      _fetchWallet(reset: true);
     }
   }
 
@@ -5786,13 +5817,13 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _fetchWallet,
+            onPressed: () => _fetchWallet(reset: true),
             tooltip: 'Refresh Wallet',
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _fetchWallet,
+        onRefresh: () => _fetchWallet(reset: true),
         child: Column(
           children: [
             // Wallet Balance Header Card
@@ -5920,7 +5951,7 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
                                 _toDate = null;
                                 _selectedType = '';
                               });
-                              _fetchWallet();
+                              _fetchWallet(reset: true);
                             },
                             child: Container(
                               padding: const EdgeInsets.all(8),
@@ -5961,7 +5992,7 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   Text(
-                    '${_transactions.length} Entry${_transactions.length == 1 ? '' : 'ies'}',
+                    'Showing ${_transactions.length} of ${_totalCount > 0 ? _totalCount : _transactions.length}',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
@@ -5989,8 +6020,33 @@ class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
                         )
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                          itemCount: _transactions.length,
+                          itemCount: _transactions.length + (_hasMore ? 1 : 0),
                           itemBuilder: (context, index) {
+                            if (index == _transactions.length) {
+                              return Container(
+                                margin: const EdgeInsets.symmetric(vertical: 12.0),
+                                child: Center(
+                                  child: _isLoadingMore
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(8.0),
+                                          child: CircularProgressIndicator(color: Color(0xFF34D399), strokeWidth: 2.5),
+                                        )
+                                      : ElevatedButton.icon(
+                                          onPressed: () => _fetchWallet(reset: false),
+                                          icon: const Icon(Icons.arrow_downward_rounded, size: 16),
+                                          label: Text('Load More (+${_totalCount - _transactions.length > _limit ? _limit : _totalCount - _transactions.length})'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF10B981),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            elevation: 2,
+                                          ),
+                                        ),
+                                ),
+                              );
+                            }
+
                             final tx = _transactions[index];
                             final isCredit = tx['type'] == 'credit';
                             final amount = (tx['amount'] is num) ? (tx['amount'] as num).toDouble() : 0.0;

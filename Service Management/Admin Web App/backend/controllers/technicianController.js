@@ -313,7 +313,7 @@ const getTechnicianWalletSelf = async (req, res) => {
       return res.status(404).json({ message: 'Technician not found' });
     }
 
-    const { fromDate, toDate, type } = req.query;
+    const { fromDate, toDate, type, page, limit } = req.query;
     const query = { technician: technicianId };
 
     if (type && ['credit', 'debit'].includes(type)) {
@@ -330,14 +330,25 @@ const getTechnicianWalletSelf = async (req, res) => {
       }
     }
 
+    const p = parseInt(page, 10) || 1;
+    const l = parseInt(limit, 10) || 10;
+    const skip = (p - 1) * l;
+
     const transactions = await WalletTransaction.find(query)
       .populate('ticket', 'ticketNumber type status')
       .populate('payout', 'month year amount status paymentMode referenceNumber')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(l);
+
+    const total = await WalletTransaction.countDocuments(query);
 
     res.json({
       walletBalance: technician.walletBalance || 0,
-      transactions
+      transactions,
+      total,
+      page: p,
+      pages: Math.ceil(total / l)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
