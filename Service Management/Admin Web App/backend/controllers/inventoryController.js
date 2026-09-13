@@ -1,5 +1,6 @@
 const InventoryItem = require('../models/InventoryItem');
 const User = require('../models/User');
+const ItemHold = require('../models/ItemHold');
 
 let XLSX;
 try {
@@ -192,12 +193,29 @@ const stockIn = async (req, res) => {
       return res.status(400).json({ message: 'Please enter a valid positive quantity' });
     }
 
+    const { technicianId, technicianName } = req.body;
+    let resolvedTechName = technicianName || '';
+    if (technicianId && !resolvedTechName) {
+      const tech = await User.findById(technicianId);
+      if (tech) resolvedTechName = tech.name;
+    }
+
     item.quantity += qty;
     item.transactions.push({
       type: 'stock_in',
       quantity: qty,
-      user: req.user ? req.user.name : 'Admin'
+      user: req.user ? req.user.name : 'Admin',
+      technician: technicianId || null,
+      technicianName: resolvedTechName
     });
+
+    if (technicianId) {
+      let itemHold = await ItemHold.findOne({ technician: technicianId, inventoryItem: item._id });
+      if (itemHold) {
+        itemHold.quantityHeld = Math.max(0, itemHold.quantityHeld - qty);
+        await itemHold.save();
+      }
+    }
 
     const updated = await item.save();
     res.json(updated);
@@ -243,8 +261,85 @@ const stockOut = async (req, res) => {
       ticketNumber: ticketNumber || ''
     });
 
+    if (technicianId) {
+      let itemHold = await ItemHold.findOne({ technician: technicianId, inventoryItem: item._id });
+      if (itemHold) {
+        itemHold.quantityHeld += qty;
+        itemHold.technicianName = resolvedTechName || itemHold.technicianName;
+        itemHold.itemName = item.name;
+        itemHold.sku = item.sku;
+        await itemHold.save();
+      } else {
+        await ItemHold.create({
+          technician: technicianId,
+          technicianName: resolvedTechName,
+          inventoryItem: item._id,
+          itemName: item.name,
+          sku: item.sku,
+          quantityHeld: qty
+        });
+      }
+    }
+
     const updated = await item.save();
     res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get all active item holds (quantityHeld > 0)
+// @route   GET /api/inventory/item-hold
+// @access  Private/Admin
+const getItemHolds = async (req, res) => {
+  try {
+    const holds = await ItemHold.find({ quantityHeld: { $gt: 0 } })
+      .populate('technician', 'name email phone')
+      .populate('inventoryItem', 'name sku quantity minStockLevel sellingPrice image')
+      .sort({ updatedAt: -1 });
+    res.json(holds);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Return held stock from technician back to inventory
+// @route   POST /api/inventory/item-hold/return
+// @access  Private/Admin
+const returnItemHold = async (req, res) => {
+  try {
+    const { holdId, quantity } = req.body;
+    const qty = Number(quantity);
+    if (!qty || qty <= 0) {
+      return res.status(400).json({ message: 'Please enter a valid positive quantity to return' });
+    }
+
+    const hold = await ItemHold.findById(holdId);
+    if (!hold) {
+      return res.status(404).json({ message: 'Item hold record not found' });
+    }
+
+    if (qty > hold.quantityHeld) {
+      return res.status(400).json({ message: `Cannot return more than held quantity (${hold.quantityHeld})` });
+    }
+
+    const item = await InventoryItem.findById(hold.inventoryItem);
+    if (item) {
+      item.quantity += qty;
+      item.transactions.push({
+        type: 'stock_in',
+        quantity: qty,
+        user: req.user ? req.user.name : 'Admin',
+        technician: hold.technician,
+        technicianName: hold.technicianName
+      });
+      await item.save();
+    }
+
+    hold.quantityHeld -= qty;
+    await hold.save();
+
+    res.json({ message: 'Stock returned successfully', hold });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -570,6 +665,8 @@ module.exports = {
   updateItem,
   stockIn,
   stockOut,
+  getItemHolds,
+  returnItemHold,
   scanImportFile,
   downloadUnsuitableFile,
   confirmImport,

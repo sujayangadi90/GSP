@@ -421,6 +421,13 @@ export default function App() {
   const [showStockAdjustment, setShowStockAdjustment] = useState(null); // null or { id, name, sku, mode, quantity, technicianId, technicianName }
   const [selectedItemTransactions, setSelectedItemTransactions] = useState(null); // null or item object
   const [inventoryPage, setInventoryPage] = useState(1);
+
+  // Item Hold states
+  const [inventoryMenuOpen, setInventoryMenuOpen] = useState(false);
+  const [itemHolds, setItemHolds] = useState([]);
+  const [itemHoldFilters, setItemHoldFilters] = useState({ search: '' });
+  const [itemHoldPage, setItemHoldPage] = useState(1);
+  const [showReturnHoldModal, setShowReturnHoldModal] = useState(null);
   
   // Inventory Excel import states
   const [showImportModal, setShowImportModal] = useState(false);
@@ -1276,6 +1283,34 @@ export default function App() {
       setInventory(data);
     } catch (err) {
       console.error('Error fetching inventory:', err);
+    }
+  };
+
+  const fetchItemHolds = async () => {
+    try {
+      const data = await apiFetch('/inventory/item-hold');
+      setItemHolds(data);
+    } catch (err) {
+      console.error('Error fetching item holds:', err);
+    }
+  };
+
+  const handleReturnHold = async (e) => {
+    e.preventDefault();
+    if (!showReturnHoldModal) return;
+    const qty = Number(showReturnHoldModal.quantity);
+    if (!qty || qty <= 0) return alert('Please enter a valid quantity to return');
+    if (qty > showReturnHoldModal.quantityHeld) return alert(`Quantity cannot exceed currently held (${showReturnHoldModal.quantityHeld})`);
+    try {
+      await apiFetch('/inventory/item-hold/return', {
+        method: 'POST',
+        body: JSON.stringify({ holdId: showReturnHoldModal.holdId, quantity: qty })
+      });
+      setShowReturnHoldModal(null);
+      fetchItemHolds();
+      fetchInventory();
+    } catch (err) {
+      alert(err.message || 'Failed to return stock');
     }
   };
 
@@ -2354,6 +2389,9 @@ export default function App() {
       } else if (activeTab === 'inventory') {
         fetchInventory();
         fetchTechnicians();
+      } else if (activeTab === 'item-hold') {
+        fetchItemHolds();
+        fetchTechnicians();
       } else if (activeTab === 'performance') {
         fetchEvaluations();
         fetchPerformanceAreas();
@@ -3016,6 +3054,7 @@ export default function App() {
       });
       setShowStockAdjustment(null);
       fetchInventory();
+      fetchItemHolds();
     } catch (err) {
       alert(err.message);
     }
@@ -3774,13 +3813,38 @@ export default function App() {
             </button>
           )}
           {(!user || user.permissions?.inventory !== false) && (
-            <button
-              onClick={() => { setActiveTab('inventory'); setMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer ${activeTab === 'inventory' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-            >
-              <Package className="w-5 h-5" />
-              Inventory
-            </button>
+            <div>
+              <button
+                onClick={() => setInventoryMenuOpen(!inventoryMenuOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition duration-200 cursor-pointer text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              >
+                <span className="flex items-center gap-3">
+                  <Package className="w-5 h-5 text-violet-400" />
+                  Inventory
+                </span>
+                <span>
+                  {(inventoryMenuOpen || activeTab === 'inventory' || activeTab === 'item-hold') ? '▲' : '▼'}
+                </span>
+              </button>
+              {(inventoryMenuOpen || activeTab === 'inventory' || activeTab === 'item-hold') && (
+                <div className="pl-6 mt-1 space-y-1">
+                  <button
+                    onClick={() => { setActiveTab('inventory'); setMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'inventory' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <Package className="w-4 h-4" />
+                    Stock List
+                  </button>
+                  <button
+                    onClick={() => { setActiveTab('item-hold'); setMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 cursor-pointer ${activeTab === 'item-hold' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+                  >
+                    <Layers className="w-4 h-4 text-amber-400" />
+                    Item Hold
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           {(!user || user.permissions?.manageDealers !== false) && (
             <button
@@ -8324,6 +8388,142 @@ export default function App() {
             </div>
           )}
 
+          {/* Item Hold Tab */}
+          {activeTab === 'item-hold' && (
+            <div className="space-y-8">
+              {/* Header Section */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 backdrop-blur-md p-6 rounded-2xl border border-slate-800/80 shadow-xl">
+                <div>
+                  <h1 className="text-3xl font-extrabold text-white tracking-tight">Inventory Item Hold</h1>
+                  <p className="text-slate-400 mt-1">Overview of inventory items currently issued to and held by technicians</p>
+                </div>
+              </div>
+
+              {/* Filters & Search */}
+              <div className="bg-slate-900/60 backdrop-blur-md p-4 rounded-2xl border border-slate-800/80 shadow-xl">
+                <div className="relative w-full max-w-md">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search Technician, Item name or SKU..."
+                    value={itemHoldFilters.search}
+                    onChange={e => setItemHoldFilters({ ...itemHoldFilters, search: e.target.value })}
+                    className="w-full bg-slate-800/90 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-violet-500/50"
+                  />
+                </div>
+              </div>
+
+              {/* Item Hold Table */}
+              <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80 shadow-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-850/50 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <th className="p-4">Technician</th>
+                        <th className="p-4">Item</th>
+                        <th className="p-4">Item Code (SKU)</th>
+                        <th className="p-4 text-center">Quantity Held</th>
+                        <th className="p-4 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {(() => {
+                        const filtered = itemHolds.filter(hold => {
+                          if (hold.quantityHeld <= 0) return false;
+                          const query = (itemHoldFilters.search || '').toLowerCase();
+                          if (!query) return true;
+                          const techName = (hold.technicianName || hold.technician?.name || '').toLowerCase();
+                          const itemName = (hold.itemName || hold.inventoryItem?.name || '').toLowerCase();
+                          const sku = (hold.sku || hold.inventoryItem?.sku || '').toLowerCase();
+                          return techName.includes(query) || itemName.includes(query) || sku.includes(query);
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="5" className="p-8 text-center text-slate-500 text-sm">
+                                No inventory items currently held by technicians.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        const paged = filtered.slice((itemHoldPage - 1) * 15, itemHoldPage * 15);
+
+                        return paged.map(hold => {
+                          const techName = hold.technicianName || hold.technician?.name || 'Unknown Technician';
+                          const itemName = hold.itemName || hold.inventoryItem?.name || 'Item';
+                          const itemSku = hold.sku || hold.inventoryItem?.sku || 'N/A';
+                          const itemImage = hold.inventoryItem?.image;
+
+                          return (
+                            <tr key={hold._id} className="hover:bg-slate-800/20 transition text-sm">
+                              <td className="p-4 font-semibold text-slate-200">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400 font-bold text-xs shrink-0">
+                                    {techName.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-slate-200">{techName}</p>
+                                    {hold.technician?.phone && (
+                                      <p className="text-xs text-slate-400">{hold.technician.phone}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-4 font-medium text-slate-200">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                                    {itemImage ? (
+                                      <img
+                                        src={itemImage.startsWith('http') ? itemImage : `/${itemImage}`}
+                                        alt={itemName}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <Package className="w-4 h-4 text-slate-500" />
+                                    )}
+                                  </div>
+                                  <span className="font-semibold text-slate-200">{itemName}</span>
+                                </div>
+                              </td>
+                              <td className="p-4 font-mono font-bold text-slate-300">
+                                {itemSku}
+                              </td>
+                              <td className="p-4 text-center">
+                                <span className="inline-block px-3 py-1 rounded-full bg-amber-950/80 text-amber-400 border border-amber-800/50 text-xs font-extrabold font-mono">
+                                  {hold.quantityHeld}
+                                </span>
+                              </td>
+                              <td className="p-4 text-center">
+                                <button
+                                  onClick={() => {
+                                    setShowReturnHoldModal({
+                                      holdId: hold._id,
+                                      itemName,
+                                      sku: itemSku,
+                                      technicianName: techName,
+                                      quantityHeld: hold.quantityHeld,
+                                      quantity: hold.quantityHeld
+                                    });
+                                  }}
+                                  className="bg-emerald-700/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-900/40 text-xs px-3 py-1.5 rounded-lg font-bold cursor-pointer transition shadow-xs flex items-center gap-1.5 mx-auto"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  Return Stock
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Reports Tab */}
           {activeTab === 'reports' && (
             <div className="space-y-8">
@@ -11366,6 +11566,63 @@ export default function App() {
                   className={`font-bold py-2 px-5 rounded-lg text-sm cursor-pointer shadow-md transition text-white ${showStockAdjustment.mode === 'in' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'}`}
                 >
                   Confirm {showStockAdjustment.mode === 'in' ? 'Stock In' : 'Stock Out'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Return Held Stock Modal */}
+      {showReturnHoldModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <h3 className="font-extrabold text-white text-lg">Return Held Stock</h3>
+              <button 
+                onClick={() => setShowReturnHoldModal(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form onSubmit={handleReturnHold}>
+              <div className="p-6 space-y-4">
+                <div className="bg-slate-850 p-4 rounded-xl space-y-1.5 border border-slate-800 text-sm">
+                  <p className="text-slate-400 text-xs uppercase font-semibold">Technician</p>
+                  <p className="font-bold text-white">{showReturnHoldModal.technicianName}</p>
+                  <p className="text-slate-400 text-xs uppercase font-semibold mt-2">Item</p>
+                  <p className="font-semibold text-slate-200">{showReturnHoldModal.itemName} <span className="font-mono text-slate-400 text-xs">({showReturnHoldModal.sku})</span></p>
+                  <p className="text-amber-400 font-bold text-xs mt-1">Currently Holding: {showReturnHoldModal.quantityHeld}</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Quantity to Return *</label>
+                  <input 
+                    required 
+                    type="number" 
+                    min="1"
+                    max={showReturnHoldModal.quantityHeld}
+                    placeholder="Quantity to return..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-emerald-500" 
+                    value={showReturnHoldModal.quantity} 
+                    onChange={e => setShowReturnHoldModal({ ...showReturnHoldModal, quantity: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 bg-slate-850 border-t border-slate-800 flex justify-end gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setShowReturnHoldModal(null)} 
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:bg-slate-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition cursor-pointer shadow-md"
+                >
+                  Return Stock
                 </button>
               </div>
             </form>

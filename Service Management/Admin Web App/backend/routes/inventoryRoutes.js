@@ -5,6 +5,8 @@ const {
   updateItem,
   stockIn,
   stockOut,
+  getItemHolds,
+  returnItemHold,
   scanImportFile,
   downloadUnsuitableFile,
   confirmImport,
@@ -24,6 +26,12 @@ router.route('/upload')
     }
     res.status(200).json({ filePath: 'uploads/' + req.file.filename });
   });
+
+router.route('/item-hold')
+  .get(authorize('admin', 'owner'), getItemHolds);
+
+router.route('/item-hold/return')
+  .post(authorize('admin', 'owner'), returnItemHold);
 
 router.route('/scan-excel')
   .post(authorize('admin', 'owner'), excelUpload.single('file'), scanImportFile);
