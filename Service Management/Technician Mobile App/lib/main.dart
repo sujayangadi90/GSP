@@ -572,6 +572,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 techFee = (job['technicianInstallationFee'] ?? job['installationFee'] ?? 0).toDouble();
               }
             }
+            if (job['technicianIncentive'] != null && job['technicianIncentive'] is num) {
+              techFee += (job['technicianIncentive'] as num).toDouble();
+            }
             earnings += techFee;
           }
         }
@@ -2305,6 +2308,48 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               if (_job!['serviceDetails']?['description'] != null)
                 'Issue: ${_job!['serviceDetails']['description']}',
             ]),
+            if (_job!['technicianIncentive'] != null && (_job!['technicianIncentive'] as num) > 0) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E1A47),
+                  border: Border.all(color: Colors.purpleAccent.withOpacity(0.4)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.stars_rounded, color: Colors.purpleAccent, size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'ASSIGNMENT INCENTIVE',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.purpleAccent),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Special Incentive Bonus:', style: TextStyle(fontSize: 13, color: Colors.white70)),
+                        Text(
+                          '₹${(_job!['technicianIncentive'] as num).toStringAsFixed(0)}',
+                          style: const TextStyle(fontWeight: FontWeight.extrabold, fontSize: 16, color: Colors.greenAccent),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'This incentive will be automatically credited to your wallet upon job closure/approval.',
+                      style: TextStyle(fontSize: 11, color: Colors.white54, fontStyle: FontStyle.italic),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             _buildDetailBlock('Scheduling Details', [
               'Preferred Visit Date & Time: ${_job!['preferredVisitDate'] != null ? _formatDateTime(_job!['preferredVisitDate'].toString()) : (_job!['installationDetails']?['preferredDate'] != null ? _formatDateTime(_job!['installationDetails']['preferredDate'].toString()) : 'Flexible')}',
