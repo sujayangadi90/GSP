@@ -5,6 +5,7 @@ const Brand = require('../models/Brand');
 const FollowUp = require('../models/FollowUp');
 const Customer = require('../models/Customer');
 const InventoryItem = require('../models/InventoryItem');
+const ItemHold = require('../models/ItemHold');
 const Amc = require('../models/Amc');
 const { sendPushNotification } = require('../utils/notification');
 
@@ -900,28 +901,59 @@ const submitWorkCompletion = async (req, res) => {
       }
     }
 
-    // Validate inventory stock
+    const techId = req.user.role === 'technician' ? req.user._id : (ticket.technician || null);
+    let resolvedTechName = req.user.role === 'technician' ? req.user.name : '';
+    if (!resolvedTechName && techId) {
+      const techUser = await User.findById(techId);
+      if (techUser) resolvedTechName = techUser.name;
+    }
+
+    // Validate inventory stock (main inventory + technician held stock)
     for (const up of parsedUsedParts) {
       const item = await InventoryItem.findById(up.part);
       if (!item) {
         return res.status(404).json({ message: 'Inventory item not found' });
       }
-      if (item.quantity < Number(up.quantity)) {
-        return res.status(400).json({ message: `Insufficient stock for item "${item.name}". Available: ${item.quantity}` });
+      const reqQty = Number(up.quantity);
+      let heldQty = 0;
+      if (techId) {
+        const hold = await ItemHold.findOne({ technician: techId, inventoryItem: item._id });
+        if (hold) heldQty = hold.quantityHeld || 0;
+      }
+      const totalAvailable = item.quantity + heldQty;
+      if (totalAvailable < reqQty) {
+        return res.status(400).json({ message: `Insufficient stock for item "${item.name}". Total available: ${totalAvailable}` });
       }
     }
 
-    // Deduct inventory stock and record transactions
+    // Deduct inventory stock (deduct from technician ItemHold first if available, then main inventory)
     for (const up of parsedUsedParts) {
       const item = await InventoryItem.findById(up.part);
-      item.quantity -= Number(up.quantity);
+      const reqQty = Number(up.quantity);
+      let fromHold = 0;
+      let fromMain = reqQty;
+
+      if (techId) {
+        const hold = await ItemHold.findOne({ technician: techId, inventoryItem: item._id });
+        if (hold && hold.quantityHeld > 0) {
+          fromHold = Math.min(hold.quantityHeld, reqQty);
+          fromMain = reqQty - fromHold;
+          hold.quantityHeld -= fromHold;
+          await hold.save();
+        }
+      }
+
+      if (fromMain > 0) {
+        item.quantity -= fromMain;
+      }
+
       item.transactions.push({
         type: 'ticket_use',
-        quantity: Number(up.quantity),
+        quantity: reqQty,
         user: req.user.name,
         ticketNumber: ticket.ticketNumber,
-        technician: req.user.role === 'technician' ? req.user._id : (ticket.technician || null),
-        technicianName: req.user.role === 'technician' ? req.user.name : ''
+        technician: techId,
+        technicianName: resolvedTechName
       });
       await item.save();
     }
