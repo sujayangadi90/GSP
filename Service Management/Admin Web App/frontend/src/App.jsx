@@ -384,6 +384,7 @@ export default function App() {
   const [amcForm, setAmcForm] = useState(null); // null or form fields object
   const [assignTechId, setAssignTechId] = useState('');
   const [assignNotes, setAssignNotes] = useState('');
+  const [assignIncentive, setAssignIncentive] = useState('');
   const [verificationForm, setVerificationForm] = useState({ status: 'approved', reason: '' });
   const [closureRemarks, setClosureRemarks] = useState('');
   const [closurePaymentMode, setClosurePaymentMode] = useState('Cash');
@@ -3223,10 +3224,15 @@ export default function App() {
     try {
       const updated = await apiFetch(`/tickets/${selectedTicket._id}/assign`, {
         method: 'PATCH',
-        body: JSON.stringify({ technicianId: assignTechId, assignmentNotes: assignNotes })
+        body: JSON.stringify({ 
+          technicianId: assignTechId, 
+          assignmentNotes: assignNotes,
+          technicianIncentive: Number(assignIncentive) || 0
+        })
       });
       setSelectedTicket(updated);
       setAssignNotes('');
+      setAssignIncentive('');
       setAssignTechId('');
       fetchData();
       fetchDashboardData();
@@ -11856,6 +11862,11 @@ export default function App() {
                               ? `₹ ${selectedTicket.technicianEarning}`
                               : selectedTicket.technicianEarning || 'Fee Not Configured'}
                       </p>
+                      {selectedTicket.technicianIncentive > 0 && (
+                        <p className="text-[11px] font-bold text-violet-300 mt-1 bg-violet-950/60 px-2 py-0.5 rounded border border-violet-800/50 inline-block">
+                          + ₹{selectedTicket.technicianIncentive} Incentive
+                        </p>
+                      )}
                       <p className="text-[10px] text-slate-400 mt-0.5">
                         Tech: {selectedTicket.assignedTechnician?.name || 'Unassigned'}
                       </p>
@@ -12281,6 +12292,20 @@ export default function App() {
                             </p>
                           </div>
                         )}
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                            Incentive Amount (₹) <span className="text-slate-500 font-normal">(Optional)</span>
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="e.g. 100"
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-hidden focus:border-violet-500"
+                            value={assignIncentive}
+                            onChange={e => setAssignIncentive(e.target.value)}
+                          />
+                        </div>
 
                         <textarea
                           placeholder="Assignment notes/schedule..."

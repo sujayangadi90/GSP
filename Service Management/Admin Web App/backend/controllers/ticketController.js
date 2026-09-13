@@ -715,7 +715,7 @@ const getTicketById = async (req, res) => {
 // @route   PATCH /api/tickets/:id/assign
 // @access  Private/Admin
 const assignTechnician = async (req, res) => {
-  const { technicianId, assignmentNotes } = req.body;
+  const { technicianId, assignmentNotes, technicianIncentive } = req.body;
 
   try {
     const ticket = await Ticket.findById(req.params.id);
@@ -728,13 +728,17 @@ const assignTechnician = async (req, res) => {
       return res.status(400).json({ message: 'Invalid technician' });
     }
 
+    const incAmount = Number(technicianIncentive);
+    const validIncentive = (!isNaN(incAmount) && incAmount > 0) ? incAmount : 0;
+
     ticket.assignedTechnician = technicianId;
     ticket.assignmentNotes = assignmentNotes;
+    ticket.technicianIncentive = validIncentive;
     ticket.status = 'assigned';
 
     ticket.timeline.push({
       status: 'assigned',
-      note: `Assigned to technician ${technician.name}. Note: ${assignmentNotes || 'None'}`,
+      note: `Assigned to technician ${technician.name}.${validIncentive > 0 ? ` Incentive: ₹${validIncentive}.` : ''} Note: ${assignmentNotes || 'None'}`,
       updatedBy: req.user.name
     });
 
@@ -1076,13 +1080,20 @@ const verifyWork = async (req, res) => {
         const earningAmount = typeof updatedTicket.technicianEarning === 'number' && updatedTicket.technicianEarning > 0
           ? updatedTicket.technicianEarning
           : (typeof updatedTicket.technicianFee === 'number' ? updatedTicket.technicianFee : 0);
+        const incentiveAmount = typeof updatedTicket.technicianIncentive === 'number' && updatedTicket.technicianIncentive > 0
+          ? updatedTicket.technicianIncentive
+          : 0;
+        const totalCredit = earningAmount + incentiveAmount;
         
-        if (earningAmount > 0) {
+        if (totalCredit > 0) {
+          const descNotes = incentiveAmount > 0
+            ? `Earnings & Incentive credited for Ticket #${updatedTicket.ticketNumber || updatedTicket._id} (Earning: ₹${earningAmount} + Incentive: ₹${incentiveAmount})`
+            : `Earnings credited for Ticket #${updatedTicket.ticketNumber || updatedTicket._id}`;
           await creditTechnicianWallet(
             updatedTicket.assignedTechnician,
-            earningAmount,
+            totalCredit,
             updatedTicket._id,
-            `Earnings credited for Ticket #${updatedTicket.ticketNumber || updatedTicket._id}`,
+            descNotes,
             req.user ? req.user.name : 'Admin'
           );
         }
@@ -1158,13 +1169,20 @@ const closeTicket = async (req, res) => {
         const earningAmount = typeof updatedTicket.technicianEarning === 'number' && updatedTicket.technicianEarning > 0
           ? updatedTicket.technicianEarning
           : (typeof updatedTicket.technicianFee === 'number' ? updatedTicket.technicianFee : 0);
+        const incentiveAmount = typeof updatedTicket.technicianIncentive === 'number' && updatedTicket.technicianIncentive > 0
+          ? updatedTicket.technicianIncentive
+          : 0;
+        const totalCredit = earningAmount + incentiveAmount;
 
-        if (earningAmount > 0) {
+        if (totalCredit > 0) {
+          const descNotes = incentiveAmount > 0
+            ? `Earnings & Incentive credited for Ticket #${updatedTicket.ticketNumber || updatedTicket._id} (Earning: ₹${earningAmount} + Incentive: ₹${incentiveAmount})`
+            : `Earnings credited for Ticket #${updatedTicket.ticketNumber || updatedTicket._id}`;
           await creditTechnicianWallet(
             updatedTicket.assignedTechnician,
-            earningAmount,
+            totalCredit,
             updatedTicket._id,
-            `Earnings credited for Ticket #${updatedTicket.ticketNumber || updatedTicket._id}`,
+            descNotes,
             req.user ? req.user.name : 'Admin'
           );
         }

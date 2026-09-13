@@ -146,6 +146,11 @@ const TicketSchema = new mongoose.Schema({
     type: Number,
     min: 0
   },
+  technicianIncentive: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   customerPayment: {
     amount: Number,
     paymentMode: {
