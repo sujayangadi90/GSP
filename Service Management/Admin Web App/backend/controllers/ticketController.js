@@ -1102,7 +1102,8 @@ const verifyWork = async (req, res) => {
       }
     }
 
-    res.json(updatedTicket);
+    const [ticketWithFees] = await attachFeesToTickets([updatedTicket]);
+    res.json(ticketWithFees);
 
     // Trigger Notification
     if (approvalStatus === 'rejected') {
