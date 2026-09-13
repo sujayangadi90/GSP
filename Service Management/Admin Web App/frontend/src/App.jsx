@@ -4225,7 +4225,11 @@ export default function App() {
                       <span className="text-2xl font-black text-teal-400 mt-2">{stats.totalActiveAmcs || 0}</span>
                     </div>
                     <div 
-                      onClick={() => { setActiveTab('technician_payout'); }}
+                      onClick={() => {
+                        setReportTab('technician_wallet');
+                        setReportFilters(prev => ({ ...prev, technician: 'ALL' }));
+                        setActiveTab('reports');
+                      }}
                       className="bg-emerald-950/40 border border-emerald-700/60 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
                     >
                       <div className="flex items-center justify-between">
