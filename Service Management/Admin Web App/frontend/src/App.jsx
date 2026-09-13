@@ -1319,23 +1319,33 @@ export default function App() {
   const [walletTransactions, setWalletTransactions] = useState([]);
   const [loadingWalletTx, setLoadingWalletTx] = useState(false);
   const [walletTechDetail, setWalletTechDetail] = useState(null);
+  const [walletTxPage, setWalletTxPage] = useState(1);
+  const [walletTxPages, setWalletTxPages] = useState(1);
+  const [walletTxTotal, setWalletTxTotal] = useState(0);
+  const [walletTxLimit, setWalletTxLimit] = useState(10);
   const [payoutSubTab, setPayoutSubTab] = useState('payout_history'); // 'payout_history' | 'wallet_transactions'
 
-  const fetchWalletTransactions = async (techId) => {
+  const fetchWalletTransactions = async (techId, page = 1, limit = walletTxLimit) => {
     const targetTechId = techId || payoutSelectedTech;
     if (!targetTechId || targetTechId === 'ALL') {
       setWalletTransactions([]);
       setWalletTechDetail(null);
+      setWalletTxPage(1);
+      setWalletTxPages(1);
+      setWalletTxTotal(0);
       return;
     }
     setLoadingWalletTx(true);
     try {
-      const data = await apiFetch(`/technicians/${targetTechId}/wallet`);
+      const data = await apiFetch(`/technicians/${targetTechId}/wallet?page=${page}&limit=${limit}`);
       setWalletTransactions(data.transactions || []);
       setWalletTechDetail({
         walletBalance: data.walletBalance || 0,
         technician: data.technician
       });
+      setWalletTxPage(data.page || page);
+      setWalletTxPages(data.pages || 1);
+      setWalletTxTotal(data.total || 0);
     } catch (err) {
       console.error('Error fetching wallet transactions:', err);
     } finally {
@@ -9600,57 +9610,88 @@ export default function App() {
                         <RefreshCw className="w-4 h-4 animate-spin text-violet-400" /> Loading wallet transactions...
                       </div>
                     ) : (
-                      <div className="overflow-x-auto rounded-xl border border-slate-800">
-                        <table className="w-full text-left text-sm text-slate-300">
-                          <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 font-bold tracking-wider">
-                            <tr>
-                              <th className="px-4 py-3">Date & Time</th>
-                              <th className="px-4 py-3">Type</th>
-                              <th className="px-4 py-3">Amount</th>
-                              <th className="px-4 py-3">Balance After</th>
-                              <th className="px-4 py-3">Description</th>
-                              <th className="px-4 py-3">Reference / Ticket</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800">
-                            {walletTransactions.length === 0 ? (
+                      <div className="space-y-3">
+                        <div className="overflow-x-auto rounded-xl border border-slate-800">
+                          <table className="w-full text-left text-sm text-slate-300">
+                            <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 font-bold tracking-wider">
                               <tr>
-                                <td colSpan="6" className="px-4 py-8 text-center text-slate-500 font-medium">
-                                  No wallet transactions found for this technician.
-                                </td>
+                                <th className="px-4 py-3">Date & Time</th>
+                                <th className="px-4 py-3">Type</th>
+                                <th className="px-4 py-3">Amount</th>
+                                <th className="px-4 py-3">Balance After</th>
+                                <th className="px-4 py-3">Description</th>
+                                <th className="px-4 py-3">Reference / Ticket</th>
                               </tr>
-                            ) : (
-                              walletTransactions.map((tx) => (
-                                <tr key={tx._id} className="hover:bg-slate-800/40 transition">
-                                  <td className="px-4 py-3 text-xs text-slate-400">
-                                    {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() + ' ' + new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <span className={`text-xs font-bold px-2.5 py-1 rounded-lg uppercase ${
-                                      tx.type === 'credit'
-                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                                    }`}>
-                                      {tx.type}
-                                    </span>
-                                  </td>
-                                  <td className={`px-4 py-3 font-bold font-mono ${tx.type === 'credit' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                    {tx.type === 'credit' ? '+' : '-'}₹{tx.amount?.toLocaleString('en-IN') || 0}
-                                  </td>
-                                  <td className="px-4 py-3 font-mono font-medium text-slate-300">
-                                    ₹{tx.balanceAfter?.toLocaleString('en-IN') || 0}
-                                  </td>
-                                  <td className="px-4 py-3 text-xs text-slate-300">
-                                    {tx.description}
-                                  </td>
-                                  <td className="px-4 py-3 text-xs font-mono text-slate-400">
-                                    {tx.ticket ? `Ticket #${tx.ticket.ticketNumber || tx.ticket}` : (tx.payout ? `Payout Ref: ${tx.payout.referenceNumber || 'N/A'}` : '-')}
+                            </thead>
+                            <tbody className="divide-y divide-slate-800">
+                              {walletTransactions.length === 0 ? (
+                                <tr>
+                                  <td colSpan="6" className="px-4 py-8 text-center text-slate-500 font-medium">
+                                    No wallet transactions found for this technician.
                                   </td>
                                 </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
+                              ) : (
+                                walletTransactions.map((tx) => (
+                                  <tr key={tx._id} className="hover:bg-slate-800/40 transition">
+                                    <td className="px-4 py-3 text-xs text-slate-400">
+                                      {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() + ' ' + new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className={`text-xs font-bold px-2.5 py-1 rounded-lg uppercase ${
+                                        tx.type === 'credit'
+                                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                      }`}>
+                                        {tx.type}
+                                      </span>
+                                    </td>
+                                    <td className={`px-4 py-3 font-bold font-mono ${tx.type === 'credit' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                      {tx.type === 'credit' ? '+' : '-'}₹{tx.amount?.toLocaleString('en-IN') || 0}
+                                    </td>
+                                    <td className="px-4 py-3 font-mono font-medium text-slate-300">
+                                      ₹{tx.balanceAfter?.toLocaleString('en-IN') || 0}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-slate-300">
+                                      {tx.description}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs font-mono text-slate-400">
+                                      {tx.ticket ? `Ticket #${tx.ticket.ticketNumber || tx.ticket}` : (tx.payout ? `Payout Ref: ${tx.payout.referenceNumber || 'N/A'}` : '-')}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Wallet Transactions Pagination */}
+                        {walletTransactions.length > 0 && (
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                            <div className="text-xs text-slate-400">
+                              Showing <span className="font-semibold text-slate-200">{(walletTxPage - 1) * walletTxLimit + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(walletTxPage * walletTxLimit, walletTxTotal)}</span> of <span className="font-semibold text-slate-200">{walletTxTotal}</span> transactions
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => fetchWalletTransactions(payoutSelectedTech, walletTxPage - 1)}
+                                disabled={walletTxPage === 1}
+                                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold cursor-pointer"
+                              >
+                                Previous
+                              </button>
+                              <span className="text-xs text-slate-400 px-2 font-medium">
+                                Page {walletTxPage} of {walletTxPages}
+                              </span>
+                              <button
+                                onClick={() => fetchWalletTransactions(payoutSelectedTech, walletTxPage + 1)}
+                                disabled={walletTxPage >= walletTxPages}
+                                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold cursor-pointer"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
