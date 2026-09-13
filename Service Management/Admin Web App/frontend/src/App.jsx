@@ -1971,12 +1971,26 @@ export default function App() {
         return;
       }
 
-      const headers = reportTab === 'dealer'
-        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
-        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
+      const headers = reportTab === 'technician_wallet'
+        ? ['Tech Code', 'Technician Name', 'Mobile', 'Email', 'Status', 'Current Wallet Balance (₹)']
+        : reportTab === 'dealer'
+          ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
+          : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
 
 
-      const rows = exportData.map(t => {
+      const rows = exportData.map(item => {
+        if (reportTab === 'technician_wallet') {
+          return [
+            item.code || '—',
+            item.name || '—',
+            item.mobile || '—',
+            item.email || '—',
+            (item.status || 'active').toUpperCase(),
+            typeof item.walletBalance === 'number' ? item.walletBalance : (Number(item.walletBalance) || 0)
+          ];
+        }
+
+        const t = item;
         const completedDate = t.adminVerification?.verifiedAt 
           ? new Date(t.adminVerification.verifiedAt).toLocaleDateString('en-GB') 
           : t.closedAt 
@@ -2011,9 +2025,11 @@ export default function App() {
         ];
       });
 
-      const totalRow = reportTab === 'dealer'
-        ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', summary.totalAmount]
-        : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', summary.totalAmount];
+      const totalRow = reportTab === 'technician_wallet'
+        ? ['TOTAL TECHNICIAN WALLET BALANCE', '', '', '', '', summary.totalAmount]
+        : reportTab === 'dealer'
+          ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', summary.totalAmount]
+          : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', summary.totalAmount];
       rows.push(totalRow);
 
       const csvContent = [headers.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
@@ -2022,7 +2038,7 @@ export default function App() {
       const link = document.createElement('a');
       link.setAttribute('href', url);
       const dateFilters = appliedFiltersSummary || reportFilters;
-      link.setAttribute('download', `${reportTab === 'dealer' ? 'dealer_report' : 'technician_report'}_${dateFilters.fromDate}_to_${dateFilters.toDate}.csv`);
+      link.setAttribute('download', `${reportTab === 'technician_wallet' ? 'technician_wallet_report' : reportTab === 'dealer' ? 'dealer_report' : 'technician_report'}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -2051,12 +2067,26 @@ export default function App() {
         return;
       }
 
-      const headers = reportTab === 'dealer'
-        ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
-        : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
+      const headers = reportTab === 'technician_wallet'
+        ? ['Tech Code', 'Technician Name', 'Mobile', 'Email', 'Status', 'Current Wallet Balance (₹)']
+        : reportTab === 'dealer'
+          ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
+          : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
 
 
-      const rows = exportData.map(t => {
+      const rows = exportData.map(item => {
+        if (reportTab === 'technician_wallet') {
+          return [
+            item.code || '—',
+            item.name || '—',
+            item.mobile || '—',
+            item.email || '—',
+            (item.status || 'active').toUpperCase(),
+            typeof item.walletBalance === 'number' ? item.walletBalance : (Number(item.walletBalance) || 0)
+          ];
+        }
+
+        const t = item;
         const completedDate = t.adminVerification?.verifiedAt 
           ? new Date(t.adminVerification.verifiedAt).toLocaleDateString('en-GB') 
           : t.closedAt 
@@ -2091,9 +2121,11 @@ export default function App() {
         ];
       });
 
-      const totalRow = reportTab === 'dealer'
-        ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', summary.totalAmount]
-        : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', summary.totalAmount];
+      const totalRow = reportTab === 'technician_wallet'
+        ? ['TOTAL TECHNICIAN WALLET BALANCE', '', '', '', '', summary.totalAmount]
+        : reportTab === 'dealer'
+          ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', summary.totalAmount]
+          : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', summary.totalAmount];
       rows.push(totalRow);
 
       const tableHeaders = headers.map(h => `<th style="border:1px solid #cbd5e1; background-color:#f1f5f9; padding:8px 12px; font-weight:bold; text-align:left;">${String(h).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</th>`).join('');
@@ -8309,7 +8341,17 @@ export default function App() {
                       : 'border-transparent text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Technician Report
+                  Technician Ticket Report
+                </button>
+                <button
+                  onClick={() => { setReportTab('technician_wallet'); setReportsData([]); setAppliedFiltersSummary(null); }}
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer ${
+                    reportTab === 'technician_wallet'
+                      ? 'border-violet-500 text-violet-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Technician Wallet Report
                 </button>
               </div>
 
@@ -8317,31 +8359,35 @@ export default function App() {
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <SlidersHorizontal className="w-5 h-5 text-violet-400" />
-                  {reportTab === 'dealer' ? 'Dealer Report Filters' : 'Technician Report Filters'}
+                  {reportTab === 'dealer' ? 'Dealer Report Filters' : reportTab === 'technician_wallet' ? 'Technician Wallet Report Filters' : 'Technician Ticket Report Filters'}
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   {/* From Date */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">From Date</label>
-                    <input
-                      type="date"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
-                      value={reportFilters.fromDate}
-                      onChange={e => setReportFilters({ ...reportFilters, fromDate: e.target.value })}
-                    />
-                  </div>
+                  {reportTab !== 'technician_wallet' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">From Date</label>
+                      <input
+                        type="date"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                        value={reportFilters.fromDate}
+                        onChange={e => setReportFilters({ ...reportFilters, fromDate: e.target.value })}
+                      />
+                    </div>
+                  )}
 
                   {/* To Date */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">To Date</label>
-                    <input
-                      type="date"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
-                      value={reportFilters.toDate}
-                      onChange={e => setReportFilters({ ...reportFilters, toDate: e.target.value })}
-                    />
-                  </div>
+                  {reportTab !== 'technician_wallet' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">To Date</label>
+                      <input
+                        type="date"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                        value={reportFilters.toDate}
+                        onChange={e => setReportFilters({ ...reportFilters, toDate: e.target.value })}
+                      />
+                    </div>
+                  )}
 
                   {/* Dealer Filter (Dealer tab) / Technician Filter (Technician tab) */}
                   {reportTab === 'dealer' ? (
@@ -8375,60 +8421,66 @@ export default function App() {
                   )}
 
                   {/* Ticket Type */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Ticket Type</label>
-                    <select
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
-                      value={reportFilters.ticketType}
-                      onChange={e => setReportFilters({ ...reportFilters, ticketType: e.target.value })}
-                    >
-                      <option value="ALL">ALL</option>
-                      <option value="SERVICE">SERVICE</option>
-                      <option value="INSTALLATION">INSTALLATION</option>
-                    </select>
-                  </div>
+                  {reportTab !== 'technician_wallet' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Ticket Type</label>
+                      <select
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                        value={reportFilters.ticketType}
+                        onChange={e => setReportFilters({ ...reportFilters, ticketType: e.target.value })}
+                      >
+                        <option value="ALL">ALL</option>
+                        <option value="SERVICE">SERVICE</option>
+                        <option value="INSTALLATION">INSTALLATION</option>
+                      </select>
+                    </div>
+                  )}
 
                   {/* Appliance Category */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Appliance Category</label>
-                    <select
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
-                      value={reportFilters.category}
-                      onChange={e => {
-                        const newCat = e.target.value;
-                        const availableBrands = brands
-                          .filter(b => newCat === 'ALL' || (b.appliance?.name && b.appliance.name.trim().toLowerCase() === newCat.trim().toLowerCase()))
-                          .map(b => b.name);
-                        const currentBrand = reportFilters.brand;
-                        const nextBrand = (currentBrand === 'ALL' || availableBrands.includes(currentBrand)) ? currentBrand : 'ALL';
-                        setReportFilters({ ...reportFilters, category: newCat, brand: nextBrand });
-                      }}
-                    >
-                      <option value="ALL">ALL CATEGORIES</option>
-                      {appliances.map(a => (
-                        <option key={a._id} value={a.name}>{a.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {reportTab !== 'technician_wallet' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Appliance Category</label>
+                      <select
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                        value={reportFilters.category}
+                        onChange={e => {
+                          const newCat = e.target.value;
+                          const availableBrands = brands
+                            .filter(b => newCat === 'ALL' || (b.appliance?.name && b.appliance.name.trim().toLowerCase() === newCat.trim().toLowerCase()))
+                            .map(b => b.name);
+                          const currentBrand = reportFilters.brand;
+                          const nextBrand = (currentBrand === 'ALL' || availableBrands.includes(currentBrand)) ? currentBrand : 'ALL';
+                          setReportFilters({ ...reportFilters, category: newCat, brand: nextBrand });
+                        }}
+                      >
+                        <option value="ALL">ALL CATEGORIES</option>
+                        {appliances.map(a => (
+                          <option key={a._id} value={a.name}>{a.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Brand */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Brand</label>
-                    <select
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
-                      value={reportFilters.brand}
-                      onChange={e => setReportFilters({ ...reportFilters, brand: e.target.value })}
-                    >
-                      <option value="ALL">ALL BRANDS</option>
-                      {Array.from(new Set(
-                        brands
-                          .filter(b => reportFilters.category === 'ALL' || (b.appliance?.name && b.appliance.name.trim().toLowerCase() === reportFilters.category.trim().toLowerCase()))
-                          .map(b => b.name)
-                      )).map(brandName => (
-                        <option key={brandName} value={brandName}>{brandName}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {reportTab !== 'technician_wallet' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Brand</label>
+                      <select
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                        value={reportFilters.brand}
+                        onChange={e => setReportFilters({ ...reportFilters, brand: e.target.value })}
+                      >
+                        <option value="ALL">ALL BRANDS</option>
+                        {Array.from(new Set(
+                          brands
+                            .filter(b => reportFilters.category === 'ALL' || (b.appliance?.name && b.appliance.name.trim().toLowerCase() === reportFilters.category.trim().toLowerCase()))
+                            .map(b => b.name)
+                        )).map(brandName => (
+                          <option key={brandName} value={brandName}>{brandName}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">
@@ -8456,54 +8508,76 @@ export default function App() {
               ) : appliedFiltersSummary ? (
                 <div className="space-y-6">
                   {/* Summary Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        {reportTab === 'dealer' ? 'TOTAL DEALER EXPENSE' : 'TOTAL TECHNICIAN EARNING'}
-                      </span>
-                      <span className="text-2xl font-black text-white mt-2">
-                        ₹ {reportsSummary.totalAmount.toLocaleString('en-IN')}
-                      </span>
-                    </div>
+                  {reportTab === 'technician_wallet' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL TECHNICIAN WALLET BALANCE</span>
+                        <span className="text-2xl font-black text-emerald-400 mt-2">
+                          ₹ {(reportsSummary.totalAmount || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
 
-                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">COMPLETED TICKETS</span>
-                      <span className="text-2xl font-black text-white mt-2">{reportsSummary.completedCount}</span>
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL TECHNICIANS</span>
+                        <span className="text-2xl font-black text-white mt-2">{reportsSummary.completedCount}</span>
+                      </div>
                     </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          {reportTab === 'dealer' ? 'TOTAL DEALER EXPENSE' : 'TOTAL TECHNICIAN EARNING'}
+                        </span>
+                        <span className="text-2xl font-black text-white mt-2">
+                          ₹ {reportsSummary.totalAmount.toLocaleString('en-IN')}
+                        </span>
+                      </div>
 
-                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        {reportTab === 'dealer' ? 'SERVICE EXPENSE' : 'SERVICE EARNINGS'}
-                      </span>
-                      <span className="text-2xl font-black text-violet-400 mt-2">
-                        ₹ {reportsSummary.serviceAmount.toLocaleString('en-IN')}
-                      </span>
-                    </div>
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">COMPLETED TICKETS</span>
+                        <span className="text-2xl font-black text-white mt-2">{reportsSummary.completedCount}</span>
+                      </div>
 
-                    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        {reportTab === 'dealer' ? 'INSTALLATION EXPENSE' : 'INSTALLATION EARNINGS'}
-                      </span>
-                      <span className="text-2xl font-black text-indigo-400 mt-2">
-                        ₹ {reportsSummary.installationAmount.toLocaleString('en-IN')}
-                      </span>
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          {reportTab === 'dealer' ? 'SERVICE EXPENSE' : 'SERVICE EARNINGS'}
+                        </span>
+                        <span className="text-2xl font-black text-violet-400 mt-2">
+                          ₹ {reportsSummary.serviceAmount.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          {reportTab === 'dealer' ? 'INSTALLATION EXPENSE' : 'INSTALLATION EARNINGS'}
+                        </span>
+                        <span className="text-2xl font-black text-indigo-400 mt-2">
+                          ₹ {reportsSummary.installationAmount.toLocaleString('en-IN')}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Applied Filters Summary & Export Block */}
                   <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div className="space-y-1">
                       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Applied Filters</p>
                       <div className="text-sm text-slate-200 font-semibold space-y-0.5">
-                        <div>Period: <span className="text-slate-400">{new Date(appliedFiltersSummary.fromDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – {new Date(appliedFiltersSummary.toDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
-                        {reportTab === 'dealer' ? (
-                          <div>Dealer: <span className="text-slate-400">{appliedFiltersSummary.dealer === 'ALL' ? 'All Dealers' : (allDealers.length > 0 ? allDealers : dealers).find(d => d._id === appliedFiltersSummary.dealer)?.name || 'N/A'}</span></div>
-                        ) : (
+                        {reportTab === 'technician_wallet' ? (
                           <div>Technician: <span className="text-slate-400">{appliedFiltersSummary.technician === 'ALL' ? 'All Technicians' : technicians.find(t => t._id === appliedFiltersSummary.technician)?.name || 'N/A'}</span></div>
+                        ) : (
+                          <>
+                            <div>Period: <span className="text-slate-400">{new Date(appliedFiltersSummary.fromDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – {new Date(appliedFiltersSummary.toDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
+                            {reportTab === 'dealer' ? (
+                              <div>Dealer: <span className="text-slate-400">{appliedFiltersSummary.dealer === 'ALL' ? 'All Dealers' : (allDealers.length > 0 ? allDealers : dealers).find(d => d._id === appliedFiltersSummary.dealer)?.name || 'N/A'}</span></div>
+                            ) : (
+                              <div>Technician: <span className="text-slate-400">{appliedFiltersSummary.technician === 'ALL' ? 'All Technicians' : technicians.find(t => t._id === appliedFiltersSummary.technician)?.name || 'N/A'}</span></div>
+                            )}
+                            <div>Type: <span className="text-slate-400 capitalize">{appliedFiltersSummary.ticketType}</span></div>
+                            <div>Category: <span className="text-slate-400">{appliedFiltersSummary.category}</span></div>
+                            <div>Brand: <span className="text-slate-400">{appliedFiltersSummary.brand}</span></div>
+                          </>
                         )}
-                        <div>Type: <span className="text-slate-400 capitalize">{appliedFiltersSummary.ticketType}</span></div>
-                        <div>Category: <span className="text-slate-400">{appliedFiltersSummary.category}</span></div>
-                        <div>Brand: <span className="text-slate-400">{appliedFiltersSummary.brand}</span></div>
                       </div>
                     </div>
 
@@ -8531,24 +8605,54 @@ export default function App() {
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="bg-slate-800/50 border-b border-slate-800">
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ticket ID</th>
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Completed Date</th>
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">{reportTab === 'dealer' ? 'Dealer' : 'Technician'}</th>
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ticket Type</th>
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Appliance Category</th>
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Brand</th>
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</th>
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">{reportTab === 'dealer' ? 'Technician' : 'Dealer'}</th>
-                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">{reportTab === 'dealer' ? 'Dealer Expense' : 'Technician Earning'}</th>
+                            {reportTab === 'technician_wallet' ? (
+                              <>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Tech Code</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Technician Name</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Mobile</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Email</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Current Wallet Balance</th>
+                              </>
+                            ) : (
+                              <>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ticket ID</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Completed Date</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">{reportTab === 'dealer' ? 'Dealer' : 'Technician'}</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ticket Type</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Appliance Category</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Brand</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">{reportTab === 'dealer' ? 'Technician' : 'Dealer'}</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">{reportTab === 'dealer' ? 'Dealer Expense' : 'Technician Earning'}</th>
+                              </>
+                            )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
                           {reportsData.length === 0 ? (
                             <tr>
-                              <td colSpan={9} className="p-8 text-center text-slate-500 text-sm font-medium">
-                                {reportTab === 'dealer' ? 'No dealer records found' : 'No technician records found'}
+                              <td colSpan={reportTab === 'technician_wallet' ? 6 : 9} className="p-8 text-center text-slate-500 text-sm font-medium">
+                                {reportTab === 'technician_wallet' ? 'No technician records found' : reportTab === 'dealer' ? 'No dealer records found' : 'No technician records found'}
                               </td>
                             </tr>
+                          ) : reportTab === 'technician_wallet' ? (
+                            reportsData.map(tech => (
+                              <tr key={tech._id} className="hover:bg-slate-800/20 transition duration-150">
+                                <td className="p-4 text-sm font-bold text-violet-400">{tech.code || '—'}</td>
+                                <td className="p-4 text-sm text-white font-medium">{tech.name || '—'}</td>
+                                <td className="p-4 text-sm text-slate-300">{tech.mobile || '—'}</td>
+                                <td className="p-4 text-sm text-slate-300">{tech.email || '—'}</td>
+                                <td className="p-4 text-sm">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${tech.status === 'active' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+                                    {(tech.status || 'active').toUpperCase()}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-sm text-right font-bold text-emerald-400">
+                                  ₹ {(tech.walletBalance || 0).toLocaleString('en-IN')}
+                                </td>
+                              </tr>
+                            ))
                           ) : (
                             reportsData.map(t => {
                               const completedDate = t.adminVerification?.verifiedAt 
@@ -8603,7 +8707,7 @@ export default function App() {
                       <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 space-y-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-slate-300">
-                            {reportTab === 'dealer' ? 'TOTAL DEALER EXPENSE:' : 'TOTAL TECHNICIAN EARNING:'}
+                            {reportTab === 'technician_wallet' ? 'TOTAL TECHNICIAN WALLET BALANCE:' : reportTab === 'dealer' ? 'TOTAL DEALER EXPENSE:' : 'TOTAL TECHNICIAN EARNING:'}
                           </span>
                           <span className="text-lg font-black text-white">
                             ₹ {reportsSummary.totalAmount.toLocaleString('en-IN')}

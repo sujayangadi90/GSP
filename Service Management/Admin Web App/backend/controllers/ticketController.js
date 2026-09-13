@@ -1703,6 +1703,48 @@ const getReports = async (req, res) => {
   try {
     const { reportType, fromDate, toDate, dealer, technician, ticketType, category, brand, page, limit } = req.query;
 
+    if (reportType === 'technician_wallet') {
+      let query = { role: 'technician' };
+      if (technician && technician !== 'ALL') {
+        query._id = technician;
+      }
+
+      const allTechnicians = await User.find(query)
+        .select('name code mobile email status walletBalance createdAt')
+        .sort({ name: 1 });
+
+      const totalWalletBalance = allTechnicians.reduce((sum, t) => sum + (t.walletBalance || 0), 0);
+
+      const isAll = limit === '0' || limit === 0 || limit === 'all';
+      const p = parseInt(page, 10) || 1;
+      let paginatedTechs;
+      let skip = 0;
+      let l = 25;
+
+      if (isAll) {
+        paginatedTechs = allTechnicians;
+        l = allTechnicians.length;
+      } else {
+        l = parseInt(limit, 10) || 25;
+        skip = (p - 1) * l;
+        paginatedTechs = allTechnicians.slice(skip, skip + l);
+      }
+
+      return res.json({
+        data: paginatedTechs,
+        summary: {
+          totalAmount: totalWalletBalance,
+          completedCount: allTechnicians.length,
+          serviceAmount: 0,
+          installationAmount: 0
+        },
+        page: isAll ? 1 : p,
+        limit: l,
+        totalCount: allTechnicians.length,
+        hasMore: isAll ? false : (skip + paginatedTechs.length) < allTechnicians.length
+      });
+    }
+
     if (!fromDate || !toDate) {
       return res.status(400).json({ message: 'fromDate and toDate are required' });
     }
