@@ -1,15 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const {
-  calculateDealerCollection,
   createDealerCollection,
-  getDealerCollections
+  getDealerCollections,
+  getDealerWallet,
+  getDealerWalletTransactions,
+  syncDealerWallets
 } = require('../controllers/dealerCollectionController');
 const { protect, authorize } = require('../middleware/auth');
 
 router.use(protect);
 
-router.get('/calculate', authorize('admin'), calculateDealerCollection);
+router.post('/sync-wallets', authorize('admin'), syncDealerWallets);
+router.get('/transactions', authorize('admin', 'dealer'), getDealerWalletTransactions);
+router.get('/dealer/:id/wallet', authorize('admin', 'dealer'), getDealerWallet);
+
 router.route('/')
   .get(authorize('admin', 'dealer'), getDealerCollections)
   .post(authorize('admin'), createDealerCollection);

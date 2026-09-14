@@ -1,4 +1,5 @@
 const DealerCollection = require('../models/DealerCollection');
+const DealerWalletTransaction = require('../models/DealerWalletTransaction');
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
 
@@ -77,151 +78,140 @@ const attachFeesToTickets = async (tickets) => {
   });
 };
 
-// @desc    Calculate dealer expenses / collection amount for selected month & year
-// @route   GET /api/dealer-collections/calculate
-// @access  Private (Admin)
-const calculateDealerCollection = async (req, res) => {
-  try {
-    const { dealerId, month, year } = req.query;
+// Helper to charge dealer wallet (increases Due Amount)
+const chargeDealerWallet = async (dealerId, amount, ticketId, description, createdByName = 'System') => {
+  if (!dealerId || !amount || amount <= 0) return null;
 
-    if (!dealerId || !month || !year) {
-      return res.status(400).json({ message: 'Dealer, month, and year are required.' });
-    }
-
-    const m = parseInt(month, 10);
-    const y = parseInt(year, 10);
-
-    const dealerUser = await User.findById(dealerId).select('name code mobile email role contactPerson address city');
-    if (!dealerUser || dealerUser.role !== 'dealer') {
-      return res.status(404).json({ message: 'Dealer not found.' });
-    }
-
-    const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
-    const end = new Date(y, m, 0, 23, 59, 59, 999);
-
-    const completedTickets = await Ticket.find({
-      dealer: dealerId,
-      status: { $in: ['completed', 'closed'] },
-      $or: [
-        { 'completion.submittedAt': { $gte: start, $lte: end } },
-        { 'completion.submittedAt': { $exists: false }, createdAt: { $gte: start, $lte: end } },
-        { closedAt: { $gte: start, $lte: end } }
-      ]
-    }).populate('assignedTechnician', 'name code');
-
-    const ticketsWithFees = await attachFeesToTickets(completedTickets);
-
-    let totalCollection = 0;
-    let serviceCollection = 0;
-    let installationCollection = 0;
-    let completedServiceJobsCount = 0;
-    let completedInstallationJobsCount = 0;
-
-    ticketsWithFees.forEach((t) => {
-      const expense = typeof t.dealerExpense === 'number' ? t.dealerExpense : 0;
-      totalCollection += expense;
-      if (t.type === 'service') {
-        completedServiceJobsCount += 1;
-        serviceCollection += expense;
-      } else if (t.type === 'installation') {
-        completedInstallationJobsCount += 1;
-        installationCollection += expense;
-      }
-    });
-
-    const existingRecord = await DealerCollection.findOne({
-      dealer: dealerId,
-      month: m,
-      year: y
-    }).populate('recordedBy', 'name code email');
-
-    return res.json({
-      dealer: dealerUser,
-      month: m,
-      year: y,
-      totalCollection,
-      completedJobsCount: ticketsWithFees.length,
-      completedServiceJobsCount,
-      serviceCollection,
-      completedInstallationJobsCount,
-      installationCollection,
-      collectionRecord: existingRecord || null,
-      status: existingRecord ? existingRecord.status : 'uncollected'
-    });
-  } catch (error) {
-    console.error('Error in calculateDealerCollection:', error);
-    return res.status(500).json({ message: 'Failed to calculate dealer collection', error: error.message });
+  // Idempotency check
+  if (ticketId) {
+    const existing = await DealerWalletTransaction.findOne({ ticket: ticketId, type: 'charge' });
+    if (existing) return existing;
   }
+
+  const user = await User.findByIdAndUpdate(
+    dealerId,
+    { $inc: { dueAmount: amount } },
+    { new: true }
+  );
+
+  const tx = await DealerWalletTransaction.create({
+    dealer: dealerId,
+    type: 'charge',
+    amount: Number(amount),
+    dueAmountAfter: user ? user.dueAmount : amount,
+    source: 'ticket_charge',
+    ticket: ticketId || null,
+    description: description || 'Job charge added to due amount',
+    createdByName
+  });
+
+  return tx;
 };
 
-// @desc    Record dealer collection
+// Helper to record dealer payment collection (decreases Due Amount)
+const creditDealerCollection = async (dealerId, amount, collectionId, paymentMode, referenceNumber, description, createdByName = 'System') => {
+  if (!dealerId || !amount || amount <= 0) return null;
+
+  // Idempotency check
+  if (collectionId) {
+    const existing = await DealerWalletTransaction.findOne({ collectionRecord: collectionId, type: 'collection' });
+    if (existing) return existing;
+  }
+
+  const user = await User.findByIdAndUpdate(
+    dealerId,
+    { $inc: { dueAmount: -amount } },
+    { new: true }
+  );
+
+  const tx = await DealerWalletTransaction.create({
+    dealer: dealerId,
+    type: 'collection',
+    amount: Number(amount),
+    dueAmountAfter: user ? user.dueAmount : 0,
+    source: 'dealer_payment',
+    collectionRecord: collectionId || null,
+    paymentMode: paymentMode || '',
+    referenceNumber: referenceNumber || '',
+    description: description || `Payment collected via ${paymentMode || 'cash'}`,
+    createdByName
+  });
+
+  return tx;
+};
+
+// @desc    Record flexible part payment / collection from dealer
 // @route   POST /api/dealer-collections
 // @access  Private (Admin)
 const createDealerCollection = async (req, res) => {
   try {
-    const { dealerId, month, year, paymentMode, referenceNumber, amount } = req.body;
+    const { dealerId, amount, paymentMode, referenceNumber, notes } = req.body;
 
-    if (!dealerId || !month || !year || !paymentMode) {
-      return res.status(400).json({ message: 'Dealer, month, year, and payment mode are required.' });
+    if (!dealerId || !paymentMode) {
+      return res.status(400).json({ message: 'Dealer and payment mode are required.' });
     }
 
-    const m = parseInt(month, 10);
-    const y = parseInt(year, 10);
+    const payAmount = Number(amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ message: 'Valid collection amount greater than ₹0 is required.' });
+    }
 
     const dealerUser = await User.findById(dealerId);
     if (!dealerUser || dealerUser.role !== 'dealer') {
       return res.status(404).json({ message: 'Dealer not found.' });
     }
 
-    let record = await DealerCollection.findOne({
+    const currentDate = new Date();
+    const collectionRecord = new DealerCollection({
       dealer: dealerId,
-      month: m,
-      year: y
+      month: currentDate.getMonth() + 1,
+      year: currentDate.getFullYear(),
+      amount: payAmount,
+      status: 'collected',
+      paymentMode,
+      referenceNumber: referenceNumber ? referenceNumber.trim() : (notes || ''),
+      collectedAt: currentDate,
+      recordedBy: req.user ? req.user._id : null
     });
 
-    if (record && record.status === 'collected') {
-      return res.status(400).json({
-        message: `Collection for ${dealerUser.name} for ${m}/${y} has already been recorded.`
-      });
+    await collectionRecord.save();
+
+    // Automatically deduct collected amount from dealer's Due Amount
+    try {
+      await creditDealerCollection(
+        dealerId,
+        payAmount,
+        collectionRecord._id,
+        paymentMode,
+        referenceNumber ? referenceNumber.trim() : '',
+        `Payment collected via ${paymentMode}${referenceNumber ? ` (Ref: ${referenceNumber})` : ''}`,
+        req.user ? req.user.name : 'Admin'
+      );
+    } catch (walletErr) {
+      console.error('Error updating dealer wallet on collection:', walletErr);
     }
 
-    if (!record) {
-      record = new DealerCollection({
-        dealer: dealerId,
-        month: m,
-        year: y
-      });
-    }
-
-    record.amount = amount !== undefined ? Number(amount) : record.amount;
-    record.status = 'collected';
-    record.paymentMode = paymentMode;
-    record.referenceNumber = referenceNumber ? referenceNumber.trim() : '';
-    record.collectedAt = new Date();
-    record.recordedBy = req.user._id;
-
-    await record.save();
-
-    const savedRecord = await DealerCollection.findById(record._id)
-      .populate('dealer', 'name code mobile email contactPerson')
+    const savedRecord = await DealerCollection.findById(collectionRecord._id)
+      .populate('dealer', 'name code mobile email contactPerson dueAmount')
       .populate('recordedBy', 'name code email');
 
+    // Fetch updated dealer due amount
+    const updatedDealer = await User.findById(dealerId).select('name code mobile dueAmount');
+
     return res.status(201).json({
-      message: 'Dealer collection recorded successfully',
-      collectionRecord: savedRecord
+      message: `Collection of ₹${payAmount} successfully recorded for ${dealerUser.name}`,
+      collectionRecord: savedRecord,
+      dueAmount: updatedDealer ? (updatedDealer.dueAmount || 0) : 0
     });
   } catch (error) {
     console.error('Error in createDealerCollection:', error);
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'A collection record already exists for this dealer and month.' });
-    }
     return res.status(500).json({ message: 'Failed to record dealer collection', error: error.message });
   }
 };
 
-// @desc    Get all dealer collections with filters
+// @desc    Get all dealer collection payment history records
 // @route   GET /api/dealer-collections
-// @access  Private (Admin)
+// @access  Private (Admin, Dealer)
 const getDealerCollections = async (req, res) => {
   try {
     const { dealerId, month, year, paymentMode, page, limit } = req.query;
@@ -244,11 +234,11 @@ const getDealerCollections = async (req, res) => {
     }
 
     const p = parseInt(page, 10) || 1;
-    const l = parseInt(limit, 10) || 20;
+    const l = parseInt(limit, 10) || 50;
     const skip = (p - 1) * l;
 
     const collections = await DealerCollection.find(query)
-      .populate('dealer', 'name code mobile email contactPerson')
+      .populate('dealer', 'name code mobile email contactPerson dueAmount')
       .populate('recordedBy', 'name code email')
       .sort({ collectedAt: -1, createdAt: -1 })
       .skip(skip)
@@ -268,8 +258,191 @@ const getDealerCollections = async (req, res) => {
   }
 };
 
+// @desc    Get dealer wallet (Due Amount) & transaction history
+// @route   GET /api/dealer-collections/dealer/:id/wallet
+// @access  Private (Admin, Dealer)
+const getDealerWallet = async (req, res) => {
+  try {
+    const dealerId = req.params.id || req.query.dealerId;
+    if (!dealerId) {
+      return res.status(400).json({ message: 'Dealer ID is required' });
+    }
+
+    const dealerUser = await User.findById(dealerId).select('name code email mobile contactPerson dueAmount role status');
+    if (!dealerUser || dealerUser.role !== 'dealer') {
+      return res.status(404).json({ message: 'Dealer not found' });
+    }
+
+    const { type, page, limit } = req.query;
+    const query = { dealer: dealerId };
+
+    if (type && ['charge', 'collection', 'adjustment'].includes(type)) {
+      query.type = type;
+    }
+
+    const p = parseInt(page, 10) || 1;
+    const l = parseInt(limit, 10) || 50;
+    const skip = (p - 1) * l;
+
+    const transactions = await DealerWalletTransaction.find(query)
+      .populate('ticket', 'ticketNumber type status product')
+      .populate('collectionRecord', 'amount paymentMode referenceNumber collectedAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(l);
+
+    const total = await DealerWalletTransaction.countDocuments(query);
+
+    // Live sync calculation check
+    const completedTickets = await Ticket.find({
+      dealer: dealerId,
+      status: { $in: ['completed', 'closed'] }
+    });
+    const ticketsWithFees = await attachFeesToTickets(completedTickets);
+    let totalCharges = 0;
+    ticketsWithFees.forEach((t) => {
+      totalCharges += typeof t.dealerExpense === 'number' ? t.dealerExpense : 0;
+    });
+
+    const collectionsAgg = await DealerCollection.aggregate([
+      { $match: { dealer: dealerUser._id } },
+      { $group: { _id: null, totalCollected: { $sum: '$amount' } } }
+    ]);
+    const totalCollected = collectionsAgg.length > 0 ? collectionsAgg[0].totalCollected : 0;
+    const computedDueAmount = totalCharges - totalCollected;
+
+    // Update user dueAmount if out of sync
+    if (dealerUser.dueAmount !== computedDueAmount) {
+      dealerUser.dueAmount = computedDueAmount;
+      await dealerUser.save();
+    }
+
+    return res.json({
+      dealer: dealerUser,
+      dueAmount: computedDueAmount,
+      totalCharges,
+      totalCollected,
+      completedJobsCount: completedTickets.length,
+      transactions,
+      total,
+      page: p,
+      pages: Math.ceil(total / l)
+    });
+  } catch (error) {
+    console.error('Error in getDealerWallet:', error);
+    return res.status(500).json({ message: 'Failed to fetch dealer wallet details', error: error.message });
+  }
+};
+
+// @desc    Get all wallet transactions across dealers or for a specific dealer
+// @route   GET /api/dealer-collections/transactions
+// @access  Private (Admin, Dealer)
+const getDealerWalletTransactions = async (req, res) => {
+  try {
+    const { dealerId, type, page, limit } = req.query;
+    let query = {};
+
+    if (req.user.role === 'dealer') {
+      query.dealer = req.user._id;
+    } else if (dealerId && dealerId !== 'ALL') {
+      query.dealer = dealerId;
+    }
+
+    if (type && type !== 'ALL') {
+      query.type = type;
+    }
+
+    const p = parseInt(page, 10) || 1;
+    const l = parseInt(limit, 10) || 50;
+    const skip = (p - 1) * l;
+
+    const transactions = await DealerWalletTransaction.find(query)
+      .populate('dealer', 'name code mobile contactPerson')
+      .populate('ticket', 'ticketNumber type status product')
+      .populate('collectionRecord', 'amount paymentMode referenceNumber collectedAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(l);
+
+    const total = await DealerWalletTransaction.countDocuments(query);
+
+    return res.json({
+      transactions,
+      total,
+      page: p,
+      pages: Math.ceil(total / l)
+    });
+  } catch (error) {
+    console.error('Error in getDealerWalletTransactions:', error);
+    return res.status(500).json({ message: 'Failed to fetch dealer wallet transactions', error: error.message });
+  }
+};
+
+// @desc    Sync past tickets and collections into dealer due amounts & wallet transactions
+// @route   POST /api/dealer-collections/sync-wallets
+// @access  Private (Admin)
+const syncDealerWallets = async (req, res) => {
+  try {
+    const dealers = await User.find({ role: 'dealer' });
+    let updatedCount = 0;
+
+    for (const dealer of dealers) {
+      const completedTickets = await Ticket.find({
+        dealer: dealer._id,
+        status: { $in: ['completed', 'closed'] }
+      });
+      const ticketsWithFees = await attachFeesToTickets(completedTickets);
+
+      let totalCharges = 0;
+      for (const t of ticketsWithFees) {
+        const exp = typeof t.dealerExpense === 'number' ? t.dealerExpense : 0;
+        totalCharges += exp;
+
+        if (exp > 0) {
+          await chargeDealerWallet(
+            dealer._id,
+            exp,
+            t._id,
+            `Job charge for Ticket #${t.ticketNumber || t._id}`,
+            'System Backfill'
+          );
+        }
+      }
+
+      const collections = await DealerCollection.find({ dealer: dealer._id });
+      let totalCollected = 0;
+      for (const col of collections) {
+        totalCollected += col.amount || 0;
+        await creditDealerCollection(
+          dealer._id,
+          col.amount,
+          col._id,
+          col.paymentMode,
+          col.referenceNumber,
+          `Payment collected via ${col.paymentMode}`,
+          'System Backfill'
+        );
+      }
+
+      const dueAmount = totalCharges - totalCollected;
+      dealer.dueAmount = dueAmount;
+      await dealer.save();
+      updatedCount++;
+    }
+
+    return res.json({ message: `Successfully synced wallets for ${updatedCount} dealers.` });
+  } catch (error) {
+    console.error('Error in syncDealerWallets:', error);
+    return res.status(500).json({ message: 'Failed to sync dealer wallets', error: error.message });
+  }
+};
+
 module.exports = {
-  calculateDealerCollection,
+  chargeDealerWallet,
+  creditDealerCollection,
   createDealerCollection,
-  getDealerCollections
+  getDealerCollections,
+  getDealerWallet,
+  getDealerWalletTransactions,
+  syncDealerWallets
 };

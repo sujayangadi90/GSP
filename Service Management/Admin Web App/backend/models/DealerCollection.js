@@ -7,14 +7,10 @@ const dealerCollectionSchema = new mongoose.Schema({
     required: true
   },
   month: {
-    type: Number,
-    required: true,
-    min: 1,
-    max: 12
+    type: Number
   },
   year: {
-    type: Number,
-    required: true
+    type: Number
   },
   amount: {
     type: Number,
@@ -59,6 +55,6 @@ const dealerCollectionSchema = new mongoose.Schema({
   timestamps: true
 });
 
-dealerCollectionSchema.index({ dealer: 1, month: 1, year: 1 }, { unique: true });
+dealerCollectionSchema.index({ dealer: 1, createdAt: -1 });
 
 module.exports = mongoose.model('DealerCollection', dealerCollectionSchema);

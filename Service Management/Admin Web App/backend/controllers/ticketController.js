@@ -1143,6 +1143,26 @@ const verifyWork = async (req, res) => {
       }
     }
 
+    // Automatically charge dealer wallet if work approved
+    if (approvalStatus === 'approved' && updatedTicket.dealer) {
+      try {
+        const { chargeDealerWallet } = require('./dealerCollectionController');
+        const [ticketWithFees] = await attachFeesToTickets([updatedTicket]);
+        const exp = typeof ticketWithFees.dealerExpense === 'number' ? ticketWithFees.dealerExpense : 0;
+        if (exp > 0) {
+          await chargeDealerWallet(
+            updatedTicket.dealer,
+            exp,
+            updatedTicket._id,
+            `Job charge for Ticket #${updatedTicket.ticketNumber || updatedTicket._id}`,
+            req.user ? req.user.name : 'Admin'
+          );
+        }
+      } catch (dealerWalletErr) {
+        console.error('Error charging dealer wallet on job approval:', dealerWalletErr);
+      }
+    }
+
     const [ticketWithFees] = await attachFeesToTickets([updatedTicket]);
     res.json(ticketWithFees);
 
@@ -1230,6 +1250,26 @@ const closeTicket = async (req, res) => {
         }
       } catch (walletErr) {
         console.error('Error crediting technician wallet on ticket closure:', walletErr);
+      }
+    }
+
+    // Automatically charge dealer wallet on ticket closure
+    if (updatedTicket.dealer) {
+      try {
+        const { chargeDealerWallet } = require('./dealerCollectionController');
+        const [ticketWithFees] = await attachFeesToTickets([updatedTicket]);
+        const exp = typeof ticketWithFees.dealerExpense === 'number' ? ticketWithFees.dealerExpense : 0;
+        if (exp > 0) {
+          await chargeDealerWallet(
+            updatedTicket.dealer,
+            exp,
+            updatedTicket._id,
+            `Job charge for Ticket #${updatedTicket.ticketNumber || updatedTicket._id}`,
+            req.user ? req.user.name : 'Admin'
+          );
+        }
+      } catch (dealerWalletErr) {
+        console.error('Error charging dealer wallet on ticket closure:', dealerWalletErr);
       }
     }
 
