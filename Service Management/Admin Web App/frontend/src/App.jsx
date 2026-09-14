@@ -786,6 +786,55 @@ export default function App() {
     }
   };
 
+  // Dealer Wallet States
+  const [selectedDealerWallet, setSelectedDealerWallet] = useState(null);
+  const [dealerWalletLoading, setDealerWalletLoading] = useState(false);
+  const [loadingMoreDealerWallet, setLoadingMoreDealerWallet] = useState(false);
+  const [dealerWalletPage, setDealerWalletPage] = useState(1);
+  const [dealerWalletFromDate, setDealerWalletFromDate] = useState('');
+  const [dealerWalletToDate, setDealerWalletToDate] = useState('');
+  const [dealerWalletTypeFilter, setDealerWalletTypeFilter] = useState('');
+
+  const openDealerWalletModal = async (dealerId, fromDate = '', toDate = '', type = '', pageNum = 1, isAppend = false) => {
+    try {
+      if (isAppend) {
+        setLoadingMoreDealerWallet(true);
+      } else {
+        setDealerWalletLoading(true);
+        setDealerWalletPage(1);
+      }
+
+      const queryParams = new URLSearchParams();
+      queryParams.append('page', pageNum.toString());
+      queryParams.append('limit', '10');
+      if (fromDate) queryParams.append('fromDate', fromDate);
+      if (toDate) queryParams.append('toDate', toDate);
+      if (type) queryParams.append('type', type);
+
+      const queryString = `?${queryParams.toString()}`;
+      const data = await apiFetch(`/dealer-collections/dealer/${dealerId}/wallet${queryString}`);
+      if (data) {
+        if (isAppend && selectedDealerWallet) {
+          setSelectedDealerWallet({
+            ...data,
+            transactions: [...(selectedDealerWallet.transactions || []), ...(data.transactions || [])]
+          });
+          setDealerWalletPage(pageNum);
+        } else {
+          setSelectedDealerWallet(data);
+          setDealerWalletPage(1);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching dealer wallet:', err);
+      alert('Failed to load dealer wallet details');
+      if (!isAppend) setSelectedDealerWallet(null);
+    } finally {
+      setDealerWalletLoading(false);
+      setLoadingMoreDealerWallet(false);
+    }
+  };
+
   const openTechWalletModal = async (techId, fromDate = '', toDate = '', type = '', pageNum = 1, isAppend = false) => {
     try {
       if (isAppend) {
@@ -4802,6 +4851,13 @@ export default function App() {
                             className="text-xs text-violet-400 hover:text-violet-300 font-bold cursor-pointer"
                           >
                             Edit Details
+                          </button>
+                          <button
+                            onClick={() => openDealerWalletModal(dealer._id)}
+                            className="text-xs text-amber-400 hover:text-amber-300 font-bold cursor-pointer flex items-center gap-1 bg-amber-950/40 px-2 py-1 rounded-md border border-amber-900/50"
+                            title="View Wallet & Transactions"
+                          >
+                            👛 Wallet
                           </button>
                           <button
                             onClick={() => viewHistory('dealer', dealer, 'dealers')}
@@ -11897,6 +11953,222 @@ export default function App() {
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Dealer Wallet & Transaction History Modal */}
+      {selectedDealerWallet && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-950/60 border border-amber-700/50 flex items-center justify-center text-amber-400 font-bold text-lg shadow-md shrink-0">
+                  👛
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-lg">
+                    {selectedDealerWallet.dealer?.name || 'Dealer'} Wallet & Transactions
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Code: {selectedDealerWallet.dealer?.code || 'N/A'} • Mobile: {selectedDealerWallet.dealer?.mobile || 'N/A'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedDealerWallet(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 border-b border-slate-800 bg-slate-950/40">
+              <div className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-slate-900 border border-amber-900/60 p-5 rounded-2xl flex items-center justify-between shadow-lg">
+                <div>
+                  <p className="text-xs text-amber-400 font-bold uppercase tracking-wider">Due Amount (Wallet Balance)</p>
+                  <h2 className="text-3xl font-extrabold text-white mt-1 font-mono">
+                    ₹ {(selectedDealerWallet.dueAmount !== undefined ? selectedDealerWallet.dueAmount : (selectedDealerWallet.dealer?.dueAmount || 0)).toLocaleString()}
+                  </h2>
+                  <p className="text-[11px] text-slate-400 mt-1">Ticket charges added to due & payment collections deducted</p>
+                </div>
+                <div className="bg-amber-900/30 border border-amber-800/40 px-4 py-2 rounded-xl text-right">
+                  <span className="text-xs text-amber-300 font-semibold block">Wallet Status</span>
+                  <span className="text-xs font-bold text-white uppercase">Active</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Date & Type Filter Bar */}
+              <div className="bg-slate-950/60 border border-slate-800 p-3.5 rounded-xl mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-400 font-semibold">From:</span>
+                    <input 
+                      type="date"
+                      value={dealerWalletFromDate}
+                      onChange={(e) => setDealerWalletFromDate(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs focus:outline-hidden focus:border-violet-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-400 font-semibold">To:</span>
+                    <input 
+                      type="date"
+                      value={dealerWalletToDate}
+                      onChange={(e) => setDealerWalletToDate(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs focus:outline-hidden focus:border-violet-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-400 font-semibold">Type:</span>
+                    <select
+                      value={dealerWalletTypeFilter}
+                      onChange={(e) => setDealerWalletTypeFilter(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs focus:outline-hidden focus:border-violet-500 cursor-pointer"
+                    >
+                      <option value="">All Transactions</option>
+                      <option value="charge">Ticket Charges (+)</option>
+                      <option value="collection">Payments Collected (-)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (selectedDealerWallet?.dealer?._id) {
+                        openDealerWalletModal(selectedDealerWallet.dealer._id, dealerWalletFromDate, dealerWalletToDate, dealerWalletTypeFilter);
+                      }
+                    }}
+                    className="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1"
+                  >
+                    Filter
+                  </button>
+                  {(dealerWalletFromDate || dealerWalletToDate || dealerWalletTypeFilter) && (
+                    <button
+                      onClick={() => {
+                        setDealerWalletFromDate('');
+                        setDealerWalletToDate('');
+                        setDealerWalletTypeFilter('');
+                        if (selectedDealerWallet?.dealer?._id) {
+                          openDealerWalletModal(selectedDealerWallet.dealer._id, '', '', '');
+                        }
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <h4 className="font-bold text-white mb-3 text-sm flex items-center justify-between">
+                <span>Transaction History</span>
+                <span className="text-xs text-slate-400 font-normal">
+                  Showing {selectedDealerWallet.transactions ? selectedDealerWallet.transactions.length : 0} of {selectedDealerWallet.total || (selectedDealerWallet.transactions ? selectedDealerWallet.transactions.length : 0)} transactions recorded
+                </span>
+              </h4>
+
+              {(!selectedDealerWallet.transactions || selectedDealerWallet.transactions.length === 0) ? (
+                <p className="text-center text-slate-500 py-10 text-sm italic">No wallet transactions recorded for this dealer yet.</p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-slate-950/20 border border-slate-800 rounded-xl overflow-hidden">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-800/40 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider">
+                          <th className="p-3">Date & Time</th>
+                          <th className="p-3">Type</th>
+                          <th className="p-3 text-right">Amount</th>
+                          <th className="p-3 text-right">Due Balance After</th>
+                          <th className="p-3">Description / Reference</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 text-slate-300">
+                        {selectedDealerWallet.transactions.map((tx) => (
+                          <tr key={tx._id} className="hover:bg-slate-800/30 transition duration-150">
+                            <td className="p-3 text-slate-400 whitespace-nowrap">
+                              {new Date(tx.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                            </td>
+                            <td className="p-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide border ${
+                                tx.type === 'charge'
+                                  ? 'bg-rose-950/80 text-rose-400 border-rose-800/50'
+                                  : 'bg-emerald-950/80 text-emerald-400 border-emerald-800/50'
+                              }`}>
+                                {tx.type === 'charge' ? '+ TICKET CHARGE' : '- COLLECTION'}
+                              </span>
+                            </td>
+                            <td className={`p-3 text-right font-bold font-mono text-sm ${tx.type === 'charge' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {tx.type === 'charge' ? '+' : '-'}₹ {tx.amount}
+                            </td>
+                            <td className="p-3 text-right font-mono font-semibold text-amber-400">
+                              ₹ {tx.dueAmountAfter}
+                            </td>
+                            <td className="p-3">
+                              <p className="font-medium text-slate-200">{tx.description}</p>
+                              {tx.ticket && (
+                                <p className="text-[10px] text-violet-400 font-mono mt-0.5">
+                                  Ref Ticket: #{tx.ticket.ticketNumber || tx.ticket._id}
+                                </p>
+                              )}
+                              {tx.collectionRecord && (
+                                <p className="text-[10px] text-emerald-400 font-mono mt-0.5">
+                                  Payment Mode: {tx.collectionRecord.paymentMode} {tx.collectionRecord.referenceNumber ? `(Ref: ${tx.collectionRecord.referenceNumber})` : ''}
+                                </p>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Load More Button */}
+                  {selectedDealerWallet.transactions.length < (selectedDealerWallet.total || 0) && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        onClick={() => {
+                          if (selectedDealerWallet?.dealer?._id) {
+                            openDealerWalletModal(
+                              selectedDealerWallet.dealer._id,
+                              dealerWalletFromDate,
+                              dealerWalletToDate,
+                              dealerWalletTypeFilter,
+                              dealerWalletPage + 1,
+                              true
+                            );
+                          }
+                        }}
+                        disabled={loadingMoreDealerWallet}
+                        className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs px-5 py-2 rounded-xl shadow-md transition duration-150 flex items-center gap-2 cursor-pointer"
+                      >
+                        {loadingMoreDealerWallet ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading more...
+                          </>
+                        ) : (
+                          <>
+                            <span>👇</span> Load More (+{Math.min(10, (selectedDealerWallet.total || 0) - selectedDealerWallet.transactions.length)})
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-850 px-6 py-4 flex items-center justify-end border-t border-slate-800">
+              <button 
+                onClick={() => setSelectedDealerWallet(null)} 
+                className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-5 rounded-xl text-xs transition cursor-pointer"
+              >
+                Close Wallet
+              </button>
+            </div>
           </div>
         </div>
       )}

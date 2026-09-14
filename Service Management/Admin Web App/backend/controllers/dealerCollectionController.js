@@ -275,11 +275,21 @@ const getDealerWallet = async (req, res) => {
       return res.status(404).json({ message: 'Dealer not found' });
     }
 
-    const { type, page, limit } = req.query;
+    const { type, page, limit, fromDate, toDate } = req.query;
     const query = { dealer: dealerId };
 
     if (type && ['charge', 'collection', 'adjustment'].includes(type)) {
       query.type = type;
+    }
+
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) {
+        query.createdAt.$gte = new Date(`${fromDate}T00:00:00`);
+      }
+      if (toDate) {
+        query.createdAt.$lte = new Date(`${toDate}T23:59:59.999`);
+      }
     }
 
     const p = parseInt(page, 10) || 1;
