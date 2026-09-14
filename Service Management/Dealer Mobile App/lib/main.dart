@@ -2689,6 +2689,9 @@ class ExpenseHistoryScreen extends StatefulWidget {
 class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
   late int _selectedMonth;
   late int _selectedYear;
+  String _selectedType = 'ALL'; // 'ALL', 'SERVICE', 'INSTALLATION'
+  List<dynamic> _allCompletedTickets = [];
+  bool _isLoading = false;
   int _page = 1;
   final int _limit = 10;
   bool _hasMore = false;
