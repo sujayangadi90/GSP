@@ -2075,9 +2075,11 @@ export default function App() {
         ? ['Ticket ID', 'Date Consumed', 'Ticket Type', 'Customer', 'Technician', 'Item Name', 'Item Code (SKU)', 'Qty Consumed', 'Unit Price (₹)', 'Total Value (₹)']
         : reportTab === 'technician_wallet'
           ? ['Tech Code', 'Technician Name', 'Mobile', 'Email', 'Status', 'Current Wallet Balance (₹)']
-          : reportTab === 'dealer'
-            ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
-            : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
+          : reportTab === 'payment_due'
+            ? ['Dealer Code', 'Dealer Name', 'Contact Person', 'Mobile', 'City', 'Status', 'Current Due Amount (₹)']
+            : reportTab === 'dealer'
+              ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
+              : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
 
 
       const rows = exportData.map(item => {
@@ -2104,6 +2106,18 @@ export default function App() {
             item.email || '—',
             (item.status || 'active').toUpperCase(),
             typeof item.walletBalance === 'number' ? item.walletBalance : (Number(item.walletBalance) || 0)
+          ];
+        }
+
+        if (reportTab === 'payment_due') {
+          return [
+            item.code || '—',
+            item.name || '—',
+            item.contactPerson || '—',
+            item.mobile || '—',
+            item.city || '—',
+            (item.status || 'active').toUpperCase(),
+            typeof item.dueAmount === 'number' ? item.dueAmount : (Number(item.dueAmount) || 0)
           ];
         }
 
@@ -2146,17 +2160,19 @@ export default function App() {
         ? ['TOTAL INVENTORY BURN', '', '', '', '', '', '', summary.totalItemsBurned || 0, '', summary.totalBurnValue || 0]
         : reportTab === 'technician_wallet'
           ? ['TOTAL TECHNICIAN WALLET BALANCE', '', '', '', '', summary.totalAmount]
-          : [
-              'TOTAL AMOUNT',
-              '',
-              '',
-              '',
-              '',
-              '',
-              '',
-              '',
-              summary.totalAmount
-            ];
+          : reportTab === 'payment_due'
+            ? ['TOTAL DEALER DUE AMOUNT', '', '', '', '', '', summary.totalAmount]
+            : [
+                'TOTAL AMOUNT',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                summary.totalAmount
+              ];
 
       const csvRows = [
         headers,
@@ -2205,14 +2221,33 @@ export default function App() {
         return;
       }
 
-      const headers = reportTab === 'technician_wallet'
-        ? ['Tech Code', 'Technician Name', 'Mobile', 'Email', 'Status', 'Current Wallet Balance (₹)']
-        : reportTab === 'dealer'
-          ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
-          : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
+      const headers = reportTab === 'inventory_burn'
+        ? ['Ticket ID', 'Date Consumed', 'Ticket Type', 'Customer', 'Technician', 'Item Name', 'Item Code (SKU)', 'Qty Consumed', 'Unit Price (₹)', 'Total Value (₹)']
+        : reportTab === 'technician_wallet'
+          ? ['Tech Code', 'Technician Name', 'Mobile', 'Email', 'Status', 'Current Wallet Balance (₹)']
+          : reportTab === 'payment_due'
+            ? ['Dealer Code', 'Dealer Name', 'Contact Person', 'Mobile', 'City', 'Status', 'Current Due Amount (₹)']
+            : reportTab === 'dealer'
+              ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
+              : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
 
 
       const rows = exportData.map(item => {
+        if (reportTab === 'inventory_burn') {
+          return [
+            item.ticketNumber || '—',
+            item.date ? new Date(item.date).toLocaleDateString('en-GB') : '—',
+            (item.ticketType || '—').toUpperCase(),
+            item.customerName || '—',
+            item.technicianName || '—',
+            item.itemName || '—',
+            item.sku || '—',
+            item.quantity || 0,
+            item.sellingPrice || 0,
+            item.totalValue || 0
+          ];
+        }
+
         if (reportTab === 'technician_wallet') {
           return [
             item.code || '—',
@@ -2221,6 +2256,18 @@ export default function App() {
             item.email || '—',
             (item.status || 'active').toUpperCase(),
             typeof item.walletBalance === 'number' ? item.walletBalance : (Number(item.walletBalance) || 0)
+          ];
+        }
+
+        if (reportTab === 'payment_due') {
+          return [
+            item.code || '—',
+            item.name || '—',
+            item.contactPerson || '—',
+            item.mobile || '—',
+            item.city || '—',
+            (item.status || 'active').toUpperCase(),
+            typeof item.dueAmount === 'number' ? item.dueAmount : (Number(item.dueAmount) || 0)
           ];
         }
 
@@ -2259,11 +2306,15 @@ export default function App() {
         ];
       });
 
-      const totalRow = reportTab === 'technician_wallet'
-        ? ['TOTAL TECHNICIAN WALLET BALANCE', '', '', '', '', summary.totalAmount]
-        : reportTab === 'dealer'
-          ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', summary.totalAmount]
-          : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', summary.totalAmount];
+      const totalRow = reportTab === 'inventory_burn'
+        ? ['TOTAL INVENTORY BURN', '', '', '', '', '', '', summary.totalItemsBurned || 0, '', summary.totalBurnValue || 0]
+        : reportTab === 'technician_wallet'
+          ? ['TOTAL TECHNICIAN WALLET BALANCE', '', '', '', '', summary.totalAmount]
+          : reportTab === 'payment_due'
+            ? ['TOTAL DEALER DUE AMOUNT', '', '', '', '', '', summary.totalAmount]
+            : reportTab === 'dealer'
+              ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', summary.totalAmount]
+              : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', summary.totalAmount];
       rows.push(totalRow);
 
       const tableHeaders = headers.map(h => `<th style="border:1px solid #cbd5e1; background-color:#f1f5f9; padding:8px 12px; font-weight:bold; text-align:left;">${String(h).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</th>`).join('');
@@ -8689,18 +8740,28 @@ export default function App() {
                 >
                   Technician Wallet Report
                 </button>
+                <button
+                  onClick={() => { setReportTab('payment_due'); setReportsData([]); setAppliedFiltersSummary(null); }}
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer ${
+                    reportTab === 'payment_due'
+                      ? 'border-violet-500 text-violet-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Payment Due Report
+                </button>
               </div>
 
               {/* Filters Block */}
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <SlidersHorizontal className="w-5 h-5 text-violet-400" />
-                  {reportTab === 'dealer' ? 'Dealer Report Filters' : reportTab === 'technician_wallet' ? 'Technician Wallet Report Filters' : 'Technician Ticket Report Filters'}
+                  {reportTab === 'dealer' ? 'Dealer Report Filters' : reportTab === 'technician_wallet' ? 'Technician Wallet Report Filters' : reportTab === 'payment_due' ? 'Payment Due Report Filters' : 'Technician Ticket Report Filters'}
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   {/* From Date */}
-                  {reportTab !== 'technician_wallet' && (
+                  {(reportTab !== 'technician_wallet' && reportTab !== 'payment_due') && (
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">From Date</label>
                       <input
@@ -8713,7 +8774,7 @@ export default function App() {
                   )}
 
                   {/* To Date */}
-                  {reportTab !== 'technician_wallet' && (
+                  {(reportTab !== 'technician_wallet' && reportTab !== 'payment_due') && (
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">To Date</label>
                       <input
@@ -8725,8 +8786,8 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Dealer Filter (Dealer tab) / Technician Filter (Technician tab) */}
-                  {reportTab === 'dealer' ? (
+                  {/* Dealer Filter (Dealer/Payment Due tab) / Technician Filter (Technician tab) */}
+                  {(reportTab === 'dealer' || reportTab === 'payment_due') ? (
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Dealer</label>
                       <select
@@ -8757,7 +8818,7 @@ export default function App() {
                   )}
 
                   {/* Ticket Type */}
-                  {reportTab !== 'technician_wallet' && (
+                  {(reportTab !== 'technician_wallet' && reportTab !== 'payment_due') && (
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Ticket Type</label>
                       <select
@@ -8773,7 +8834,7 @@ export default function App() {
                   )}
 
                   {/* Appliance Category */}
-                  {reportTab !== 'technician_wallet' && (
+                  {(reportTab !== 'technician_wallet' && reportTab !== 'payment_due') && (
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Appliance Category</label>
                       <select
@@ -8798,7 +8859,7 @@ export default function App() {
                   )}
 
                   {/* Brand */}
-                  {reportTab !== 'technician_wallet' && (
+                  {(reportTab !== 'technician_wallet' && reportTab !== 'payment_due') && (
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Brand</label>
                       <select
@@ -8881,6 +8942,20 @@ export default function App() {
                         <span className="text-2xl font-black text-white mt-2">{reportsSummary.completedCount}</span>
                       </div>
                     </div>
+                  ) : reportTab === 'payment_due' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL DEALER DUE AMOUNT</span>
+                        <span className="text-2xl font-black text-amber-400 mt-2">
+                          ₹ {(reportsSummary.totalAmount || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL DEALERS</span>
+                        <span className="text-2xl font-black text-white mt-2">{reportsSummary.completedCount}</span>
+                      </div>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
@@ -8924,6 +8999,8 @@ export default function App() {
                       <div className="text-sm text-slate-200 font-semibold space-y-0.5">
                         {reportTab === 'technician_wallet' ? (
                           <div>Technician: <span className="text-slate-400">{appliedFiltersSummary.technician === 'ALL' ? 'All Technicians' : technicians.find(t => t._id === appliedFiltersSummary.technician)?.name || 'N/A'}</span></div>
+                        ) : reportTab === 'payment_due' ? (
+                          <div>Dealer: <span className="text-slate-400">{appliedFiltersSummary.dealer === 'ALL' ? 'All Dealers' : (allDealers.length > 0 ? allDealers : dealers).find(d => d._id === appliedFiltersSummary.dealer)?.name || 'N/A'}</span></div>
                         ) : (
                           <>
                             <div>Period: <span className="text-slate-400">{new Date(appliedFiltersSummary.fromDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – {new Date(appliedFiltersSummary.toDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
@@ -8985,6 +9062,16 @@ export default function App() {
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Current Wallet Balance</th>
                               </>
+                            ) : reportTab === 'payment_due' ? (
+                              <>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Dealer Code</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Dealer Name</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Contact Person</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Mobile</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">City</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Current Due Amount</th>
+                              </>
                             ) : (
                               <>
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ticket ID</th>
@@ -9003,8 +9090,8 @@ export default function App() {
                         <tbody className="divide-y divide-slate-800">
                           {reportsData.length === 0 ? (
                             <tr>
-                              <td colSpan={reportTab === 'inventory_burn' ? 9 : reportTab === 'technician_wallet' ? 6 : 9} className="p-8 text-center text-slate-500 text-sm font-medium">
-                                {reportTab === 'inventory_burn' ? 'No inventory burn records found' : reportTab === 'technician_wallet' ? 'No technician records found' : reportTab === 'dealer' ? 'No dealer records found' : 'No technician records found'}
+                              <td colSpan={reportTab === 'inventory_burn' ? 9 : (reportTab === 'technician_wallet' || reportTab === 'payment_due') ? 7 : 9} className="p-8 text-center text-slate-500 text-sm font-medium">
+                                {reportTab === 'inventory_burn' ? 'No inventory burn records found' : reportTab === 'technician_wallet' ? 'No technician records found' : reportTab === 'payment_due' ? 'No dealer records found' : reportTab === 'dealer' ? 'No dealer records found' : 'No technician records found'}
                               </td>
                             </tr>
                           ) : reportTab === 'inventory_burn' ? (
@@ -9058,6 +9145,24 @@ export default function App() {
                                 </td>
                                 <td className="p-4 text-sm text-right font-bold text-emerald-400">
                                   ₹ {(tech.walletBalance || 0).toLocaleString('en-IN')}
+                                </td>
+                              </tr>
+                            ))
+                          ) : reportTab === 'payment_due' ? (
+                            reportsData.map(dealer => (
+                              <tr key={dealer._id} className="hover:bg-slate-800/20 transition duration-150">
+                                <td className="p-4 text-sm font-bold text-amber-400 font-mono">{dealer.code || '—'}</td>
+                                <td className="p-4 text-sm text-white font-medium">{dealer.name || '—'}</td>
+                                <td className="p-4 text-sm text-slate-300">{dealer.contactPerson || '—'}</td>
+                                <td className="p-4 text-sm text-slate-300">{dealer.mobile || '—'}</td>
+                                <td className="p-4 text-sm text-slate-300">{dealer.city || '—'}</td>
+                                <td className="p-4 text-sm">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${dealer.status === 'active' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+                                    {(dealer.status || 'active').toUpperCase()}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-sm text-right font-bold text-amber-400 font-mono">
+                                  ₹ {(dealer.dueAmount || 0).toLocaleString('en-IN')}
                                 </td>
                               </tr>
                             ))

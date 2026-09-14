@@ -1827,6 +1827,48 @@ const getReports = async (req, res) => {
       });
     }
 
+    if (reportType === 'payment_due' || reportType === 'dealer_wallet') {
+      let query = { role: 'dealer' };
+      if (dealer && dealer !== 'ALL') {
+        query._id = dealer;
+      }
+
+      const allDealers = await User.find(query)
+        .select('name code mobile email contactPerson city status dueAmount createdAt')
+        .sort({ name: 1 });
+
+      const totalDueAmount = allDealers.reduce((sum, d) => sum + (d.dueAmount || 0), 0);
+
+      const isAll = limit === '0' || limit === 0 || limit === 'all';
+      const p = parseInt(page, 10) || 1;
+      let paginatedDealers;
+      let skip = 0;
+      let l = 25;
+
+      if (isAll) {
+        paginatedDealers = allDealers;
+        l = allDealers.length;
+      } else {
+        l = parseInt(limit, 10) || 25;
+        skip = (p - 1) * l;
+        paginatedDealers = allDealers.slice(skip, skip + l);
+      }
+
+      return res.json({
+        data: paginatedDealers,
+        summary: {
+          totalAmount: totalDueAmount,
+          completedCount: allDealers.length,
+          serviceAmount: 0,
+          installationAmount: 0
+        },
+        page: isAll ? 1 : p,
+        limit: l,
+        totalCount: allDealers.length,
+        hasMore: isAll ? false : (skip + paginatedDealers.length) < allDealers.length
+      });
+    }
+
     if (reportType === 'inventory_burn') {
       if (!fromDate || !toDate) {
         return res.status(400).json({ message: 'fromDate and toDate are required' });
