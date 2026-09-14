@@ -2689,32 +2689,41 @@ class ExpenseHistoryScreen extends StatefulWidget {
 class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
   late int _selectedMonth;
   late int _selectedYear;
-  String _selectedType = 'ALL'; // 'ALL', 'SERVICE', 'INSTALLATION'
-  List<dynamic> _allCompletedTickets = [];
-  bool _isLoading = false;
-  int _visibleCount = 10;
+  int _page = 1;
+  final int _limit = 10;
+  bool _hasMore = false;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
     _selectedMonth = widget.initialMonth;
     _selectedYear = widget.initialYear;
-    _loadExpenses();
+    _loadExpenses(reset: true);
   }
 
-  Future<void> _loadExpenses() async {
-    setState(() {
-      _isLoading = true;
-      _visibleCount = 10;
-    });
+  Future<void> _loadExpenses({bool reset = false}) async {
+    if (reset) {
+      setState(() {
+        _page = 1;
+        _isLoading = true;
+        _allCompletedTickets = [];
+        _hasMore = false;
+      });
+    } else {
+      if (_isLoadingMore || !_hasMore) return;
+      setState(() => _isLoadingMore = true);
+    }
+
     try {
       final firstDay = DateTime(_selectedYear, _selectedMonth, 1);
       final lastDay = DateTime(_selectedYear, _selectedMonth + 1, 0);
       final fromDateStr = "${firstDay.year}-${firstDay.month.toString().padLeft(2, '0')}-01";
       final toDateStr = "${lastDay.year}-${lastDay.month.toString().padLeft(2, '0')}-${lastDay.day.toString().padLeft(2, '0')}";
 
+      final currentPage = reset ? 1 : _page;
       final res = await http.get(
-        Uri.parse('${widget.apiUrl}/tickets?fromDate=$fromDateStr&toDate=$toDateStr'),
+        Uri.parse('${widget.apiUrl}/tickets?fromDate=$fromDateStr&toDate=$toDateStr&page=$currentPage&limit=$_limit'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}'
@@ -2722,8 +2731,19 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
       );
 
       if (res.statusCode == 200) {
-        final List tickets = jsonDecode(res.body);
-        final filtered = tickets.where((t) {
+        final decoded = jsonDecode(res.body);
+        List newTickets = [];
+        bool hasMoreFromRes = false;
+
+        if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+          newTickets = decoded['data'] ?? [];
+          hasMoreFromRes = decoded['hasMore'] ?? false;
+        } else if (decoded is List) {
+          newTickets = decoded;
+          hasMoreFromRes = false;
+        }
+
+        final filtered = newTickets.where((t) {
           final s = t['status']?.toString().toLowerCase() ?? '';
           if (s == 'completed' || s == 'closed') {
             final exp = t['dealerExpense'];
@@ -2733,13 +2753,22 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
         }).toList();
 
         setState(() {
-          _allCompletedTickets = filtered;
+          if (reset) {
+            _allCompletedTickets = filtered;
+          } else {
+            _allCompletedTickets.addAll(filtered);
+          }
+          _hasMore = hasMoreFromRes;
+          _page = currentPage + 1;
         });
       }
     } catch (e) {
       print('Error fetching expenses: $e');
     } finally {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
     }
   }
 
@@ -2782,7 +2811,6 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
         onTap: () {
           setState(() {
             _selectedType = type;
-            _visibleCount = 10;
           });
         },
         child: Container(
@@ -3004,38 +3032,35 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
         ),
       );
     } else {
-      final visibleTickets = filtered.take(_visibleCount).toList();
       listBody = Column(
         children: [
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: visibleTickets.length,
-            itemBuilder: (context, idx) => _buildTicketCard(visibleTickets[idx]),
+            itemCount: filtered.length,
+            itemBuilder: (context, idx) => _buildTicketCard(filtered[idx]),
           ),
-          if (filtered.length > _visibleCount)
+          if (_hasMore || _isLoadingMore)
             Padding(
               padding: const EdgeInsets.only(top: 8.0, bottom: 20.0),
               child: Center(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _visibleCount += 10;
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E1B24),
-                    foregroundColor: const Color(0xFF818CF8),
-                    side: const BorderSide(color: Color(0xFF6366F1)),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  icon: const Icon(Icons.expand_more, size: 18),
-                  label: Text(
-                    'Load More (${filtered.length - _visibleCount} remaining)',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
+                child: _isLoadingMore
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton.icon(
+                        onPressed: () => _loadExpenses(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E1B24),
+                          foregroundColor: const Color(0xFF818CF8),
+                          side: const BorderSide(color: Color(0xFF6366F1)),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.expand_more, size: 18),
+                        label: const Text(
+                          'Load More',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
               ),
             ),
         ],
@@ -3232,8 +3257,16 @@ class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTick
   double _dueAmount = 0;
   List<dynamic> _transactions = [];
   List<dynamic> _collections = [];
-  int _visibleLedgerCount = 10;
-  int _visibleCollectionsCount = 10;
+
+  int _ledgerPage = 1;
+  final int _ledgerLimit = 10;
+  bool _hasMoreLedger = false;
+  bool _isLoadingMoreLedger = false;
+
+  int _collectionsPage = 1;
+  final int _collectionsLimit = 10;
+  bool _hasMoreCollections = false;
+  bool _isLoadingMoreCollections = false;
 
   @override
   void initState() {
@@ -3252,8 +3285,10 @@ class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTick
     setState(() {
       _isLoading = true;
       _error = null;
-      _visibleLedgerCount = 10;
-      _visibleCollectionsCount = 10;
+      _ledgerPage = 1;
+      _collectionsPage = 1;
+      _transactions = [];
+      _collections = [];
     });
 
     try {
@@ -3262,20 +3297,32 @@ class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTick
         'Authorization': 'Bearer ${widget.token}',
       };
 
-      final walletUri = Uri.parse('${widget.apiUrl}/dealer-collections/dealer/me/wallet');
+      final walletUri = Uri.parse('${widget.apiUrl}/dealer-collections/dealer/me/wallet?page=1&limit=$_ledgerLimit');
       final walletRes = await http.get(walletUri, headers: headers);
 
-      final collectionsUri = Uri.parse('${widget.apiUrl}/dealer-collections');
+      final collectionsUri = Uri.parse('${widget.apiUrl}/dealer-collections?page=1&limit=$_collectionsLimit');
       final collectionsRes = await http.get(collectionsUri, headers: headers);
 
       if (walletRes.statusCode == 200) {
         final walletData = jsonDecode(walletRes.body);
         final collData = collectionsRes.statusCode == 200 ? jsonDecode(collectionsRes.body) : {};
 
+        final txs = walletData['transactions'] ?? [];
+        final totalTx = walletData['total'] ?? txs.length;
+
+        final colls = collData['collections'] ?? [];
+        final totalColls = collData['total'] ?? colls.length;
+
         setState(() {
           _dueAmount = (walletData['dueAmount'] ?? walletData['dealer']?['dueAmount'] ?? 0).toDouble();
-          _transactions = walletData['transactions'] ?? [];
-          _collections = collData['collections'] ?? [];
+          _transactions = txs;
+          _hasMoreLedger = txs.length < totalTx;
+          _ledgerPage = 2;
+
+          _collections = colls;
+          _hasMoreCollections = colls.length < totalColls;
+          _collectionsPage = 2;
+
           _isLoading = false;
         });
       } else {
@@ -3289,6 +3336,68 @@ class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTick
         _error = 'Error connecting to server: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMoreLedger() async {
+    if (_isLoadingMoreLedger || !_hasMoreLedger) return;
+    setState(() => _isLoadingMoreLedger = true);
+
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${widget.token}',
+      };
+
+      final walletUri = Uri.parse('${widget.apiUrl}/dealer-collections/dealer/me/wallet?page=$_ledgerPage&limit=$_ledgerLimit');
+      final walletRes = await http.get(walletUri, headers: headers);
+
+      if (walletRes.statusCode == 200) {
+        final walletData = jsonDecode(walletRes.body);
+        final List newTxs = walletData['transactions'] ?? [];
+        final totalTx = walletData['total'] ?? 0;
+
+        setState(() {
+          _transactions.addAll(newTxs);
+          _hasMoreLedger = _transactions.length < totalTx;
+          _ledgerPage += 1;
+        });
+      }
+    } catch (e) {
+      print('Error loading more ledger items: $e');
+    } finally {
+      setState(() => _isLoadingMoreLedger = false);
+    }
+  }
+
+  Future<void> _loadMoreCollections() async {
+    if (_isLoadingMoreCollections || !_hasMoreCollections) return;
+    setState(() => _isLoadingMoreCollections = true);
+
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${widget.token}',
+      };
+
+      final collectionsUri = Uri.parse('${widget.apiUrl}/dealer-collections?page=$_collectionsPage&limit=$_collectionsLimit');
+      final collectionsRes = await http.get(collectionsUri, headers: headers);
+
+      if (collectionsRes.statusCode == 200) {
+        final collData = jsonDecode(collectionsRes.body);
+        final List newColls = collData['collections'] ?? [];
+        final totalColls = collData['total'] ?? 0;
+
+        setState(() {
+          _collections.addAll(newColls);
+          _hasMoreCollections = _collections.length < totalColls;
+          _collectionsPage += 1;
+        });
+      }
+    } catch (e) {
+      print('Error loading more collection items: $e');
+    } finally {
+      setState(() => _isLoadingMoreCollections = false);
     }
   }
 
@@ -3430,44 +3539,39 @@ class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTick
       );
     }
 
-    final visibleTxs = _transactions.take(_visibleLedgerCount).toList();
-    final bool hasMore = _transactions.length > _visibleLedgerCount;
-
     return RefreshIndicator(
       onRefresh: _fetchWalletData,
       color: Colors.amberAccent,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: visibleTxs.length + (hasMore ? 1 : 0),
+        itemCount: _transactions.length + ((_hasMoreLedger || _isLoadingMoreLedger) ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index == visibleTxs.length) {
+          if (index == _transactions.length) {
             return Padding(
               padding: const EdgeInsets.only(top: 8.0, bottom: 24.0),
               child: Center(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _visibleLedgerCount += 10;
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E1B24),
-                    foregroundColor: Colors.amberAccent,
-                    side: BorderSide(color: Colors.amber.shade700),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  icon: const Icon(Icons.expand_more, size: 18),
-                  label: Text(
-                    'Load More (${_transactions.length - _visibleLedgerCount} remaining)',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
+                child: _isLoadingMoreLedger
+                    ? const CircularProgressIndicator(color: Colors.amberAccent)
+                    : ElevatedButton.icon(
+                        onPressed: _loadMoreLedger,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E1B24),
+                          foregroundColor: Colors.amberAccent,
+                          side: BorderSide(color: Colors.amber.shade700),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.expand_more, size: 18),
+                        label: const Text(
+                          'Load More',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
               ),
             );
           }
 
-          final tx = visibleTxs[index];
+          final tx = _transactions[index];
           final type = tx['type'] ?? 'charge';
           final isCharge = type == 'charge';
           final amt = tx['amount'] ?? 0;
@@ -3577,44 +3681,39 @@ class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTick
       );
     }
 
-    final visibleColls = _collections.take(_visibleCollectionsCount).toList();
-    final bool hasMore = _collections.length > _visibleCollectionsCount;
-
     return RefreshIndicator(
       onRefresh: _fetchWalletData,
       color: Colors.amberAccent,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: visibleColls.length + (hasMore ? 1 : 0),
+        itemCount: _collections.length + ((_hasMoreCollections || _isLoadingMoreCollections) ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index == visibleColls.length) {
+          if (index == _collections.length) {
             return Padding(
               padding: const EdgeInsets.only(top: 8.0, bottom: 24.0),
               child: Center(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _visibleCollectionsCount += 10;
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E1B24),
-                    foregroundColor: Colors.amberAccent,
-                    side: BorderSide(color: Colors.amber.shade700),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  icon: const Icon(Icons.expand_more, size: 18),
-                  label: Text(
-                    'Load More (${_collections.length - _visibleCollectionsCount} remaining)',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
+                child: _isLoadingMoreCollections
+                    ? const CircularProgressIndicator(color: Colors.amberAccent)
+                    : ElevatedButton.icon(
+                        onPressed: _loadMoreCollections,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E1B24),
+                          foregroundColor: Colors.amberAccent,
+                          side: BorderSide(color: Colors.amber.shade700),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.expand_more, size: 18),
+                        label: const Text(
+                          'Load More',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
               ),
             );
           }
 
-          final item = visibleColls[index];
+          final item = _collections[index];
           final amt = item['amount'] ?? 0;
           final paymentMode = item['paymentMode'] ?? 'Cash';
           final refNum = item['referenceNumber'] ?? '';
