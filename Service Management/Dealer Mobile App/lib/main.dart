@@ -2692,6 +2692,7 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
   String _selectedType = 'ALL'; // 'ALL', 'SERVICE', 'INSTALLATION'
   List<dynamic> _allCompletedTickets = [];
   bool _isLoading = false;
+  int _visibleCount = 10;
 
   @override
   void initState() {
@@ -2702,7 +2703,10 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
   }
 
   Future<void> _loadExpenses() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _visibleCount = 10;
+    });
     try {
       final firstDay = DateTime(_selectedYear, _selectedMonth, 1);
       final lastDay = DateTime(_selectedYear, _selectedMonth + 1, 0);
@@ -2778,6 +2782,7 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
         onTap: () {
           setState(() {
             _selectedType = type;
+            _visibleCount = 10;
           });
         },
         child: Container(
@@ -2999,11 +3004,41 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
         ),
       );
     } else {
-      listBody = ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: filtered.length,
-        itemBuilder: (context, idx) => _buildTicketCard(filtered[idx]),
+      final visibleTickets = filtered.take(_visibleCount).toList();
+      listBody = Column(
+        children: [
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: visibleTickets.length,
+            itemBuilder: (context, idx) => _buildTicketCard(visibleTickets[idx]),
+          ),
+          if (filtered.length > _visibleCount)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0, bottom: 20.0),
+              child: Center(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _visibleCount += 10;
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E1B24),
+                    foregroundColor: const Color(0xFF818CF8),
+                    side: const BorderSide(color: Color(0xFF6366F1)),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.expand_more, size: 18),
+                  label: Text(
+                    'Load More (${filtered.length - _visibleCount} remaining)',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+        ],
       );
     }
 
@@ -3197,6 +3232,8 @@ class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTick
   double _dueAmount = 0;
   List<dynamic> _transactions = [];
   List<dynamic> _collections = [];
+  int _visibleLedgerCount = 10;
+  int _visibleCollectionsCount = 10;
 
   @override
   void initState() {
@@ -3215,6 +3252,8 @@ class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTick
     setState(() {
       _isLoading = true;
       _error = null;
+      _visibleLedgerCount = 10;
+      _visibleCollectionsCount = 10;
     });
 
     try {
@@ -3391,14 +3430,44 @@ class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTick
       );
     }
 
+    final visibleTxs = _transactions.take(_visibleLedgerCount).toList();
+    final bool hasMore = _transactions.length > _visibleLedgerCount;
+
     return RefreshIndicator(
       onRefresh: _fetchWalletData,
       color: Colors.amberAccent,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _transactions.length,
+        itemCount: visibleTxs.length + (hasMore ? 1 : 0),
         itemBuilder: (context, index) {
-          final tx = _transactions[index];
+          if (index == visibleTxs.length) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 8.0, bottom: 24.0),
+              child: Center(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _visibleLedgerCount += 10;
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E1B24),
+                    foregroundColor: Colors.amberAccent,
+                    side: BorderSide(color: Colors.amber.shade700),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.expand_more, size: 18),
+                  label: Text(
+                    'Load More (${_transactions.length - _visibleLedgerCount} remaining)',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          final tx = visibleTxs[index];
           final type = tx['type'] ?? 'charge';
           final isCharge = type == 'charge';
           final amt = tx['amount'] ?? 0;
@@ -3508,14 +3577,44 @@ class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTick
       );
     }
 
+    final visibleColls = _collections.take(_visibleCollectionsCount).toList();
+    final bool hasMore = _collections.length > _visibleCollectionsCount;
+
     return RefreshIndicator(
       onRefresh: _fetchWalletData,
       color: Colors.amberAccent,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _collections.length,
+        itemCount: visibleColls.length + (hasMore ? 1 : 0),
         itemBuilder: (context, index) {
-          final item = _collections[index];
+          if (index == visibleColls.length) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 8.0, bottom: 24.0),
+              child: Center(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _visibleCollectionsCount += 10;
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E1B24),
+                    foregroundColor: Colors.amberAccent,
+                    side: BorderSide(color: Colors.amber.shade700),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.expand_more, size: 18),
+                  label: Text(
+                    'Load More (${_collections.length - _visibleCollectionsCount} remaining)',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          final item = visibleColls[index];
           final amt = item['amount'] ?? 0;
           final paymentMode = item['paymentMode'] ?? 'Cash';
           final refNum = item['referenceNumber'] ?? '';
