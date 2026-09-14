@@ -99,6 +99,40 @@ export default function EditTicketModal({
     }
   }, [ticket, isOpen]);
 
+  const availableModules = React.useMemo(() => {
+    if (!formData?.productCategory) return [];
+
+    const selectedApp = (appliances || []).find(
+      (a) =>
+        (a.name && a.name.trim().toLowerCase() === formData.productCategory.trim().toLowerCase()) ||
+        a._id === formData.productCategory
+    );
+
+    return (brands || []).filter((b) => {
+      if (b.isActive === false) return false;
+
+      const bAppId = typeof b.appliance === "object" ? b.appliance?._id : b.appliance;
+      const bAppName = typeof b.appliance === "object" ? b.appliance?.name : "";
+
+      if (selectedApp) {
+        if (bAppId && String(bAppId) === String(selectedApp._id)) return true;
+        if (bAppName && bAppName.trim().toLowerCase() === selectedApp.name.trim().toLowerCase()) return true;
+      }
+      if (bAppName && bAppName.trim().toLowerCase() === formData.productCategory.trim().toLowerCase()) return true;
+      if (bAppId && String(bAppId) === String(formData.productCategory)) return true;
+
+      return false;
+    });
+  }, [brands, appliances, formData?.productCategory]);
+
+  const handleCategoryChange = (e) => {
+    const newCategory = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      productCategory: newCategory,
+    }));
+  };
+
   if (!isOpen || !formData) return null;
 
   const handleInvoiceChange = (e) => {
@@ -376,7 +410,7 @@ export default function EditTicketModal({
                 <select
                   className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                   value={formData.productCategory}
-                  onChange={(e) => setFormData({ ...formData, productCategory: e.target.value })}
+                  onChange={handleCategoryChange}
                 >
                   <option value="">Select Category...</option>
                   {appliances.map((app) => (
@@ -387,14 +421,28 @@ export default function EditTicketModal({
 
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                  Brand / Product Name
+                  Module/Size
                 </label>
-                <input
-                  type="text"
-                  className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-violet-500"
+                <select
+                  className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
                   value={formData.productName}
                   onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
-                />
+                >
+                  <option value="">Select Module/Size...</option>
+                  {availableModules.map((m) => (
+                    <option key={m._id || m.name} value={m.name}>
+                      {m.name}
+                    </option>
+                  ))}
+                  {formData.productName &&
+                    !availableModules.some(
+                      (m) => m.name && m.name.trim().toLowerCase() === formData.productName.trim().toLowerCase()
+                    ) && (
+                      <option value={formData.productName}>
+                        {formData.productName}
+                      </option>
+                    )}
+                </select>
               </div>
 
               <div>
