@@ -360,7 +360,7 @@ export default function App() {
   const [tickets, setTickets] = useState([]);
   const [stats, setStats] = useState({
     total: 0, new: 0, assigned: 0, pending: 0, closed: 0,
-    totalCustomers: 0, totalActiveAmcs: 0
+    totalCustomers: 0, totalDealerPaymentDue: 0
   });
 
   // Modals & Forms
@@ -4322,11 +4322,17 @@ export default function App() {
                       <span className="text-2xl font-black text-violet-400 mt-2">{stats.totalCustomers || 0}</span>
                     </div>
                     <div 
-                      onClick={() => { setActiveTab('amcs'); }}
-                      className="bg-teal-950/20 border border-teal-900/40 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
+                      onClick={() => {
+                        setReportTab('payment_due');
+                        setReportFilters(prev => ({ ...prev, dealer: 'ALL' }));
+                        setActiveTab('reports');
+                      }}
+                      className="bg-amber-950/20 border border-amber-900/40 p-4 rounded-2xl flex flex-col justify-between shadow-lg cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all duration-200"
                     >
-                      <span className="text-[11px] font-semibold text-teal-400 uppercase tracking-wider">Active AMCs</span>
-                      <span className="text-2xl font-black text-teal-400 mt-2">{stats.totalActiveAmcs || 0}</span>
+                      <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">Payment Due</span>
+                      <span className="text-2xl font-black text-amber-400 mt-2 font-mono">
+                        ₹ {(stats.totalDealerPaymentDue || 0).toLocaleString('en-IN')}
+                      </span>
                     </div>
                     <div 
                       onClick={() => {

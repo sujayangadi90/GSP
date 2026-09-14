@@ -1665,12 +1665,18 @@ const getDashboardStats = async (req, res) => {
       console.error('Error counting totalCustomers:', e.message);
     }
 
-    // 5. Total Active AMCs in the system (Independent of date range)
-    let totalActiveAmcs = 0;
+    // 5. Total Dealer Payment Due in the system (Independent of date range)
+    let totalDealerPaymentDue = 0;
     try {
-      totalActiveAmcs = await Amc.countDocuments({ status: 'active' });
+      const dueSum = await User.aggregate([
+        { $match: { role: 'dealer' } },
+        { $group: { _id: null, totalDue: { $sum: '$dueAmount' } } }
+      ]);
+      if (dueSum.length > 0 && dueSum[0].totalDue) {
+        totalDealerPaymentDue = dueSum[0].totalDue;
+      }
     } catch (e) {
-      console.error('Error counting totalActiveAmcs:', e.message);
+      console.error('Error calculating totalDealerPaymentDue:', e.message);
     }
 
     // 6. Total Technicians Wallet Balance (Independent of date range)
@@ -1687,7 +1693,7 @@ const getDashboardStats = async (req, res) => {
       console.error('Error calculating totalTechnicianWalletBalance:', e.message);
     }
 
-    // 6. Tickets Graph series (number of tickets over time)
+    // 7. Tickets Graph series (number of tickets over time)
     let ticketsByDate = [];
     try {
       ticketsByDate = await Ticket.aggregate([
@@ -1716,7 +1722,7 @@ const getDashboardStats = async (req, res) => {
         pending: pendingCount,
         closed: closedCount,
         totalCustomers,
-        totalActiveAmcs,
+        totalDealerPaymentDue,
         totalTechnicianWalletBalance
       },
       topTechnicians,
