@@ -2592,23 +2592,23 @@ class ProfileScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => CollectionHistoryScreen(
+                      builder: (context) => DealerWalletScreen(
                         token: token!,
                         apiUrl: apiUrl!,
                       ),
                     ),
                   );
                 },
-                icon: const Icon(Icons.history, color: Colors.deepPurpleAccent),
+                icon: const Icon(Icons.account_balance_wallet, color: Colors.amberAccent),
                 label: const Text(
-                  'Collection History',
+                  'Dealer Wallet (Due Amount)',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1E1B24),
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(52),
-                  side: BorderSide(color: Colors.deepPurple.shade700, width: 1.5),
+                  side: BorderSide(color: Colors.amber.shade700, width: 1.5),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   elevation: 2,
                 ),
@@ -3175,62 +3175,73 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
   }
 }
 
-class CollectionHistoryScreen extends StatefulWidget {
+class DealerWalletScreen extends StatefulWidget {
   final String token;
   final String apiUrl;
 
-  const CollectionHistoryScreen({
+  const DealerWalletScreen({
     super.key,
     required this.token,
     required this.apiUrl,
   });
 
   @override
-  State<CollectionHistoryScreen> createState() => _CollectionHistoryScreenState();
+  State<DealerWalletScreen> createState() => _DealerWalletScreenState();
 }
 
-class _CollectionHistoryScreenState extends State<CollectionHistoryScreen> {
+class _DealerWalletScreenState extends State<DealerWalletScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   bool _isLoading = true;
   String? _error;
-  List<dynamic> _collections = [];
-  int _selectedYear = DateTime.now().year;
 
-  final List<String> _monthsList = const [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
+  double _dueAmount = 0;
+  List<dynamic> _transactions = [];
+  List<dynamic> _collections = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchCollections();
+    _tabController = TabController(length: 2, vsync: this);
+    _fetchWalletData();
   }
 
-  Future<void> _fetchCollections() async {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchWalletData() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      final uri = Uri.parse('${widget.apiUrl}/dealer-collections?year=$_selectedYear');
-      final res = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${widget.token}',
-        },
-      );
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${widget.token}',
+      };
 
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
+      final walletUri = Uri.parse('${widget.apiUrl}/dealer-collections/dealer/me/wallet');
+      final walletRes = await http.get(walletUri, headers: headers);
+
+      final collectionsUri = Uri.parse('${widget.apiUrl}/dealer-collections');
+      final collectionsRes = await http.get(collectionsUri, headers: headers);
+
+      if (walletRes.statusCode == 200) {
+        final walletData = jsonDecode(walletRes.body);
+        final collData = collectionsRes.statusCode == 200 ? jsonDecode(collectionsRes.body) : {};
+
         setState(() {
-          _collections = data['collections'] ?? [];
+          _dueAmount = (walletData['dueAmount'] ?? walletData['dealer']?['dueAmount'] ?? 0).toDouble();
+          _transactions = walletData['transactions'] ?? [];
+          _collections = collData['collections'] ?? [];
           _isLoading = false;
         });
       } else {
         setState(() {
-          _error = 'Failed to load collections (${res.statusCode})';
+          _error = 'Failed to load wallet data (${walletRes.statusCode})';
           _isLoading = false;
         });
       }
@@ -3244,30 +3255,32 @@ class _CollectionHistoryScreenState extends State<CollectionHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    double totalYearlyCollection = 0;
-    for (var item in _collections) {
-      final amt = item['amount'];
-      if (amt is num) {
-        totalYearlyCollection += amt.toDouble();
-      }
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Collection History',
+          'Dealer Wallet (Due Amount)',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _fetchCollections,
+            onPressed: _fetchWalletData,
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.amberAccent,
+          labelColor: Colors.amberAccent,
+          unselectedLabelColor: Colors.grey,
+          tabs: const [
+            Tab(icon: Icon(Icons.receipt_long), text: 'Due Amount Ledger'),
+            Tab(icon: Icon(Icons.history), text: 'Payment History'),
+          ],
+        ),
       ),
       body: Column(
         children: [
-          // Filter & Total Card Header
+          // Due Amount Highlight Card
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -3276,90 +3289,61 @@ class _CollectionHistoryScreenState extends State<CollectionHistoryScreen> {
                 bottom: BorderSide(color: Colors.grey.shade800, width: 1),
               ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'FILTER BY YEAR',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.purpleAccent,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<int>(
-                        value: _selectedYear,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: const Color(0xFF0F172A),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFF334155)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFF334155)),
-                          ),
-                        ),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                        dropdownColor: const Color(0xFF0F172A),
-                        items: [2024, 2025, 2026, 2027, 2028].map((y) {
-                          return DropdownMenuItem(value: y, child: Text(y.toString()));
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null && val != _selectedYear) {
-                            setState(() {
-                              _selectedYear = val;
-                            });
-                            _fetchCollections();
-                          }
-                        },
-                      ),
-                    ],
-                  ),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [const Color(0xFFD97706).withOpacity(0.2), const Color(0xFFB45309).withOpacity(0.1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Container(
+                border: Border.all(color: Colors.amber.shade700.withOpacity(0.4)),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withOpacity(0.12),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.35)),
+                      color: Colors.amber.shade700.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    child: const Icon(Icons.account_balance_wallet, color: Colors.amberAccent, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'TOTAL COLLECTED',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF34D399)),
+                          'TOTAL DUE AMOUNT',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amberAccent,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            '₹ ${totalYearlyCollection.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white),
+                            '₹ ${_dueAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
-          // Content List
+          // Content List Views
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.purpleAccent))
+                ? const Center(child: CircularProgressIndicator(color: Colors.amberAccent))
                 : _error != null
                     ? Center(
                         child: Column(
@@ -3370,173 +3354,254 @@ class _CollectionHistoryScreenState extends State<CollectionHistoryScreen> {
                             Text(_error!, style: const TextStyle(color: Colors.grey)),
                             const SizedBox(height: 12),
                             ElevatedButton(
-                              onPressed: _fetchCollections,
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple.shade900),
+                              onPressed: _fetchWalletData,
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade900),
                               child: const Text('Retry', style: TextStyle(color: Colors.white)),
                             ),
                           ],
                         ),
                       )
-                    : _collections.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.receipt_long_outlined, size: 56, color: Colors.grey.shade600),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'No collection history found for $_selectedYear',
-                                  style: TextStyle(color: Colors.grey.shade400, fontSize: 15, fontWeight: FontWeight.w500),
-                                ),
-                              ],
-                            ),
-                          )
-                        : RefreshIndicator(
-                            onRefresh: _fetchCollections,
-                            color: Colors.purpleAccent,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: _collections.length,
-                              itemBuilder: (context, index) {
-                                final item = _collections[index];
-                                final monthNum = item['month'] as int? ?? 1;
-                                final yearNum = item['year'] as int? ?? _selectedYear;
-                                final monthName = (monthNum >= 1 && monthNum <= 12) ? _monthsList[monthNum - 1] : 'Month $monthNum';
-                                final amt = item['amount'] ?? 0;
-                                final paymentMode = item['paymentMode'] ?? 'Cash';
-                                final refNum = item['referenceNumber'] ?? '';
-                                final collectedAtRaw = item['collectedAt'] ?? item['createdAt'];
-                                String formattedDate = '-';
-                                if (collectedAtRaw != null) {
-                                  try {
-                                    final dt = DateTime.parse(collectedAtRaw.toString()).toLocal();
-                                    formattedDate = "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
-                                  } catch (_) {
-                                    formattedDate = collectedAtRaw.toString();
-                                  }
-                                }
-
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 14),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1E1B24),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: Colors.grey.shade800),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // Header Row: Month/Year & Amount
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '$monthName $yearNum',
-                                                  style: const TextStyle(
-                                                    fontSize: 17,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFF064E3B).withOpacity(0.4),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
-                                                  ),
-                                                  child: const Text(
-                                                    'COLLECTED',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Color(0xFF34D399),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            Text(
-                                              '₹ ${amt is num ? amt.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},') : amt}',
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w900,
-                                                color: Color(0xFF34D399),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const Padding(
-                                          padding: EdgeInsets.symmetric(vertical: 12),
-                                          child: Divider(color: Color(0xFF2D2A36), height: 1),
-                                        ),
-                                        // Details Grid
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  const Text(
-                                                    'Payment Mode',
-                                                    style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500),
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    paymentMode,
-                                                    style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            if (refNum.toString().isNotEmpty)
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text(
-                                                      'Ref Number',
-                                                      style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      refNum,
-                                                      style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 10),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.access_time, size: 14, color: Colors.grey),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              'Paid Date: $formattedDate',
-                                              style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildLedgerTab(),
+                          _buildPaymentHistoryTab(),
+                        ],
+                      ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLedgerTab() {
+    if (_transactions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.receipt_long_outlined, size: 56, color: Colors.grey.shade600),
+            const SizedBox(height: 12),
+            Text(
+              'No wallet transactions found.',
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchWalletData,
+      color: Colors.amberAccent,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _transactions.length,
+        itemBuilder: (context, index) {
+          final tx = _transactions[index];
+          final type = tx['type'] ?? 'charge';
+          final isCharge = type == 'charge';
+          final amt = tx['amount'] ?? 0;
+          final dueAfter = tx['dueAmountAfter'] ?? 0;
+          final desc = tx['description'] ?? 'Transaction';
+          final createdAtRaw = tx['createdAt'];
+          String formattedDate = '-';
+          if (createdAtRaw != null) {
+            try {
+              final dt = DateTime.parse(createdAtRaw.toString()).toLocal();
+              formattedDate = "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+            } catch (_) {
+              formattedDate = createdAtRaw.toString();
+            }
+          }
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1B24),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade800),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isCharge ? Colors.red.shade900.withOpacity(0.3) : Colors.green.shade900.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: isCharge ? Colors.red.shade500.withOpacity(0.5) : Colors.green.shade500.withOpacity(0.5)),
+                        ),
+                        child: Text(
+                          isCharge ? '+ TICKET CHARGE' : '- PAYMENT COLLECTED',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isCharge ? Colors.redAccent : Colors.greenAccent,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${isCharge ? '+' : '-'} ₹ ${amt is num ? amt.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},') : amt}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: isCharge ? Colors.redAccent : Colors.greenAccent,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    desc,
+                    style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Divider(color: Color(0xFF2D2A36), height: 1),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time, size: 13, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Text(formattedDate, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
+                      Text(
+                        'Due Balance: ₹ ${dueAfter is num ? dueAfter.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},') : dueAfter}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amberAccent),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPaymentHistoryTab() {
+    if (_collections.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history_outlined, size: 56, color: Colors.grey.shade600),
+            const SizedBox(height: 12),
+            Text(
+              'No payment collection records found.',
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchWalletData,
+      color: Colors.amberAccent,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _collections.length,
+        itemBuilder: (context, index) {
+          final item = _collections[index];
+          final amt = item['amount'] ?? 0;
+          final paymentMode = item['paymentMode'] ?? 'Cash';
+          final refNum = item['referenceNumber'] ?? '';
+          final collectedAtRaw = item['collectedAt'] ?? item['createdAt'];
+          String formattedDate = '-';
+          if (collectedAtRaw != null) {
+            try {
+              final dt = DateTime.parse(collectedAtRaw.toString()).toLocal();
+              formattedDate = "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+            } catch (_) {
+              formattedDate = collectedAtRaw.toString();
+            }
+          }
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1B24),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade800),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF064E3B).withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
+                        ),
+                        child: const Text(
+                          'COLLECTED',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF34D399)),
+                        ),
+                      ),
+                      Text(
+                        '₹ ${amt is num ? amt.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},') : amt}',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF34D399)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Payment Mode', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 2),
+                            Text(paymentMode, style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      if (refNum.toString().isNotEmpty)
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Ref Number', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500)),
+                              const SizedBox(height: 2),
+                              Text(refNum, style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Icon(Icons.access_time, size: 13, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Text('Collected: $formattedDate', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

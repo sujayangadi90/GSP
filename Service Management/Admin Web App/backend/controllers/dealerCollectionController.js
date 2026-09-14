@@ -263,7 +263,9 @@ const getDealerCollections = async (req, res) => {
 // @access  Private (Admin, Dealer)
 const getDealerWallet = async (req, res) => {
   try {
-    const dealerId = req.params.id || req.query.dealerId;
+    const rawId = req.params.id || req.query.dealerId;
+    const dealerId = (rawId === 'me' && req.user) ? req.user._id : rawId;
+
     if (!dealerId) {
       return res.status(400).json({ message: 'Dealer ID is required' });
     }
