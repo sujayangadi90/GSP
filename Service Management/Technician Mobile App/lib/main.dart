@@ -1306,9 +1306,44 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   bool _isFetchingLocation = false;
   String? _locationError;
 
+  Future<ImageSource?> _showImageSourceDialog() async {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              const ListTile(
+                title: Text(
+                  'Select Image Source',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                title: const Text('Take Photo (Camera)'),
+                onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.purple),
+                title: const Text('Choose from Gallery'),
+                onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _pickSlotImage(String key) async {
+    final source = await _showImageSourceDialog();
+    if (source == null) return;
     final pickedFile = await _picker.pickImage(
-      source: ImageSource.camera,
+      source: source,
       maxWidth: 1920,
       maxHeight: 1080,
       imageQuality: 80,
@@ -1726,7 +1761,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                       const SizedBox(height: 6),
                       GestureDetector(
                         onTap: () async {
-                          final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                          final source = await _showImageSourceDialog();
+                          if (source == null) return;
+                          final picked = await _picker.pickImage(source: source, imageQuality: 70);
                           if (picked != null) {
                             setDialogState(() {
                               sitePhoto = File(picked.path);

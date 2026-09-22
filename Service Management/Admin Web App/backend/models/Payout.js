@@ -59,7 +59,14 @@ const payoutSchema = new mongoose.Schema(
   }
 );
 
-// Compound index to ensure 1 payout record per technician per month/year
-payoutSchema.index({ technician: 1, month: 1, year: 1 }, { unique: true });
+// Index to optimize payout queries per technician per month/year (non-unique to allow multiple disbursements/anytime payouts)
+payoutSchema.index({ technician: 1, month: 1, year: 1 });
 
-module.exports = mongoose.model('Payout', payoutSchema);
+const Payout = mongoose.model('Payout', payoutSchema);
+
+// Drop legacy unique index if it exists in MongoDB
+Payout.collection.dropIndex('technician_1_month_1_year_1').catch(() => {
+  // Index might not exist or already dropped, ignore error
+});
+
+module.exports = Payout;

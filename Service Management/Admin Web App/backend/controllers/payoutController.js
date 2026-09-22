@@ -100,12 +100,21 @@ const calculateTechnicianPayout = async (req, res) => {
       }
     });
 
-    // Check existing payout record
+    // Check existing payout record (latest disbursement)
     const existingPayout = await Payout.findOne({
       technician: technicianId,
       month: m,
       year: y
-    }).populate('paidBy', 'name code email');
+    }).sort({ paidAt: -1, createdAt: -1 }).populate('paidBy', 'name code email');
+
+    // Calculate total paid amount across all disbursements in this month/year
+    const allPaidPayouts = await Payout.find({
+      technician: technicianId,
+      month: m,
+      year: y,
+      status: 'paid'
+    });
+    const totalPaidAmount = allPaidPayouts.reduce((sum, p) => sum + (p.amount || 0), 0);
 
     return res.json({
       technician: technicianUser,
@@ -119,7 +128,8 @@ const calculateTechnicianPayout = async (req, res) => {
       completedInstallationJobsCount,
       installationEarnings,
       payout: existingPayout || null,
-      status: existingPayout ? existingPayout.status : 'unpaid'
+      totalPaidAmount,
+      status: totalPaidAmount >= totalEarnings && totalEarnings > 0 ? 'paid' : (existingPayout ? existingPayout.status : 'unpaid')
     });
   } catch (error) {
     console.error('Error in calculateTechnicianPayout:', error);
@@ -165,7 +175,22 @@ const createPayout = async (req, res) => {
       paidBy: req.user ? req.user._id : null
     });
 
-    await payout.save();
+    try {
+      await payout.save();
+    } catch (saveErr) {
+      if (saveErr.code === 11000) {
+        console.warn('Duplicate key error on Payout schema index technician_1_month_1_year_1. Dropping legacy unique index...');
+        try {
+          await Payout.collection.dropIndex('technician_1_month_1_year_1');
+          await payout.save();
+        } catch (dropErr) {
+          console.error('Failed to drop unique index on retry:', dropErr);
+          throw saveErr;
+        }
+      } else {
+        throw saveErr;
+      }
+    }
 
     // Automatically deduct payout amount from technician wallet
     try {
