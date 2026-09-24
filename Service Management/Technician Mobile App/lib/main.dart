@@ -1297,6 +1297,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   File? _warrantyCardPhoto;
   File? _beforePhoto;
   File? _afterPhoto;
+  File? _siteNotReadyPhoto;
 
   final _picker = ImagePicker();
   List<dynamic> _inventory = [];
@@ -1306,49 +1307,99 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   bool _isFetchingLocation = false;
   String? _locationError;
 
-  Future<ImageSource?> _showImageSourceDialog() async {
-    return showModalBottomSheet<ImageSource>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (BuildContext ctx) {
-        return SafeArea(
-          child: Wrap(
-            children: [
-              const ListTile(
-                title: Text(
-                  'Select Image Source',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt, color: Colors.blue),
-                title: const Text('Take Photo (Camera)'),
-                onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library, color: Colors.purple),
-                title: const Text('Choose from Gallery'),
-                onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  Future<void> _loadPersistedPhotos() async {
+    final jobId = widget.jobId;
+    if (jobId.isEmpty) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      Map<String, File?> tempMap = {
+        'bill': _billPhoto,
+        'installation1': _installation1Photo,
+        'installation2': _installation2Photo,
+        'serialNumber': _serialNumberPhoto,
+        'warrantyCard': _warrantyCardPhoto,
+        'before': _beforePhoto,
+        'after': _afterPhoto,
+        'siteNotReady': _siteNotReadyPhoto,
+      };
+
+      bool changed = false;
+      for (final key in tempMap.keys) {
+        final savedPath = prefs.getString('ticket_photo_${jobId}_$key');
+        if (savedPath != null && savedPath.isNotEmpty) {
+          final file = File(savedPath);
+          if (file.existsSync()) {
+            tempMap[key] = file;
+            changed = true;
+          } else {
+            await prefs.remove('ticket_photo_${jobId}_$key');
+          }
+        }
+      }
+
+      if (changed && mounted) {
+        setState(() {
+          _billPhoto = tempMap['bill'];
+          _installation1Photo = tempMap['installation1'];
+          _installation2Photo = tempMap['installation2'];
+          _serialNumberPhoto = tempMap['serialNumber'];
+          _warrantyCardPhoto = tempMap['warrantyCard'];
+          _beforePhoto = tempMap['before'];
+          _afterPhoto = tempMap['after'];
+          _siteNotReadyPhoto = tempMap['siteNotReady'];
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading persisted photos for ticket $jobId: $e');
+    }
+  }
+
+  Future<void> _savePersistedPhoto(String key, String path) async {
+    final jobId = widget.jobId;
+    if (jobId.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('ticket_photo_${jobId}_$key', path);
+    } catch (e) {
+      debugPrint('Error saving photo for ticket $jobId: $e');
+    }
+  }
+
+  Future<void> _removePersistedPhoto(String key) async {
+    final jobId = widget.jobId;
+    if (jobId.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('ticket_photo_${jobId}_$key');
+    } catch (e) {
+      debugPrint('Error removing photo for ticket $jobId: $e');
+    }
+  }
+
+  Future<void> _clearAllPersistedPhotos() async {
+    final jobId = widget.jobId;
+    if (jobId.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = ['bill', 'installation1', 'installation2', 'serialNumber', 'warrantyCard', 'before', 'after', 'siteNotReady'];
+      for (final k in keys) {
+        await prefs.remove('ticket_photo_${jobId}_$k');
+      }
+    } catch (e) {
+      debugPrint('Error clearing photos for ticket $jobId: $e');
+    }
   }
 
   Future<void> _pickSlotImage(String key) async {
-    final source = await _showImageSourceDialog();
-    if (source == null) return;
     final pickedFile = await _picker.pickImage(
-      source: source,
+      source: ImageSource.camera,
       maxWidth: 1920,
       maxHeight: 1080,
       imageQuality: 80,
     );
     if (pickedFile != null) {
+      await _savePersistedPhoto(key, pickedFile.path);
       setState(() {
         if (key == 'bill') _billPhoto = File(pickedFile.path);
         else if (key == 'installation1') _installation1Photo = File(pickedFile.path);
@@ -1361,7 +1412,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     }
   }
 
-  void _removeSlotImage(String key) {
+  Future<void> _removeSlotImage(String key) async {
+    await _removePersistedPhoto(key);
     setState(() {
       if (key == 'bill') _billPhoto = null;
       else if (key == 'installation1') _installation1Photo = null;
@@ -1605,6 +1657,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     }
     _loadJob();
     _fetchInventory();
+    _loadPersistedPhotos();
   }
 
   Future<void> _fetchInventory() async {
@@ -1761,38 +1814,69 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                       const SizedBox(height: 6),
                       GestureDetector(
                         onTap: () async {
-                          final source = await _showImageSourceDialog();
-                          if (source == null) return;
-                          final picked = await _picker.pickImage(source: source, imageQuality: 70);
+                          final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
                           if (picked != null) {
+                            final f = File(picked.path);
+                            await _savePersistedPhoto('siteNotReady', picked.path);
                             setDialogState(() {
-                              sitePhoto = File(picked.path);
+                              sitePhoto = f;
+                            });
+                            setState(() {
+                              _siteNotReadyPhoto = f;
                             });
                           }
                         },
-                        child: Container(
-                          height: 120,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.blueGrey[900],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: sitePhoto != null ? Colors.tealAccent : Colors.grey[700]!),
-                          ),
-                          child: sitePhoto != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.file(sitePhoto!, fit: BoxFit.cover),
-                                )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  Icon(Icons.add_a_photo, color: Colors.tealAccent, size: 28),
-                                  SizedBox(height: 6),
-                                  Text('Tap to take Site Photo', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                                ],
+                        child: Stack(
+                          children: [
+                            Container(
+                              height: 120,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.blueGrey[900],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: sitePhoto != null ? Colors.tealAccent : Colors.grey[700]!),
                               ),
+                              child: sitePhoto != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.file(sitePhoto!, fit: BoxFit.cover),
+                                    )
+                                  : Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: const [
+                                        Icon(Icons.add_a_photo, color: Colors.tealAccent, size: 28),
+                                        SizedBox(height: 6),
+                                        Text('Tap to take Site Photo', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                      ],
+                                    ),
+                            ),
+                            if (sitePhoto != null)
+                              Positioned(
+                                top: 6,
+                                right: 6,
+                                child: GestureDetector(
+                                  onTap: () async {
+                                    await _removePersistedPhoto('siteNotReady');
+                                    setDialogState(() {
+                                      sitePhoto = null;
+                                    });
+                                    setState(() {
+                                      _siteNotReadyPhoto = null;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black87,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.close, color: Colors.redAccent, size: 18),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 16),
 
                     // 2. Next Visit Date & Time Picker
@@ -1886,6 +1970,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                       final response = await http.Response.fromStream(streamedRes);
 
                       if (response.statusCode == 200) {
+                        await _clearAllPersistedPhotos();
                         final updatedData = jsonDecode(response.body);
                         if (mounted) {
                           setState(() {
@@ -2053,6 +2138,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
+        await _clearAllPersistedPhotos();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Work completion submitted for approval!'), backgroundColor: Colors.green),
         );
@@ -4583,7 +4669,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   }
 
   Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await _picker.pickImage(source: ImageSource.camera);
     if (pickedFile != null) {
       setState(() {
         _selectedInvoice = File(pickedFile.path);
