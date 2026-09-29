@@ -1947,6 +1947,8 @@ const getReports = async (req, res) => {
               ticketType: t.type,
               customerName: t.customer?.name || t.customerName || 'N/A',
               customerMobile: t.customer?.mobile || t.customerMobile || '',
+              customerPincode: t.customer?.pincode || t.pincode || '—',
+              customerAddress: t.customer?.address || t.address || '—',
               technicianName: t.assignedTechnician?.name || t.technicianName || 'Unassigned',
               dealerName: t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : 'N/A',
               itemName,

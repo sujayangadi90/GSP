@@ -2072,14 +2072,14 @@ export default function App() {
       }
 
       const headers = reportTab === 'inventory_burn'
-        ? ['Ticket ID', 'Date Consumed', 'Ticket Type', 'Customer', 'Technician', 'Item Name', 'Item Code (SKU)', 'Qty Consumed', 'Unit Price (₹)', 'Total Value (₹)']
+        ? ['Ticket ID', 'Date Consumed', 'Ticket Type', 'Customer', 'Pincode', 'Address', 'Technician', 'Item Name', 'Item Code (SKU)', 'Qty Consumed', 'Unit Price (₹)', 'Total Value (₹)']
         : reportTab === 'technician_wallet'
           ? ['Tech Code', 'Technician Name', 'Mobile', 'Email', 'Status', 'Current Wallet Balance (₹)']
           : reportTab === 'payment_due'
             ? ['Dealer Code', 'Dealer Name', 'Contact Person', 'Mobile', 'City', 'Status', 'Current Due Amount (₹)']
             : reportTab === 'dealer'
-              ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
-              : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
+              ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Technician', 'Dealer Expense (₹)']
+              : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Dealer', 'Technician Earning (₹)'];
 
 
       const rows = exportData.map(item => {
@@ -2089,6 +2089,8 @@ export default function App() {
             item.date ? new Date(item.date).toLocaleDateString('en-GB') : '—',
             (item.ticketType || '—').toUpperCase(),
             item.customerName || '—',
+            item.customerPincode || item.pincode || '—',
+            item.customerAddress || item.address || '—',
             item.technicianName || '—',
             item.itemName || '—',
             item.sku || '—',
@@ -2141,6 +2143,8 @@ export default function App() {
           t.product?.category || '—',
           t.product?.name || '—',
           t.customer?.name || '—',
+          t.customer?.pincode || '—',
+          t.customer?.address || '—',
           t.assignedTechnician?.name || '—',
           amountVal
         ] : [
@@ -2151,28 +2155,22 @@ export default function App() {
           t.product?.category || '—',
           t.product?.name || '—',
           t.customer?.name || '—',
+          t.customer?.pincode || '—',
+          t.customer?.address || '—',
           t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
           amountVal
         ];
       });
 
       const totalRow = reportTab === 'inventory_burn'
-        ? ['TOTAL INVENTORY BURN', '', '', '', '', '', '', summary.totalItemsBurned || 0, '', summary.totalBurnValue || 0]
+        ? ['TOTAL INVENTORY BURN', '', '', '', '', '', '', '', '', summary.totalItemsBurned || 0, '', summary.totalBurnValue || 0]
         : reportTab === 'technician_wallet'
           ? ['TOTAL TECHNICIAN WALLET BALANCE', '', '', '', '', summary.totalAmount]
           : reportTab === 'payment_due'
             ? ['TOTAL DEALER DUE AMOUNT', '', '', '', '', '', summary.totalAmount]
-            : [
-                'TOTAL AMOUNT',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                summary.totalAmount
-              ];
+            : reportTab === 'dealer'
+              ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', '', '', summary.totalAmount]
+              : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', '', '', summary.totalAmount];
 
       const csvRows = [
         headers,
@@ -2222,14 +2220,14 @@ export default function App() {
       }
 
       const headers = reportTab === 'inventory_burn'
-        ? ['Ticket ID', 'Date Consumed', 'Ticket Type', 'Customer', 'Technician', 'Item Name', 'Item Code (SKU)', 'Qty Consumed', 'Unit Price (₹)', 'Total Value (₹)']
+        ? ['Ticket ID', 'Date Consumed', 'Ticket Type', 'Customer', 'Pincode', 'Address', 'Technician', 'Item Name', 'Item Code (SKU)', 'Qty Consumed', 'Unit Price (₹)', 'Total Value (₹)']
         : reportTab === 'technician_wallet'
           ? ['Tech Code', 'Technician Name', 'Mobile', 'Email', 'Status', 'Current Wallet Balance (₹)']
           : reportTab === 'payment_due'
             ? ['Dealer Code', 'Dealer Name', 'Contact Person', 'Mobile', 'City', 'Status', 'Current Due Amount (₹)']
             : reportTab === 'dealer'
-              ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Technician', 'Dealer Expense (₹)']
-              : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Dealer', 'Technician Earning (₹)'];
+              ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Technician', 'Dealer Expense (₹)']
+              : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Dealer', 'Technician Earning (₹)'];
 
 
       const rows = exportData.map(item => {
@@ -2239,6 +2237,8 @@ export default function App() {
             item.date ? new Date(item.date).toLocaleDateString('en-GB') : '—',
             (item.ticketType || '—').toUpperCase(),
             item.customerName || '—',
+            item.customerPincode || item.pincode || '—',
+            item.customerAddress || item.address || '—',
             item.technicianName || '—',
             item.itemName || '—',
             item.sku || '—',
@@ -2291,6 +2291,8 @@ export default function App() {
           t.product?.category || '—',
           t.product?.name || '—',
           t.customer?.name || '—',
+          t.customer?.pincode || '—',
+          t.customer?.address || '—',
           t.assignedTechnician?.name || '—',
           amountVal
         ] : [
@@ -2301,20 +2303,22 @@ export default function App() {
           t.product?.category || '—',
           t.product?.name || '—',
           t.customer?.name || '—',
+          t.customer?.pincode || '—',
+          t.customer?.address || '—',
           t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
           amountVal
         ];
       });
 
       const totalRow = reportTab === 'inventory_burn'
-        ? ['TOTAL INVENTORY BURN', '', '', '', '', '', '', summary.totalItemsBurned || 0, '', summary.totalBurnValue || 0]
+        ? ['TOTAL INVENTORY BURN', '', '', '', '', '', '', '', '', summary.totalItemsBurned || 0, '', summary.totalBurnValue || 0]
         : reportTab === 'technician_wallet'
           ? ['TOTAL TECHNICIAN WALLET BALANCE', '', '', '', '', summary.totalAmount]
           : reportTab === 'payment_due'
             ? ['TOTAL DEALER DUE AMOUNT', '', '', '', '', '', summary.totalAmount]
             : reportTab === 'dealer'
-              ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', summary.totalAmount]
-              : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', summary.totalAmount];
+              ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', '', '', summary.totalAmount]
+              : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', '', '', summary.totalAmount];
       rows.push(totalRow);
 
       const tableHeaders = headers.map(h => `<th style="border:1px solid #cbd5e1; background-color:#f1f5f9; padding:8px 12px; font-weight:bold; text-align:left;">${String(h).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</th>`).join('');
@@ -2322,7 +2326,7 @@ export default function App() {
         const isTotal = idx === rows.length - 1;
         return '<tr>' + r.map((c, colIdx) => {
           const isNum = typeof c === 'number';
-          const align = isNum || (isTotal && colIdx === 8) ? 'right' : 'left';
+          const align = isNum || (isTotal && colIdx === (r.length - 1)) || (isTotal && reportTab === 'inventory_burn' && colIdx === 9) ? 'right' : 'left';
           const style = `border:1px solid #e2e8f0; padding:6px 12px; text-align:${align}; ${isTotal ? 'font-weight:bold; background-color:#f8fafc;' : ''}`;
           return `<td style="${style}">${String(c).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`;
         }).join('') + '</tr>';
