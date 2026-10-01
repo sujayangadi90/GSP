@@ -2015,6 +2015,13 @@ const getReports = async (req, res) => {
       if (technician && technician !== 'ALL') {
         query.assignedTechnician = technician;
       }
+    } else if (reportType === 'ticket_360') {
+      if (technician && technician !== 'ALL') {
+        query.assignedTechnician = technician;
+      }
+      if (dealer && dealer !== 'ALL') {
+        query.dealer = dealer;
+      }
     } else {
       if (dealer && dealer !== 'ALL') {
         query.dealer = dealer;
@@ -2034,10 +2041,11 @@ const getReports = async (req, res) => {
     }
 
     const allMatchingTickets = await Ticket.find(query)
-      .populate('dealer', 'name code')
-      .populate('assignedTechnician', 'name')
+      .populate('dealer', 'name code mobile email city')
+      .populate('assignedTechnician', 'name code mobile email')
       .populate('completion.usedParts.part', 'name sku sellingPrice')
-      .populate('completionHistory.usedParts.part', 'name sku sellingPrice');
+      .populate('completionHistory.usedParts.part', 'name sku sellingPrice')
+      .sort({ 'completion.submittedAt': -1, updatedAt: -1, closedAt: -1 });
 
     const allTicketsWithFees = await attachFeesToTickets(allMatchingTickets);
 
@@ -2045,49 +2053,72 @@ const getReports = async (req, res) => {
     let serviceAmount = 0;
     let installationAmount = 0;
     let completedCount = 0;
+    let totalTechEarning = 0;
+    let totalDealerExpense = 0;
+    let totalCustomerFee = 0;
 
     allTicketsWithFees.forEach(t => {
-      if (reportType === 'technician') {
-        let techEarning = 0;
-        if (typeof t.technicianEarning === 'number' && t.technicianEarning > 0) {
-          techEarning = t.technicianEarning;
+      // Technician Earning
+      let techEarning = 0;
+      if (typeof t.technicianEarning === 'number' && t.technicianEarning > 0) {
+        techEarning = t.technicianEarning;
+      } else {
+        const baseFee = t.type === 'installation'
+          ? (t.technicianInstallationFee !== undefined ? t.technicianInstallationFee : (t.installationFee || 0))
+          : (t.technicianServiceFee !== undefined ? t.technicianServiceFee : (t.serviceFee || 0));
+        techEarning = Number(baseFee) || 0;
+      }
+      t.technicianEarning = techEarning;
+
+      // Dealer Expense
+      const sType = t.serviceType || (t.serviceDetails && t.serviceDetails.serviceType) || 'In Warranty';
+      const iType = t.installationType || (t.installationDetails && t.installationDetails.installationType) || 'Free Installation';
+      const isPaidByDealer = (t.type === 'service' && sType === 'Paid by Dealer') || (t.type === 'installation' && iType === 'Paid by Dealer');
+
+      let dealerAmt = 0;
+      if (isPaidByDealer) {
+        if (typeof t.dealerExpense === 'number' && t.dealerExpense > 0) {
+          dealerAmt = t.dealerExpense;
         } else {
           const baseFee = t.type === 'installation'
-            ? (t.technicianInstallationFee !== undefined ? t.technicianInstallationFee : (t.installationFee || 0))
-            : (t.technicianServiceFee !== undefined ? t.technicianServiceFee : (t.serviceFee || 0));
-          techEarning = Number(baseFee) || 0;
+            ? (t.dealerInstallationFee !== undefined ? t.dealerInstallationFee : (t.installationFee || 0))
+            : (t.dealerServiceFee !== undefined ? t.dealerServiceFee : (t.serviceFee || 0));
+          dealerAmt = (Number(baseFee) || 0) + (Number(t.totalPartsPrice) || 0);
         }
+      }
+      t.dealerExpense = dealerAmt;
+      t.dealerAmount = dealerAmt;
 
-        t.technicianEarning = techEarning;
+      // Customer Fee
+      let custFee = 0;
+      if (t.customerPayment && typeof t.customerPayment.amount === 'number' && t.customerPayment.amount >= 0) {
+        custFee = t.customerPayment.amount;
+      } else if (typeof t.customerFee === 'number') {
+        custFee = t.customerFee;
+      }
+      t.customerFee = custFee;
+
+      totalTechEarning += techEarning;
+      totalDealerExpense += dealerAmt;
+      totalCustomerFee += custFee;
+      completedCount++;
+
+      if (reportType === 'technician') {
         totalAmount += techEarning;
-        completedCount++;
+        if (t.type === 'service') {
+          serviceAmount += techEarning;
+        } else if (t.type === 'installation') {
+          installationAmount += techEarning;
+        }
+      } else if (reportType === 'ticket_360') {
+        totalAmount += (techEarning + dealerAmt + custFee);
         if (t.type === 'service') {
           serviceAmount += techEarning;
         } else if (t.type === 'installation') {
           installationAmount += techEarning;
         }
       } else {
-        const sType = t.serviceType || (t.serviceDetails && t.serviceDetails.serviceType) || 'In Warranty';
-        const iType = t.installationType || (t.installationDetails && t.installationDetails.installationType) || 'Free Installation';
-        const isPaidByDealer = (t.type === 'service' && sType === 'Paid by Dealer') || (t.type === 'installation' && iType === 'Paid by Dealer');
-
-        let dealerAmt = 0;
-        if (isPaidByDealer) {
-          if (typeof t.dealerExpense === 'number' && t.dealerExpense > 0) {
-            dealerAmt = t.dealerExpense;
-          } else {
-            const baseFee = t.type === 'installation'
-              ? (t.dealerInstallationFee !== undefined ? t.dealerInstallationFee : (t.installationFee || 0))
-              : (t.dealerServiceFee !== undefined ? t.dealerServiceFee : (t.serviceFee || 0));
-            dealerAmt = (Number(baseFee) || 0) + (Number(t.totalPartsPrice) || 0);
-          }
-        }
-
-        t.dealerExpense = dealerAmt;
-        t.dealerAmount = dealerAmt;
-
         totalAmount += dealerAmt;
-        completedCount++;
         if (t.type === 'service') {
           serviceAmount += dealerAmt;
         } else if (t.type === 'installation') {
@@ -2115,6 +2146,9 @@ const getReports = async (req, res) => {
       data: paginatedTickets,
       summary: {
         totalAmount,
+        totalTechEarning,
+        totalDealerExpense,
+        totalCustomerFee,
         completedCount: allMatchingTickets.length,
         serviceAmount,
         installationAmount

@@ -2077,9 +2077,11 @@ export default function App() {
           ? ['Tech Code', 'Technician Name', 'Mobile', 'Email', 'Status', 'Current Wallet Balance (₹)']
           : reportTab === 'payment_due'
             ? ['Dealer Code', 'Dealer Name', 'Contact Person', 'Mobile', 'City', 'Status', 'Current Due Amount (₹)']
-            : reportTab === 'dealer'
-              ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Technician', 'Dealer Expense (₹)']
-              : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Dealer', 'Technician Earning (₹)'];
+            : reportTab === 'ticket_360'
+              ? ['Ticket Number', 'Completed Date', 'Dealer Name', 'Technician Name', 'Appliance', 'Brand', 'Customer', 'Technician Earning (₹)', 'Dealer Expense (₹)', 'Customer Fee (₹)', 'Payment Mode of customer fee', 'Ref of customer Fee']
+              : reportTab === 'dealer'
+                ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Technician', 'Dealer Expense (₹)']
+                : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Dealer', 'Technician Earning (₹)'];
 
 
       const rows = exportData.map(item => {
@@ -2130,6 +2132,27 @@ export default function App() {
             ? new Date(t.closedAt).toLocaleDateString('en-GB') 
             : new Date(t.updatedAt).toLocaleDateString('en-GB');
 
+        if (reportTab === 'ticket_360') {
+          const techEarning = typeof t.technicianEarning === 'number' ? t.technicianEarning : (Number(t.technicianEarning) || 0);
+          const dealerExp = typeof t.dealerExpense === 'number' ? t.dealerExpense : (typeof t.dealerAmount === 'number' ? t.dealerAmount : (Number(t.dealerExpense) || 0));
+          const custFee = typeof t.customerFee === 'number' ? t.customerFee : (t.customerPayment?.amount !== undefined ? Number(t.customerPayment.amount) : 0);
+
+          return [
+            t.ticketNumber || '—',
+            completedDate,
+            t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
+            t.assignedTechnician?.name || 'Unassigned',
+            t.product?.category || '—',
+            t.product?.name || '—',
+            t.customer?.name || '—',
+            techEarning,
+            dealerExp,
+            custFee,
+            t.customerPayment?.paymentMode || '—',
+            t.customerPayment?.referenceNumber || '—'
+          ];
+        }
+
         const amtVal = reportTab === 'dealer'
           ? (t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount)
           : t.technicianEarning;
@@ -2168,9 +2191,11 @@ export default function App() {
           ? ['TOTAL TECHNICIAN WALLET BALANCE', '', '', '', '', summary.totalAmount]
           : reportTab === 'payment_due'
             ? ['TOTAL DEALER DUE AMOUNT', '', '', '', '', '', summary.totalAmount]
-            : reportTab === 'dealer'
-              ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', '', '', summary.totalAmount]
-              : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', '', '', summary.totalAmount];
+            : reportTab === 'ticket_360'
+              ? ['TOTAL', '', '', '', '', '', '', summary.totalTechEarning || 0, summary.totalDealerExpense || 0, summary.totalCustomerFee || 0, '', '']
+              : reportTab === 'dealer'
+                ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', '', '', summary.totalAmount]
+                : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', '', '', summary.totalAmount];
 
       const csvRows = [
         headers,
@@ -2183,13 +2208,17 @@ export default function App() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      const filename = reportTab === 'inventory_burn'
-        ? `Inventory_Burn_Report_${filtersToUse.fromDate}_to_${filtersToUse.toDate}.csv`
-        : reportTab === 'technician_wallet'
-          ? `Technician_Wallet_Report_${new Date().toISOString().split('T')[0]}.csv`
-          : reportTab === 'dealer'
-            ? `Dealer_Report_${filtersToUse.fromDate}_to_${filtersToUse.toDate}.csv`
-            : `Technician_Report_${filtersToUse.fromDate}_to_${filtersToUse.toDate}.csv`;
+      const filename = reportTab === 'ticket_360'
+        ? `Ticket_360_Report_${filtersToUse.fromDate}_to_${filtersToUse.toDate}.csv`
+        : reportTab === 'inventory_burn'
+          ? `Inventory_Burn_Report_${filtersToUse.fromDate}_to_${filtersToUse.toDate}.csv`
+          : reportTab === 'technician_wallet'
+            ? `Technician_Wallet_Report_${new Date().toISOString().split('T')[0]}.csv`
+            : reportTab === 'payment_due'
+              ? `Payment_Due_Report_${new Date().toISOString().split('T')[0]}.csv`
+              : reportTab === 'dealer'
+                ? `Dealer_Report_${filtersToUse.fromDate}_to_${filtersToUse.toDate}.csv`
+                : `Technician_Report_${filtersToUse.fromDate}_to_${filtersToUse.toDate}.csv`;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
@@ -2225,9 +2254,11 @@ export default function App() {
           ? ['Tech Code', 'Technician Name', 'Mobile', 'Email', 'Status', 'Current Wallet Balance (₹)']
           : reportTab === 'payment_due'
             ? ['Dealer Code', 'Dealer Name', 'Contact Person', 'Mobile', 'City', 'Status', 'Current Due Amount (₹)']
-            : reportTab === 'dealer'
-              ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Technician', 'Dealer Expense (₹)']
-              : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Dealer', 'Technician Earning (₹)'];
+            : reportTab === 'ticket_360'
+              ? ['Ticket Number', 'Completed Date', 'Dealer Name', 'Technician Name', 'Appliance', 'Brand', 'Customer', 'Technician Earning (₹)', 'Dealer Expense (₹)', 'Customer Fee (₹)', 'Payment Mode of customer fee', 'Ref of customer Fee']
+              : reportTab === 'dealer'
+                ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Technician', 'Dealer Expense (₹)']
+                : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Dealer', 'Technician Earning (₹)'];
 
 
       const rows = exportData.map(item => {
@@ -2278,6 +2309,27 @@ export default function App() {
             ? new Date(t.closedAt).toLocaleDateString('en-GB') 
             : new Date(t.updatedAt).toLocaleDateString('en-GB');
 
+        if (reportTab === 'ticket_360') {
+          const techEarning = typeof t.technicianEarning === 'number' ? t.technicianEarning : (Number(t.technicianEarning) || 0);
+          const dealerExp = typeof t.dealerExpense === 'number' ? t.dealerExpense : (typeof t.dealerAmount === 'number' ? t.dealerAmount : (Number(t.dealerExpense) || 0));
+          const custFee = typeof t.customerFee === 'number' ? t.customerFee : (t.customerPayment?.amount !== undefined ? Number(t.customerPayment.amount) : 0);
+
+          return [
+            t.ticketNumber || '—',
+            completedDate,
+            t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
+            t.assignedTechnician?.name || 'Unassigned',
+            t.product?.category || '—',
+            t.product?.name || '—',
+            t.customer?.name || '—',
+            techEarning,
+            dealerExp,
+            custFee,
+            t.customerPayment?.paymentMode || '—',
+            t.customerPayment?.referenceNumber || '—'
+          ];
+        }
+
         const amtVal = reportTab === 'dealer'
           ? (t.dealerExpense !== undefined ? t.dealerExpense : t.dealerAmount)
           : t.technicianEarning;
@@ -2316,9 +2368,11 @@ export default function App() {
           ? ['TOTAL TECHNICIAN WALLET BALANCE', '', '', '', '', summary.totalAmount]
           : reportTab === 'payment_due'
             ? ['TOTAL DEALER DUE AMOUNT', '', '', '', '', '', summary.totalAmount]
-            : reportTab === 'dealer'
-              ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', '', '', summary.totalAmount]
-              : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', '', '', summary.totalAmount];
+            : reportTab === 'ticket_360'
+              ? ['TOTAL', '', '', '', '', '', '', summary.totalTechEarning || 0, summary.totalDealerExpense || 0, summary.totalCustomerFee || 0, '', '']
+              : reportTab === 'dealer'
+                ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', '', '', summary.totalAmount]
+                : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', '', '', summary.totalAmount];
       rows.push(totalRow);
 
       const tableHeaders = headers.map(h => `<th style="border:1px solid #cbd5e1; background-color:#f1f5f9; padding:8px 12px; font-weight:bold; text-align:left;">${String(h).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</th>`).join('');
@@ -2326,7 +2380,7 @@ export default function App() {
         const isTotal = idx === rows.length - 1;
         return '<tr>' + r.map((c, colIdx) => {
           const isNum = typeof c === 'number';
-          const align = isNum || (isTotal && colIdx === (r.length - 1)) || (isTotal && reportTab === 'inventory_burn' && colIdx === 9) ? 'right' : 'left';
+          const align = isNum || (isTotal && colIdx >= 7 && colIdx <= 9) || (isTotal && colIdx === (r.length - 1)) || (isTotal && reportTab === 'inventory_burn' && colIdx === 9) ? 'right' : 'left';
           const style = `border:1px solid #e2e8f0; padding:6px 12px; text-align:${align}; ${isTotal ? 'font-weight:bold; background-color:#f8fafc;' : ''}`;
           return `<td style="${style}">${String(c).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`;
         }).join('') + '</tr>';
@@ -2341,7 +2395,7 @@ export default function App() {
             <x:ExcelWorkbook>
               <x:ExcelWorksheets>
                 <x:ExcelWorksheet>
-                  <x:Name>${reportTab === 'dealer' ? 'Dealer Report' : 'Technician Report'}</x:Name>
+                  <x:Name>${reportTab === 'ticket_360' ? 'Ticket 360' : reportTab === 'dealer' ? 'Dealer Report' : reportTab === 'technician' ? 'Technician Report' : 'Report'}</x:Name>
                   <x:WorksheetOptions>
                     <x:DisplayGridlines/>
                   </x:WorksheetOptions>
@@ -2365,7 +2419,14 @@ export default function App() {
       const link = document.createElement('a');
       link.setAttribute('href', url);
       const dateFilters = appliedFiltersSummary || reportFilters;
-      link.setAttribute('download', `${reportTab === 'dealer' ? 'dealer_report' : 'technician_report'}_${dateFilters.fromDate}_to_${dateFilters.toDate}.xls`);
+      const downloadFilename = reportTab === 'ticket_360'
+        ? `Ticket_360_Report_${dateFilters.fromDate}_to_${dateFilters.toDate}.xls`
+        : reportTab === 'dealer'
+          ? `Dealer_Report_${dateFilters.fromDate}_to_${dateFilters.toDate}.xls`
+          : reportTab === 'technician'
+            ? `Technician_Report_${dateFilters.fromDate}_to_${dateFilters.toDate}.xls`
+            : `${reportTab}_Report_${dateFilters.fromDate || new Date().toISOString().split('T')[0]}_to_${dateFilters.toDate || new Date().toISOString().split('T')[0]}.xls`;
+      link.setAttribute('download', downloadFilename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -8709,10 +8770,20 @@ export default function App() {
               </div>
 
               {/* Tab Selector */}
-              <div className="flex border-b border-slate-800">
+              <div className="flex border-b border-slate-800 overflow-x-auto">
+                <button
+                  onClick={() => { setReportTab('ticket_360'); setReportsData([]); setAppliedFiltersSummary(null); }}
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer whitespace-nowrap ${
+                    reportTab === 'ticket_360'
+                      ? 'border-violet-500 text-violet-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Ticket 360
+                </button>
                 <button
                   onClick={() => { setReportTab('dealer'); setReportsData([]); setAppliedFiltersSummary(null); }}
-                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer ${
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer whitespace-nowrap ${
                     reportTab === 'dealer'
                       ? 'border-violet-500 text-violet-400'
                       : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -8722,7 +8793,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => { setReportTab('technician'); setReportsData([]); setAppliedFiltersSummary(null); }}
-                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer ${
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer whitespace-nowrap ${
                     reportTab === 'technician'
                       ? 'border-violet-500 text-violet-400'
                       : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -8732,7 +8803,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => { setReportTab('inventory_burn'); setReportsData([]); setAppliedFiltersSummary(null); }}
-                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer ${
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer whitespace-nowrap ${
                     reportTab === 'inventory_burn'
                       ? 'border-violet-500 text-violet-400'
                       : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -8742,7 +8813,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => { setReportTab('technician_wallet'); setReportsData([]); setAppliedFiltersSummary(null); }}
-                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer ${
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer whitespace-nowrap ${
                     reportTab === 'technician_wallet'
                       ? 'border-violet-500 text-violet-400'
                       : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -8752,7 +8823,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => { setReportTab('payment_due'); setReportsData([]); setAppliedFiltersSummary(null); }}
-                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer ${
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition duration-200 cursor-pointer whitespace-nowrap ${
                     reportTab === 'payment_due'
                       ? 'border-violet-500 text-violet-400'
                       : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -8766,7 +8837,7 @@ export default function App() {
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <SlidersHorizontal className="w-5 h-5 text-violet-400" />
-                  {reportTab === 'dealer' ? 'Dealer Report Filters' : reportTab === 'technician_wallet' ? 'Technician Wallet Report Filters' : reportTab === 'payment_due' ? 'Payment Due Report Filters' : 'Technician Ticket Report Filters'}
+                  {reportTab === 'ticket_360' ? 'Ticket 360 Report Filters' : reportTab === 'dealer' ? 'Dealer Report Filters' : reportTab === 'technician_wallet' ? 'Technician Wallet Report Filters' : reportTab === 'payment_due' ? 'Payment Due Report Filters' : reportTab === 'inventory_burn' ? 'Inventory Burn Report Filters' : 'Technician Ticket Report Filters'}
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -8796,8 +8867,8 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Dealer Filter (Dealer/Payment Due tab) / Technician Filter (Technician tab) */}
-                  {(reportTab === 'dealer' || reportTab === 'payment_due') ? (
+                  {/* Dealer Filter (Dealer/Payment Due/Ticket 360 tab) */}
+                  {(reportTab === 'dealer' || reportTab === 'payment_due' || reportTab === 'ticket_360') && (
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Dealer</label>
                       <select
@@ -8811,7 +8882,10 @@ export default function App() {
                         ))}
                       </select>
                     </div>
-                  ) : (
+                  )}
+
+                  {/* Technician Filter (Technician/Technician Wallet/Inventory Burn/Ticket 360 tab) */}
+                  {(reportTab === 'technician' || reportTab === 'technician_wallet' || reportTab === 'inventory_burn' || reportTab === 'ticket_360') && (
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Technician</label>
                       <select
@@ -8915,7 +8989,35 @@ export default function App() {
               ) : appliedFiltersSummary ? (
                 <div className="space-y-6">
                   {/* Summary Cards */}
-                  {reportTab === 'inventory_burn' ? (
+                  {reportTab === 'ticket_360' ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">COMPLETED TICKETS</span>
+                        <span className="text-2xl font-black text-white mt-2">{reportsSummary.completedCount || 0}</span>
+                      </div>
+
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL TECHNICIAN EARNING</span>
+                        <span className="text-2xl font-black text-emerald-400 mt-2">
+                          ₹ {(reportsSummary.totalTechEarning || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL DEALER EXPENSE</span>
+                        <span className="text-2xl font-black text-amber-400 mt-2">
+                          ₹ {(reportsSummary.totalDealerExpense || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL CUSTOMER FEE</span>
+                        <span className="text-2xl font-black text-cyan-400 mt-2">
+                          ₹ {(reportsSummary.totalCustomerFee || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+                  ) : reportTab === 'inventory_burn' ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-lg">
                         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL ITEMS CONSUMED</span>
@@ -9011,6 +9113,15 @@ export default function App() {
                           <div>Technician: <span className="text-slate-400">{appliedFiltersSummary.technician === 'ALL' ? 'All Technicians' : technicians.find(t => t._id === appliedFiltersSummary.technician)?.name || 'N/A'}</span></div>
                         ) : reportTab === 'payment_due' ? (
                           <div>Dealer: <span className="text-slate-400">{appliedFiltersSummary.dealer === 'ALL' ? 'All Dealers' : (allDealers.length > 0 ? allDealers : dealers).find(d => d._id === appliedFiltersSummary.dealer)?.name || 'N/A'}</span></div>
+                        ) : reportTab === 'ticket_360' ? (
+                          <>
+                            <div>Period: <span className="text-slate-400">{new Date(appliedFiltersSummary.fromDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – {new Date(appliedFiltersSummary.toDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
+                            <div>Dealer: <span className="text-slate-400">{appliedFiltersSummary.dealer === 'ALL' ? 'All Dealers' : (allDealers.length > 0 ? allDealers : dealers).find(d => d._id === appliedFiltersSummary.dealer)?.name || 'N/A'}</span></div>
+                            <div>Technician: <span className="text-slate-400">{appliedFiltersSummary.technician === 'ALL' ? 'All Technicians' : technicians.find(t => t._id === appliedFiltersSummary.technician)?.name || 'N/A'}</span></div>
+                            <div>Type: <span className="text-slate-400 capitalize">{appliedFiltersSummary.ticketType}</span></div>
+                            <div>Category: <span className="text-slate-400">{appliedFiltersSummary.category}</span></div>
+                            <div>Brand: <span className="text-slate-400">{appliedFiltersSummary.brand}</span></div>
+                          </>
                         ) : (
                           <>
                             <div>Period: <span className="text-slate-400">{new Date(appliedFiltersSummary.fromDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – {new Date(appliedFiltersSummary.toDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
@@ -9051,7 +9162,22 @@ export default function App() {
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="bg-slate-800/50 border-b border-slate-800">
-                            {reportTab === 'inventory_burn' ? (
+                            {reportTab === 'ticket_360' ? (
+                              <>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ticket Number</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Completed Date</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Dealer Name</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Technician Name</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Appliance</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Brand</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Technician Earning</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Dealer Expense</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Customer Fee</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Payment Mode of customer fee</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ref of customer Fee</th>
+                              </>
+                            ) : reportTab === 'inventory_burn' ? (
                               <>
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Date</th>
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ticket ID</th>
@@ -9100,10 +9226,62 @@ export default function App() {
                         <tbody className="divide-y divide-slate-800">
                           {reportsData.length === 0 ? (
                             <tr>
-                              <td colSpan={reportTab === 'inventory_burn' ? 9 : (reportTab === 'technician_wallet' || reportTab === 'payment_due') ? 7 : 9} className="p-8 text-center text-slate-500 text-sm font-medium">
-                                {reportTab === 'inventory_burn' ? 'No inventory burn records found' : reportTab === 'technician_wallet' ? 'No technician records found' : reportTab === 'payment_due' ? 'No dealer records found' : reportTab === 'dealer' ? 'No dealer records found' : 'No technician records found'}
+                              <td colSpan={reportTab === 'ticket_360' ? 12 : reportTab === 'inventory_burn' ? 9 : (reportTab === 'technician_wallet' || reportTab === 'payment_due') ? 7 : 9} className="p-8 text-center text-slate-500 text-sm font-medium">
+                                {reportTab === 'ticket_360' ? 'No ticket records found' : reportTab === 'inventory_burn' ? 'No inventory burn records found' : reportTab === 'technician_wallet' ? 'No technician records found' : reportTab === 'payment_due' ? 'No dealer records found' : reportTab === 'dealer' ? 'No dealer records found' : 'No technician records found'}
                               </td>
                             </tr>
+                          ) : reportTab === 'ticket_360' ? (
+                            reportsData.map(t => {
+                              const completedDate = t.adminVerification?.verifiedAt 
+                                ? new Date(t.adminVerification.verifiedAt).toLocaleDateString('en-GB') 
+                                : t.closedAt 
+                                  ? new Date(t.closedAt).toLocaleDateString('en-GB') 
+                                  : new Date(t.updatedAt).toLocaleDateString('en-GB');
+
+                              const techEarning = typeof t.technicianEarning === 'number' ? t.technicianEarning : 0;
+                              const dealerExp = typeof t.dealerExpense === 'number' ? t.dealerExpense : (typeof t.dealerAmount === 'number' ? t.dealerAmount : 0);
+                              const custFee = typeof t.customerFee === 'number' ? t.customerFee : (t.customerPayment?.amount || 0);
+
+                              return (
+                                <tr key={t._id} className="hover:bg-slate-800/20 transition duration-150 text-sm">
+                                  <td className="p-4 font-bold text-white">
+                                    <button 
+                                      onClick={() => setSelectedTicket(t)}
+                                      className="hover:text-violet-400 transition cursor-pointer text-left font-mono"
+                                    >
+                                      {t.ticketNumber}
+                                    </button>
+                                  </td>
+                                  <td className="p-4 text-slate-300 whitespace-nowrap">{completedDate}</td>
+                                  <td className="p-4 text-slate-200 font-medium">
+                                    {t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : (t.dealer?.name || 'N/A')}
+                                  </td>
+                                  <td className="p-4 text-slate-200 font-medium">{t.assignedTechnician?.name || 'Unassigned'}</td>
+                                  <td className="p-4 text-slate-300">{t.product?.category || 'N/A'}</td>
+                                  <td className="p-4 text-slate-300">{t.product?.name || 'N/A'}</td>
+                                  <td className="p-4 text-slate-300">{t.customer?.name || 'N/A'}</td>
+                                  <td className="p-4 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
+                                    ₹ {techEarning.toLocaleString('en-IN')}
+                                  </td>
+                                  <td className="p-4 text-right font-mono font-bold text-amber-400 whitespace-nowrap">
+                                    ₹ {dealerExp.toLocaleString('en-IN')}
+                                  </td>
+                                  <td className="p-4 text-right font-mono font-bold text-cyan-400 whitespace-nowrap">
+                                    ₹ {custFee.toLocaleString('en-IN')}
+                                  </td>
+                                  <td className="p-4 text-slate-300">
+                                    {t.customerPayment?.paymentMode ? (
+                                      <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 whitespace-nowrap">
+                                        {t.customerPayment.paymentMode}
+                                      </span>
+                                    ) : '—'}
+                                  </td>
+                                  <td className="p-4 text-slate-400 font-mono text-xs whitespace-nowrap">
+                                    {t.customerPayment?.referenceNumber || '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })
                           ) : reportTab === 'inventory_burn' ? (
                             reportsData.map((item, idx) => (
                               <tr key={item._id || idx} className="hover:bg-slate-800/20 transition duration-150 text-sm">
@@ -9228,14 +9406,31 @@ export default function App() {
                     {/* Pagination / Total Block */}
                     {reportsData.length > 0 && (
                       <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800/80 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-slate-300">
-                            {reportTab === 'technician_wallet' ? 'TOTAL TECHNICIAN WALLET BALANCE:' : reportTab === 'dealer' ? 'TOTAL DEALER EXPENSE:' : 'TOTAL TECHNICIAN EARNING:'}
-                          </span>
-                          <span className="text-lg font-black text-white">
-                            ₹ {reportsSummary.totalAmount.toLocaleString('en-IN')}
-                          </span>
-                        </div>
+                        {reportTab === 'ticket_360' ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm font-bold text-slate-300">
+                            <div>
+                              <span className="text-xs text-slate-400 uppercase block">TOTAL TECHNICIAN EARNING:</span>
+                              <span className="text-base text-emerald-400 font-black">₹ {(reportsSummary.totalTechEarning || 0).toLocaleString('en-IN')}</span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-slate-400 uppercase block">TOTAL DEALER EXPENSE:</span>
+                              <span className="text-base text-amber-400 font-black">₹ {(reportsSummary.totalDealerExpense || 0).toLocaleString('en-IN')}</span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-slate-400 uppercase block">TOTAL CUSTOMER FEE:</span>
+                              <span className="text-base text-cyan-400 font-black">₹ {(reportsSummary.totalCustomerFee || 0).toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold text-slate-300">
+                              {reportTab === 'technician_wallet' ? 'TOTAL TECHNICIAN WALLET BALANCE:' : reportTab === 'dealer' ? 'TOTAL DEALER EXPENSE:' : 'TOTAL TECHNICIAN EARNING:'}
+                            </span>
+                            <span className="text-lg font-black text-white">
+                              ₹ {reportsSummary.totalAmount.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between flex-wrap gap-4">
                           <div className="text-xs text-slate-400">
                             Showing <span className="font-semibold text-slate-200">{(reportsPage - 1) * 25 + 1}</span> to <span className="font-semibold text-slate-200">{Math.min(reportsPage * 25, reportsTotalCount)}</span> of <span className="font-semibold text-slate-200">{reportsTotalCount}</span> records
@@ -9264,7 +9459,7 @@ export default function App() {
                             <button
                               onClick={() => generateReport(reportsPage + 1)}
                               disabled={reportsPage === Math.max(1, Math.ceil(reportsTotalCount / 25))}
-                              className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-355 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold cursor-pointer"
+                              className="px-3 py-1.5 rounded-lg bg-slate-850 text-slate-350 hover:bg-slate-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition text-xs font-bold cursor-pointer"
                             >
                               Next
                             </button>
@@ -9274,7 +9469,15 @@ export default function App() {
                     )}
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center shadow-xl">
+                  <SlidersHorizontal className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <h4 className="text-slate-300 font-bold text-lg mb-1">No Report Generated</h4>
+                  <p className="text-slate-500 text-sm max-w-sm mx-auto">
+                    Select your desired filters above and click <span className="text-violet-400 font-semibold">"GENERATE REPORT"</span> to view business metrics.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
