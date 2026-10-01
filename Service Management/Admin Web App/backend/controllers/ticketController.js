@@ -2098,6 +2098,9 @@ const getReports = async (req, res) => {
       }
       t.customerFee = custFee;
 
+      t.subType = (t.type === 'installation' ? iType : sType);
+      t.ticketTypeFormatted = (t.type === 'installation' ? 'Installation' : 'Service');
+
       totalTechEarning += techEarning;
       totalDealerExpense += dealerAmt;
       totalCustomerFee += custFee;

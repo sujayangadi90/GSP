@@ -2071,14 +2071,14 @@ export default function App() {
         return;
       }
 
-      const headers = reportTab === 'inventory_burn'
+        const headers = reportTab === 'inventory_burn'
         ? ['Ticket ID', 'Date Consumed', 'Ticket Type', 'Customer', 'Pincode', 'Address', 'Technician', 'Item Name', 'Item Code (SKU)', 'Qty Consumed', 'Unit Price (₹)', 'Total Value (₹)']
         : reportTab === 'technician_wallet'
           ? ['Tech Code', 'Technician Name', 'Mobile', 'Email', 'Status', 'Current Wallet Balance (₹)']
           : reportTab === 'payment_due'
             ? ['Dealer Code', 'Dealer Name', 'Contact Person', 'Mobile', 'City', 'Status', 'Current Due Amount (₹)']
             : reportTab === 'ticket_360'
-              ? ['Ticket Number', 'Completed Date', 'Dealer Name', 'Technician Name', 'Appliance', 'Brand', 'Customer', 'Technician Earning (₹)', 'Dealer Expense (₹)', 'Customer Fee (₹)', 'Payment Mode of customer fee', 'Ref of customer Fee']
+              ? ['Ticket Number', 'Completed Date', 'Dealer Name', 'Technician Name', 'Type', 'Sub-Type', 'Appliance', 'Brand', 'Customer', 'Technician Earning (₹)', 'Dealer Expense (₹)', 'Customer Fee (₹)', 'Payment Mode of customer fee', 'Ref of customer Fee']
               : reportTab === 'dealer'
                 ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Technician', 'Dealer Expense (₹)']
                 : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Dealer', 'Technician Earning (₹)'];
@@ -2136,12 +2136,18 @@ export default function App() {
           const techEarning = typeof t.technicianEarning === 'number' ? t.technicianEarning : (Number(t.technicianEarning) || 0);
           const dealerExp = typeof t.dealerExpense === 'number' ? t.dealerExpense : (typeof t.dealerAmount === 'number' ? t.dealerAmount : (Number(t.dealerExpense) || 0));
           const custFee = typeof t.customerFee === 'number' ? t.customerFee : (t.customerPayment?.amount !== undefined ? Number(t.customerPayment.amount) : 0);
+          const typeVal = (t.type || '').toLowerCase() === 'installation' ? 'Installation' : 'Service';
+          const subTypeVal = (t.type || '').toLowerCase() === 'installation'
+            ? (t.installationType || t.installationDetails?.installationType || 'Free Installation')
+            : (t.serviceType || t.serviceDetails?.serviceType || 'In Warranty');
 
           return [
             t.ticketNumber || '—',
             completedDate,
             t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
             t.assignedTechnician?.name || 'Unassigned',
+            typeVal,
+            subTypeVal,
             t.product?.category || '—',
             t.product?.name || '—',
             t.customer?.name || '—',
@@ -2192,7 +2198,7 @@ export default function App() {
           : reportTab === 'payment_due'
             ? ['TOTAL DEALER DUE AMOUNT', '', '', '', '', '', summary.totalAmount]
             : reportTab === 'ticket_360'
-              ? ['TOTAL', '', '', '', '', '', '', summary.totalTechEarning || 0, summary.totalDealerExpense || 0, summary.totalCustomerFee || 0, '', '']
+              ? ['TOTAL', '', '', '', '', '', '', '', '', summary.totalTechEarning || 0, summary.totalDealerExpense || 0, summary.totalCustomerFee || 0, '', '']
               : reportTab === 'dealer'
                 ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', '', '', summary.totalAmount]
                 : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', '', '', summary.totalAmount];
@@ -2255,7 +2261,7 @@ export default function App() {
           : reportTab === 'payment_due'
             ? ['Dealer Code', 'Dealer Name', 'Contact Person', 'Mobile', 'City', 'Status', 'Current Due Amount (₹)']
             : reportTab === 'ticket_360'
-              ? ['Ticket Number', 'Completed Date', 'Dealer Name', 'Technician Name', 'Appliance', 'Brand', 'Customer', 'Technician Earning (₹)', 'Dealer Expense (₹)', 'Customer Fee (₹)', 'Payment Mode of customer fee', 'Ref of customer Fee']
+              ? ['Ticket Number', 'Completed Date', 'Dealer Name', 'Technician Name', 'Type', 'Sub-Type', 'Appliance', 'Brand', 'Customer', 'Technician Earning (₹)', 'Dealer Expense (₹)', 'Customer Fee (₹)', 'Payment Mode of customer fee', 'Ref of customer Fee']
               : reportTab === 'dealer'
                 ? ['Ticket ID', 'Completed Date', 'Dealer', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Technician', 'Dealer Expense (₹)']
                 : ['Ticket ID', 'Completed Date', 'Technician', 'Ticket Type', 'Appliance Category', 'Size/Module', 'Customer', 'Pincode', 'Address', 'Dealer', 'Technician Earning (₹)'];
@@ -2313,12 +2319,18 @@ export default function App() {
           const techEarning = typeof t.technicianEarning === 'number' ? t.technicianEarning : (Number(t.technicianEarning) || 0);
           const dealerExp = typeof t.dealerExpense === 'number' ? t.dealerExpense : (typeof t.dealerAmount === 'number' ? t.dealerAmount : (Number(t.dealerExpense) || 0));
           const custFee = typeof t.customerFee === 'number' ? t.customerFee : (t.customerPayment?.amount !== undefined ? Number(t.customerPayment.amount) : 0);
+          const typeVal = (t.type || '').toLowerCase() === 'installation' ? 'Installation' : 'Service';
+          const subTypeVal = (t.type || '').toLowerCase() === 'installation'
+            ? (t.installationType || t.installationDetails?.installationType || 'Free Installation')
+            : (t.serviceType || t.serviceDetails?.serviceType || 'In Warranty');
 
           return [
             t.ticketNumber || '—',
             completedDate,
             t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : '—',
             t.assignedTechnician?.name || 'Unassigned',
+            typeVal,
+            subTypeVal,
             t.product?.category || '—',
             t.product?.name || '—',
             t.customer?.name || '—',
@@ -2369,7 +2381,7 @@ export default function App() {
           : reportTab === 'payment_due'
             ? ['TOTAL DEALER DUE AMOUNT', '', '', '', '', '', summary.totalAmount]
             : reportTab === 'ticket_360'
-              ? ['TOTAL', '', '', '', '', '', '', summary.totalTechEarning || 0, summary.totalDealerExpense || 0, summary.totalCustomerFee || 0, '', '']
+              ? ['TOTAL', '', '', '', '', '', '', '', '', summary.totalTechEarning || 0, summary.totalDealerExpense || 0, summary.totalCustomerFee || 0, '', '']
               : reportTab === 'dealer'
                 ? ['TOTAL DEALER EXPENSE', '', '', '', '', '', '', '', '', '', summary.totalAmount]
                 : ['TOTAL TECHNICIAN EARNING', '', '', '', '', '', '', '', '', '', summary.totalAmount];
@@ -2380,7 +2392,7 @@ export default function App() {
         const isTotal = idx === rows.length - 1;
         return '<tr>' + r.map((c, colIdx) => {
           const isNum = typeof c === 'number';
-          const align = isNum || (isTotal && colIdx >= 7 && colIdx <= 9) || (isTotal && colIdx === (r.length - 1)) || (isTotal && reportTab === 'inventory_burn' && colIdx === 9) ? 'right' : 'left';
+          const align = isNum || (isTotal && colIdx >= 9 && colIdx <= 11) || (isTotal && colIdx === (r.length - 1)) || (isTotal && reportTab === 'inventory_burn' && colIdx === 9) ? 'right' : 'left';
           const style = `border:1px solid #e2e8f0; padding:6px 12px; text-align:${align}; ${isTotal ? 'font-weight:bold; background-color:#f8fafc;' : ''}`;
           return `<td style="${style}">${String(c).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`;
         }).join('') + '</tr>';
@@ -9168,6 +9180,8 @@ export default function App() {
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Completed Date</th>
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Dealer Name</th>
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Technician Name</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Type</th>
+                                <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Sub-Type</th>
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Appliance</th>
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Brand</th>
                                 <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</th>
@@ -9226,7 +9240,7 @@ export default function App() {
                         <tbody className="divide-y divide-slate-800">
                           {reportsData.length === 0 ? (
                             <tr>
-                              <td colSpan={reportTab === 'ticket_360' ? 12 : reportTab === 'inventory_burn' ? 9 : (reportTab === 'technician_wallet' || reportTab === 'payment_due') ? 7 : 9} className="p-8 text-center text-slate-500 text-sm font-medium">
+                              <td colSpan={reportTab === 'ticket_360' ? 14 : reportTab === 'inventory_burn' ? 9 : (reportTab === 'technician_wallet' || reportTab === 'payment_due') ? 7 : 9} className="p-8 text-center text-slate-500 text-sm font-medium">
                                 {reportTab === 'ticket_360' ? 'No ticket records found' : reportTab === 'inventory_burn' ? 'No inventory burn records found' : reportTab === 'technician_wallet' ? 'No technician records found' : reportTab === 'payment_due' ? 'No dealer records found' : reportTab === 'dealer' ? 'No dealer records found' : 'No technician records found'}
                               </td>
                             </tr>
@@ -9241,6 +9255,10 @@ export default function App() {
                               const techEarning = typeof t.technicianEarning === 'number' ? t.technicianEarning : 0;
                               const dealerExp = typeof t.dealerExpense === 'number' ? t.dealerExpense : (typeof t.dealerAmount === 'number' ? t.dealerAmount : 0);
                               const custFee = typeof t.customerFee === 'number' ? t.customerFee : (t.customerPayment?.amount || 0);
+                              const typeFormatted = (t.type || '').toLowerCase() === 'installation' ? 'Installation' : 'Service';
+                              const subType = (t.type || '').toLowerCase() === 'installation'
+                                ? (t.installationType || t.installationDetails?.installationType || 'Free Installation')
+                                : (t.serviceType || t.serviceDetails?.serviceType || 'In Warranty');
 
                               return (
                                 <tr key={t._id} className="hover:bg-slate-800/20 transition duration-150 text-sm">
@@ -9257,6 +9275,16 @@ export default function App() {
                                     {t.dealer?.name ? `${t.dealer.name}${t.dealer.code ? ` (${t.dealer.code})` : ''}` : (t.dealer?.name || 'N/A')}
                                   </td>
                                   <td className="p-4 text-slate-200 font-medium">{t.assignedTechnician?.name || 'Unassigned'}</td>
+                                  <td className="p-4 text-slate-300">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${(t.type || '').toLowerCase() === 'installation' ? 'bg-indigo-950 text-indigo-400 border border-indigo-800/50' : 'bg-violet-950 text-violet-400 border border-violet-800/50'}`}>
+                                      {typeFormatted}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-slate-300">
+                                    <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 whitespace-nowrap">
+                                      {subType}
+                                    </span>
+                                  </td>
                                   <td className="p-4 text-slate-300">{t.product?.category || 'N/A'}</td>
                                   <td className="p-4 text-slate-300">{t.product?.name || 'N/A'}</td>
                                   <td className="p-4 text-slate-300">{t.customer?.name || 'N/A'}</td>
