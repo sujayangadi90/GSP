@@ -270,26 +270,41 @@ export default function AdminServicesManager() {
                 {categories.map((cat) => (
                   <div 
                     key={cat._id}
-                    className="bg-slate-950 border border-slate-850 p-4 rounded-2xl flex justify-between items-start hover:border-slate-700 transition-colors"
+                    className="bg-slate-950 border border-slate-850 p-4 rounded-2xl flex items-center justify-between gap-3 hover:border-slate-700 transition-colors"
                   >
-                    <div className="flex flex-col gap-1 text-left max-w-[70%]">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-sm text-white">{cat.name}</span>
-                        <span className={`w-2 h-2 rounded-full ${cat.isActive !== false ? 'bg-teal-500' : 'bg-red-500'}`}></span>
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden flex items-center justify-center flex-shrink-0">
+                        {cat.image ? (
+                          <img 
+                            src={getCategoryImageUrl(cat.image)} 
+                            alt={cat.name} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <ImageIcon className="w-5 h-5 text-slate-600" />
+                        )}
                       </div>
-                      <span className="text-[10px] text-slate-500 font-mono select-all">/{cat.slug}</span>
+                      <div className="flex flex-col gap-1 text-left min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm text-white truncate">{cat.name}</span>
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cat.isActive !== false ? 'bg-teal-500' : 'bg-red-500'}`}></span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono select-all truncate">/{cat.slug}</span>
+                      </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-shrink-0">
                       <button 
                         onClick={() => handleEditCat(cat)}
                         className="p-1.5 rounded-lg bg-slate-850 text-slate-400 hover:text-teal-400 transition-colors cursor-pointer"
+                        title="Edit Category"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button 
                         onClick={() => handleDeleteCat(cat._id)}
                         className="p-1.5 rounded-lg bg-slate-850 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+                        title="Delete Category"
                       >
                         <Trash className="w-3.5 h-3.5" />
                       </button>
@@ -317,29 +332,46 @@ export default function AdminServicesManager() {
                     className="bg-slate-950 border border-slate-850 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-700 transition-colors"
                   >
                     <div className="flex flex-col gap-3 text-left">
-                      <div className="flex justify-between items-start">
-                        <span className="text-[9px] font-extrabold text-teal-400 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded uppercase">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-[9px] font-extrabold text-teal-400 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded uppercase truncate max-w-[75%]">
                           {serv.category ? serv.category.name : 'Unknown Category'}
                         </span>
-                        <span className={`w-2 h-2 rounded-full ${serv.isActive !== false ? 'bg-teal-500' : 'bg-red-500'}`}></span>
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${serv.isActive !== false ? 'bg-teal-500' : 'bg-red-500'}`}></span>
                       </div>
 
-                      <h4 className="font-bold text-white text-base">{serv.name}</h4>
-                      <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{serv.shortDescription}</p>
+                      <div className="flex gap-3.5 items-start">
+                        <div className="w-16 h-16 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden flex items-center justify-center flex-shrink-0">
+                          {serv.image ? (
+                            <img 
+                              src={getCategoryImageUrl(serv.image)} 
+                              alt={serv.name} 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <ImageIcon className="w-6 h-6 text-slate-600" />
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1 min-w-0 flex-1">
+                          <h4 className="font-bold text-white text-base leading-snug">{serv.name}</h4>
+                          <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{serv.shortDescription}</p>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex justify-between items-center pt-4 border-t border-slate-850 mt-4">
-                      <span className="text-[10px] text-slate-500 font-mono">/{serv.slug}</span>
-                      <div className="flex gap-2">
+                      <span className="text-[10px] text-slate-500 font-mono truncate max-w-[60%]">/{serv.slug}</span>
+                      <div className="flex gap-2 flex-shrink-0">
                         <button 
                           onClick={() => handleEditServ(serv)}
                           className="p-1.5 rounded-lg bg-slate-850 text-slate-400 hover:text-teal-450 transition-colors cursor-pointer"
+                          title="Edit Service"
                         >
                           <Edit className="w-3.5 h-3.5" />
                         </button>
                         <button 
                           onClick={() => handleDeleteServ(serv._id)}
                           className="p-1.5 rounded-lg bg-slate-850 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+                          title="Delete Service"
                         >
                           <Trash className="w-3.5 h-3.5" />
                         </button>
@@ -428,17 +460,28 @@ export default function AdminServicesManager() {
                     )}
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] cursor-pointer flex items-center gap-1 w-max">
-                      <Upload className="w-3 h-3" />
-                      <span>{uploading ? 'Uploading...' : 'Choose Square Image'}</span>
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        disabled={uploading}
-                      />
-                    </label>
+                    <div className="flex items-center gap-2">
+                      <label className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] cursor-pointer flex items-center gap-1 w-max">
+                        <Upload className="w-3 h-3" />
+                        <span>{uploading ? 'Uploading...' : 'Choose Square Image'}</span>
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          disabled={uploading}
+                        />
+                      </label>
+                      {catForm.image && (
+                        <button
+                          type="button"
+                          onClick={() => setCatForm((prev) => ({ ...prev, image: '' }))}
+                          className="text-[10px] text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-2 py-1.5 rounded-lg"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
                     <span className="text-[10px] text-slate-500">JPG, PNG (Recommended: 1:1 Aspect Ratio)</span>
                   </div>
                 </div>
@@ -590,17 +633,28 @@ export default function AdminServicesManager() {
                     )}
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] cursor-pointer flex items-center gap-1 w-max">
-                      <Upload className="w-3 h-3" />
-                      <span>{uploading ? 'Uploading...' : 'Choose Square Image'}</span>
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        onChange={handleServiceImageUpload}
-                        className="hidden"
-                        disabled={uploading}
-                      />
-                    </label>
+                    <div className="flex items-center gap-2">
+                      <label className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] cursor-pointer flex items-center gap-1 w-max">
+                        <Upload className="w-3 h-3" />
+                        <span>{uploading ? 'Uploading...' : 'Choose Square Image'}</span>
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={handleServiceImageUpload}
+                          className="hidden"
+                          disabled={uploading}
+                        />
+                      </label>
+                      {servForm.image && (
+                        <button
+                          type="button"
+                          onClick={() => setServForm((prev) => ({ ...prev, image: '' }))}
+                          className="text-[10px] text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-2 py-1.5 rounded-lg"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
                     <span className="text-[10px] text-slate-500">JPG, PNG (Recommended: 1:1 Aspect Ratio)</span>
                   </div>
                 </div>

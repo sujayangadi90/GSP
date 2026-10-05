@@ -59,6 +59,13 @@ export default function ServiceDetailPage({ params }) {
     fetchData();
   }, [serviceSlug]);
 
+  const getServiceImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+    return `${baseUrl}${imagePath}`;
+  };
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -119,9 +126,20 @@ export default function ServiceDetailPage({ params }) {
             <span className="text-teal-400 font-bold uppercase tracking-widest text-xs">
               {service.category ? service.category.name : 'Service Details'}
             </span>
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
-              {service.name}
-            </h1>
+            <div className="flex items-center gap-4">
+              {service.image && (
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 shadow-lg">
+                  <img 
+                    src={getServiceImageUrl(service.image)} 
+                    alt={service.name} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+              <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
+                {service.name}
+              </h1>
+            </div>
             <p className="text-slate-400 text-sm sm:text-base max-w-3xl leading-relaxed">
               {service.shortDescription}
             </p>
