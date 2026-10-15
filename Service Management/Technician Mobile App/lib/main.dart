@@ -4504,11 +4504,52 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   String _serviceType = 'In Warranty';
   String _installationType = 'Free Installation';
 
+  bool _hasAuthError = false;
+  bool _isLoadingDropdownData = false;
+  bool _isLoadingBrands = false;
+
   @override
   void initState() {
     super.initState();
-    _fetchAppliances();
-    _fetchCities();
+    _loadInitialDropdownData();
+  }
+
+  void _onSessionExpired() {
+    if (!mounted) return;
+    setState(() => _hasAuthError = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Your session has expired. Please sign out and sign in again.'),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'Sign Out',
+          textColor: Colors.white,
+          onPressed: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('token');
+            await prefs.remove('user');
+            if (mounted) {
+              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadInitialDropdownData() async {
+    setState(() {
+      _isLoadingDropdownData = true;
+      _hasAuthError = false;
+    });
+    await Future.wait([
+      _fetchAppliances(),
+      _fetchCities(),
+    ]);
+    if (mounted) {
+      setState(() => _isLoadingDropdownData = false);
+    }
   }
 
   Future<void> _fetchCities() async {
@@ -4518,12 +4559,17 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
         headers: {'Authorization': 'Bearer ${widget.token}'},
       );
       if (res.statusCode == 200) {
-        setState(() {
-          _cities = jsonDecode(res.body);
-        });
+        final decoded = jsonDecode(res.body);
+        if (decoded is List && mounted) {
+          setState(() {
+            _cities = decoded.where((c) => c is Map && c['isActive'] != false).toList();
+          });
+        }
+      } else if (res.statusCode == 401) {
+        _onSessionExpired();
       }
     } catch (e) {
-      print('Error fetching cities: $e');
+      debugPrint('Error fetching cities: $e');
     }
   }
 
@@ -4535,16 +4581,21 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
       );
       if (res.statusCode == 200) {
         final List fetched = jsonDecode(res.body);
-        setState(() {
-          _appliances = fetched.where((app) => app['isActive'] != false).toList();
-        });
+        if (mounted) {
+          setState(() {
+            _appliances = fetched.where((app) => app is Map && app['isActive'] != false).toList();
+          });
+        }
+      } else if (res.statusCode == 401) {
+        _onSessionExpired();
       }
     } catch (e) {
-      print('Error fetching appliances: $e');
+      debugPrint('Error fetching appliances: $e');
     }
   }
 
   Future<void> _fetchBrands(String applianceId) async {
+    setState(() => _isLoadingBrands = true);
     try {
       final res = await http.get(
         Uri.parse('${widget.apiUrl}/brands?appliance=$applianceId&active=true'),
@@ -4552,12 +4603,20 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
       );
       if (res.statusCode == 200) {
         final List fetched = jsonDecode(res.body);
-        setState(() {
-          _brands = fetched.where((b) => b['isActive'] != false).toList();
-        });
+        if (mounted) {
+          setState(() {
+            _brands = fetched.where((b) => b is Map && b['isActive'] != false).toList();
+          });
+        }
+      } else if (res.statusCode == 401) {
+        _onSessionExpired();
       }
     } catch (e) {
-      print('Error fetching brands: $e');
+      debugPrint('Error fetching brands: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingBrands = false);
+      }
     }
   }
 
@@ -4760,6 +4819,13 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.type == 'installation' ? 'Raise Installation Request' : 'Raise Service Request'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Reload Form Data',
+            onPressed: _loadInitialDropdownData,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -4770,6 +4836,44 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_hasAuthError) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade900.withOpacity(0.3),
+                        border: Border.all(color: Colors.redAccent),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.redAccent),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Session expired (401). Please sign out and sign in again to load data.',
+                              style: TextStyle(color: Colors.white, fontSize: 13),
+                            ),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            ),
+                            onPressed: () async {
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.remove('token');
+                              await prefs.remove('user');
+                              if (mounted) {
+                                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                              }
+                            },
+                            child: const Text('Sign In Again', style: TextStyle(color: Colors.white, fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   _buildSectionHeader('Customer Details'),
                   _buildTextField(_custName, 'Customer Name'),
                   _buildTextField(

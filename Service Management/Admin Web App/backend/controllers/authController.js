@@ -2,10 +2,10 @@ const User = require('../models/User');
 const SystemConfig = require('../models/SystemConfig');
 const jwt = require('jsonwebtoken');
 
-// Generate JWT
+// Generate JWT (5 years long-lived session for mobile apps & web)
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'supersecretjwtkeygsp123', {
-    expiresIn: '30d'
+    expiresIn: '1825d'
   });
 };
 

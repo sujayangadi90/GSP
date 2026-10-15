@@ -4,7 +4,7 @@ const Attendance = require("../models/Attendance");
 
 const generateToken = (id, role = "employee") => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET || "supersecretjwtkeygsp123", {
-    expiresIn: "30d"
+    expiresIn: "1825d"
   });
 };
 

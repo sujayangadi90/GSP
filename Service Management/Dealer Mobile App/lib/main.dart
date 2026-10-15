@@ -849,12 +849,53 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
   String? _selectedBrandName;
   String? _selectedCity;
   String? _selectedTaluk;
+  bool _isLoadingDropdownData = false;
+  bool _isLoadingBrands = false;
+
+  bool _hasAuthError = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchAppliances();
-    _fetchCities();
+    _loadInitialDropdownData();
+  }
+
+  void _onSessionExpired() {
+    if (!mounted) return;
+    setState(() => _hasAuthError = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Your session has expired. Please sign out and sign in again.'),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'Sign Out',
+          textColor: Colors.white,
+          onPressed: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('token');
+            await prefs.remove('user');
+            if (mounted) {
+              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadInitialDropdownData() async {
+    setState(() {
+      _isLoadingDropdownData = true;
+      _hasAuthError = false;
+    });
+    await Future.wait([
+      _fetchAppliances(),
+      _fetchCities(),
+    ]);
+    if (mounted) {
+      setState(() => _isLoadingDropdownData = false);
+    }
   }
 
   Future<void> _fetchCities() async {
@@ -864,12 +905,19 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
         headers: {'Authorization': 'Bearer ${widget.token}'},
       );
       if (res.statusCode == 200) {
-        setState(() {
-          _cities = jsonDecode(res.body);
-        });
+        final decoded = jsonDecode(res.body);
+        if (decoded is List && mounted) {
+          setState(() {
+            _cities = decoded.where((c) => c is Map && c['isActive'] != false).toList();
+          });
+        }
+      } else if (res.statusCode == 401) {
+        _onSessionExpired();
+      } else {
+        debugPrint('Cities fetch failed with status: ${res.statusCode}');
       }
     } catch (e) {
-      print('Error fetching cities: $e');
+      debugPrint('Error fetching cities: $e');
     }
   }
 
@@ -880,28 +928,47 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
         headers: {'Authorization': 'Bearer ${widget.token}'},
       );
       if (res.statusCode == 200) {
-        setState(() {
-          _appliances = jsonDecode(res.body);
-        });
+        final decoded = jsonDecode(res.body);
+        if (decoded is List && mounted) {
+          setState(() {
+            _appliances = decoded.where((a) => a is Map && a['isActive'] != false).toList();
+          });
+        }
+      } else if (res.statusCode == 401) {
+        _onSessionExpired();
+      } else {
+        debugPrint('Appliances fetch failed with status: ${res.statusCode}');
       }
     } catch (e) {
-      print('Error fetching appliances: $e');
+      debugPrint('Error fetching appliances: $e');
     }
   }
 
   Future<void> _fetchBrands(String applianceId) async {
+    setState(() => _isLoadingBrands = true);
     try {
       final res = await http.get(
         Uri.parse('${widget.apiUrl}/brands?appliance=$applianceId&active=true'),
         headers: {'Authorization': 'Bearer ${widget.token}'},
       );
       if (res.statusCode == 200) {
-        setState(() {
-          _brands = jsonDecode(res.body);
-        });
+        final decoded = jsonDecode(res.body);
+        if (decoded is List && mounted) {
+          setState(() {
+            _brands = decoded.where((b) => b is Map && b['isActive'] != false).toList();
+          });
+        }
+      } else if (res.statusCode == 401) {
+        _onSessionExpired();
+      } else {
+        debugPrint('Brands fetch failed with status: ${res.statusCode}');
       }
     } catch (e) {
-      print('Error fetching brands: $e');
+      debugPrint('Error fetching brands: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingBrands = false);
+      }
     }
   }
 
@@ -991,7 +1058,16 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
     final title = widget.type == 'installation' ? 'Raise Installation Request' : 'Raise Service Request';
     
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Reload Form Data',
+            onPressed: _loadInitialDropdownData,
+          ),
+        ],
+      ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : Form(
@@ -1001,6 +1077,44 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_hasAuthError) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade900.withOpacity(0.3),
+                        border: Border.all(color: Colors.redAccent),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.redAccent),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Session expired (401). Please sign out and sign in again to load data.',
+                              style: TextStyle(color: Colors.white, fontSize: 13),
+                            ),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            ),
+                            onPressed: () async {
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.remove('token');
+                              await prefs.remove('user');
+                              if (mounted) {
+                                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                              }
+                            },
+                            child: const Text('Sign In Again', style: TextStyle(color: Colors.white, fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   _buildSectionHeader('Customer Information'),
                   _buildTextField(_custName, 'Customer Name'),
                   _buildTextField(
@@ -1039,15 +1153,20 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
                     child: DropdownButtonFormField<String>(
-                      value: _selectedCity,
-                      decoration: const InputDecoration(
+                      value: _cities.any((c) => c['name'] == _selectedCity) ? _selectedCity : null,
+                      isExpanded: true,
+                      decoration: InputDecoration(
                         labelText: 'Select City *',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                        suffixIcon: _isLoadingDropdownData 
+                          ? const SizedBox(width: 20, height: 20, child: Padding(padding: EdgeInsets.all(12.0), child: CircularProgressIndicator(strokeWidth: 2)))
+                          : null,
                       ),
                       items: _cities.map<DropdownMenuItem<String>>((city) {
+                        final name = city['name']?.toString() ?? '';
                         return DropdownMenuItem<String>(
-                          value: city['name'] as String,
-                          child: Text(city['name'] as String),
+                          value: name,
+                          child: Text(name, overflow: TextOverflow.ellipsis),
                         );
                       }).toList(),
                       onChanged: (val) {
@@ -1064,23 +1183,27 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                     child: Builder(
                       builder: (context) {
                         final selectedCityObj = _cities.firstWhere(
-                          (c) => (c['name'] as String).toLowerCase() == (_selectedCity ?? '').toLowerCase(),
+                          (c) => (c['name']?.toString().toLowerCase() ?? '') == (_selectedCity ?? '').toLowerCase(),
                           orElse: () => null,
                         );
                         final List<dynamic> taluksList = (selectedCityObj != null && selectedCityObj['taluks'] is List)
-                            ? (selectedCityObj['taluks'] as List).where((t) => t['isActive'] == true).toList()
+                            ? (selectedCityObj['taluks'] as List).where((t) => t is Map && t['isActive'] != false).toList()
                             : [];
 
                         return DropdownButtonFormField<String>(
-                          value: _selectedTaluk,
-                          decoration: const InputDecoration(
-                            labelText: 'Select Taluk (Optional)',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                          value: taluksList.any((t) => t['name'] == _selectedTaluk) ? _selectedTaluk : null,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: _selectedCity == null
+                                ? 'Select Taluk (Select City first)'
+                                : (taluksList.isEmpty ? 'No Taluks available for this City' : 'Select Taluk (Optional)'),
+                            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
                           ),
                           items: taluksList.map<DropdownMenuItem<String>>((t) {
+                            final tName = t['name']?.toString() ?? '';
                             return DropdownMenuItem<String>(
-                              value: t['name'] as String,
-                              child: Text(t['name'] as String),
+                              value: tName,
+                              child: Text(tName, overflow: TextOverflow.ellipsis),
                             );
                           }).toList(),
                           onChanged: _selectedCity == null || taluksList.isEmpty ? null : (val) {
@@ -1113,23 +1236,32 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
                     child: DropdownButtonFormField<String>(
-                      value: _selectedApplianceId,
-                      decoration: const InputDecoration(
-                        labelText: 'Select Appliance',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                      value: _appliances.any((app) => app['_id'] == _selectedApplianceId) ? _selectedApplianceId : null,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Select Appliance *',
+                        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                        suffixIcon: _isLoadingDropdownData 
+                          ? const SizedBox(width: 20, height: 20, child: Padding(padding: EdgeInsets.all(12.0), child: CircularProgressIndicator(strokeWidth: 2)))
+                          : null,
                       ),
                       items: _appliances.map<DropdownMenuItem<String>>((app) {
+                        final id = app['_id']?.toString() ?? '';
+                        final name = app['name']?.toString() ?? '';
                         return DropdownMenuItem<String>(
-                          value: app['_id'] as String,
-                          child: Text(app['name'] as String),
+                          value: id,
+                          child: Text(name, overflow: TextOverflow.ellipsis),
                         );
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) {
-                          final selectedApp = _appliances.firstWhere((app) => app['_id'] == val);
+                          final selectedApp = _appliances.firstWhere(
+                            (app) => app['_id'] == val,
+                            orElse: () => null,
+                          );
                           setState(() {
                             _selectedApplianceId = val;
-                            _selectedApplianceName = selectedApp['name'] as String;
+                            _selectedApplianceName = selectedApp != null ? selectedApp['name']?.toString() : null;
                             _brands = [];
                             _selectedBrandName = null;
                           });
@@ -1142,18 +1274,25 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
                     child: DropdownButtonFormField<String>(
-                      value: _selectedBrandName,
-                      decoration: const InputDecoration(
-                        labelText: 'Select Size/Module',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                      value: _brands.any((brand) => brand['name'] == _selectedBrandName) ? _selectedBrandName : null,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: _selectedApplianceId == null 
+                          ? 'Select Size/Module (Select Appliance first)'
+                          : (_isLoadingBrands ? 'Loading Sizes/Modules...' : 'Select Size/Module *'),
+                        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                        suffixIcon: _isLoadingBrands 
+                          ? const SizedBox(width: 20, height: 20, child: Padding(padding: EdgeInsets.all(12.0), child: CircularProgressIndicator(strokeWidth: 2)))
+                          : null,
                       ),
                       items: _brands.map<DropdownMenuItem<String>>((brand) {
+                        final bName = brand['name']?.toString() ?? '';
                         return DropdownMenuItem<String>(
-                          value: brand['name'] as String,
-                          child: Text(brand['name'] as String),
+                          value: bName,
+                          child: Text(bName, overflow: TextOverflow.ellipsis),
                         );
                       }).toList(),
-                      onChanged: (val) {
+                      onChanged: (_selectedApplianceId == null || _brands.isEmpty) ? null : (val) {
                         setState(() {
                           _selectedBrandName = val;
                         });
