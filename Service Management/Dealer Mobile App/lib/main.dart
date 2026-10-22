@@ -80,13 +80,59 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final token = prefs.getString('token');
     final userJson = prefs.getString('user');
     
-    setState(() {
-      _token = token;
-      if (userJson != null) {
-        _userData = jsonDecode(userJson);
+    if (token != null) {
+      try {
+        final res = await http.get(
+          Uri.parse('$_apiUrl/auth/profile'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(const Duration(seconds: 7));
+
+        if (res.statusCode == 401) {
+          debugPrint('Stored dealer token expired or unauthorized (401). Clearing credentials.');
+          await prefs.remove('token');
+          await prefs.remove('user');
+          if (mounted) {
+            setState(() {
+              _token = null;
+              _userData = null;
+              _isLoading = false;
+            });
+          }
+          return;
+        } else if (res.statusCode == 200) {
+          final profileData = jsonDecode(res.body);
+          if (profileData is Map<String, dynamic>) {
+            await prefs.setString('user', jsonEncode(profileData));
+            if (mounted) {
+              setState(() {
+                _token = token;
+                _userData = profileData;
+                _isLoading = false;
+              });
+            }
+            _setupFcm();
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('Backend profile check timed out or offline, continuing with cached session: $e');
       }
-      _isLoading = false;
-    });
+    }
+
+    if (mounted) {
+      setState(() {
+        _token = token;
+        if (userJson != null) {
+          try {
+            _userData = jsonDecode(userJson);
+          } catch (_) {}
+        }
+        _isLoading = false;
+      });
+    }
     if (token != null) {
       _setupFcm();
     }
@@ -412,6 +458,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Authorization': 'Bearer ${widget.token}'
         },
       );
+      if (res.statusCode == 401) {
+        debugPrint('Dealer Dashboard _loadStats received 401 Unauthorized');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Your session has expired. Please log in again.'),
+              backgroundColor: Colors.redAccent,
+              action: SnackBarAction(
+                label: 'Log In',
+                textColor: Colors.white,
+                onPressed: widget.onLogout,
+              ),
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
+        return;
+      }
       if (res.statusCode == 200) {
         final List tickets = jsonDecode(res.body);
         int fresh = 0, open = 0, work = 0, done = 0;
@@ -429,18 +493,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }
           }
         }
-        setState(() {
-          _newCount = fresh;
-          _openCount = open;
-          _inProgressCount = work;
-          _completedCount = done;
-          _expenses = expenses;
-        });
+        if (mounted) {
+          setState(() {
+            _newCount = fresh;
+            _openCount = open;
+            _inProgressCount = work;
+            _completedCount = done;
+            _expenses = expenses;
+          });
+        }
       }
     } catch (e) {
-      print('Error fetching statistics: $e');
+      debugPrint('Error fetching statistics: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

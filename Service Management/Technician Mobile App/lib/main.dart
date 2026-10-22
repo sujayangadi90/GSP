@@ -82,13 +82,59 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final token = prefs.getString('token');
     final userJson = prefs.getString('user');
     
-    setState(() {
-      _token = token;
-      if (userJson != null) {
-        _userData = jsonDecode(userJson);
+    if (token != null) {
+      try {
+        final res = await http.get(
+          Uri.parse('$_apiUrl/auth/profile'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(const Duration(seconds: 7));
+
+        if (res.statusCode == 401) {
+          debugPrint('Stored technician token expired or unauthorized (401). Clearing credentials.');
+          await prefs.remove('token');
+          await prefs.remove('user');
+          if (mounted) {
+            setState(() {
+              _token = null;
+              _userData = null;
+              _isLoading = false;
+            });
+          }
+          return;
+        } else if (res.statusCode == 200) {
+          final profileData = jsonDecode(res.body);
+          if (profileData is Map<String, dynamic>) {
+            await prefs.setString('user', jsonEncode(profileData));
+            if (mounted) {
+              setState(() {
+                _token = token;
+                _userData = profileData;
+                _isLoading = false;
+              });
+            }
+            _setupFcm();
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('Backend profile check timed out or offline, continuing with cached session: $e');
       }
-      _isLoading = false;
-    });
+    }
+
+    if (mounted) {
+      setState(() {
+        _token = token;
+        if (userJson != null) {
+          try {
+            _userData = jsonDecode(userJson);
+          } catch (_) {}
+        }
+        _isLoading = false;
+      });
+    }
     if (token != null) {
       _setupFcm();
     }
@@ -401,6 +447,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _earnings = 0.0;
   double _walletBalance = 0.0;
   bool _isLoading = false;
+  String? _errorMessage;
+  bool _isAuthError = false;
   List _jobs = [];
   String _selectedFilterType = 'this_month'; // 'this_month', 'last_2_months', 'custom'
   int _customMonth = DateTime.now().month;
@@ -537,7 +585,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadJobs() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _isAuthError = false;
+    });
     try {
       final range = _getDateRangeForFilter();
       final res = await http.get(
@@ -547,6 +599,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Authorization': 'Bearer ${widget.token}'
         },
       );
+
+      if (res.statusCode == 401) {
+        debugPrint('Dashboard _loadJobs received 401 Unauthorized');
+        if (mounted) {
+          setState(() {
+            _isAuthError = true;
+            _errorMessage = 'Session expired. Please log in again.';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Your session has expired. Please log in again.'),
+              backgroundColor: Colors.redAccent,
+              action: SnackBarAction(
+                label: 'Log In',
+                textColor: Colors.white,
+                onPressed: widget.onLogout,
+              ),
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
+        return;
+      }
+
       if (res.statusCode == 200) {
         final List jobsData = jsonDecode(res.body);
         int assigned = 0, inProgress = 0, pending = 0, completed = 0;
@@ -578,14 +654,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
             earnings += techFee;
           }
         }
-        setState(() {
-          _jobs = jobsData;
-          _assignedCount = assigned;
-          _inProgressCount = inProgress;
-          _pendingCount = pending;
-          _completedCount = completed;
-          _earnings = earnings;
-        });
+        if (mounted) {
+          setState(() {
+            _jobs = jobsData;
+            _assignedCount = assigned;
+            _inProgressCount = inProgress;
+            _pendingCount = pending;
+            _completedCount = completed;
+            _earnings = earnings;
+            _errorMessage = null;
+            _isAuthError = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Failed to load tickets (Status: ${res.statusCode})';
+          });
+        }
       }
 
       try {
@@ -598,7 +684,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
         if (walletRes.statusCode == 200) {
           final wData = jsonDecode(walletRes.body);
-          if (wData['walletBalance'] is num) {
+          if (wData['walletBalance'] is num && mounted) {
             setState(() {
               _walletBalance = (wData['walletBalance'] as num).toDouble();
             });
@@ -608,9 +694,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         debugPrint('Error fetching wallet in dashboard: $wErr');
       }
     } catch (e) {
-      print('Error fetching jobs: $e');
+      debugPrint('Error fetching jobs: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Connection error. Please check internet connection.';
+        });
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -963,6 +1056,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 12),
+              if (_errorMessage != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: _isAuthError ? Colors.red.shade900.withOpacity(0.3) : Colors.amber.shade900.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _isAuthError ? Colors.redAccent : Colors.amberAccent,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _isAuthError ? Icons.lock_clock : Icons.warning_amber_rounded,
+                        color: _isAuthError ? Colors.redAccent : Colors.amberAccent,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _isAuthError ? 'Session Expired' : 'Unable to load tickets',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _errorMessage!,
+                              style: TextStyle(color: Colors.grey.shade300, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _isAuthError ? widget.onLogout : _loadJobs,
+                        style: TextButton.styleFrom(
+                          foregroundColor: _isAuthError ? Colors.redAccent : Colors.tealAccent,
+                        ),
+                        child: Text(_isAuthError ? 'Log In' : 'Retry'),
+                      ),
+                    ],
+                  ),
+                ),
               activeJobs.isEmpty
                 ? Container(
                     padding: const EdgeInsets.all(24),
@@ -970,10 +1110,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: const Color(0xFF1E2422),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Text(
-                      'No active assigned jobs. Refresh to check again.',
+                    child: Text(
+                      _errorMessage != null
+                          ? 'Failed to fetch tickets. Tap Retry above to try again.'
+                          : 'No active assigned jobs. Refresh to check again.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
+                      style: const TextStyle(color: Colors.grey),
                     ),
                   )
                 : ListView.builder(
@@ -3160,22 +3302,35 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
       if (res.statusCode == 200) {
         final Map<String, dynamic> body = jsonDecode(res.body);
         final List data = body['data'] ?? [];
-        setState(() {
-          if (isLoadMore) {
-            _jobs.addAll(data);
-          } else {
-            _jobs = data;
-          }
-          _hasMore = body['hasMore'] ?? false;
-        });
+        if (mounted) {
+          setState(() {
+            if (isLoadMore) {
+              _jobs.addAll(data);
+            } else {
+              _jobs = data;
+            }
+            _hasMore = body['hasMore'] ?? false;
+          });
+        }
+      } else if (res.statusCode == 401) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Session expired. Please log out and log in again.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
       }
     } catch (e) {
-      print('Error fetching jobs: $e');
+      debugPrint('Error fetching jobs: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-        _isMoreLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isMoreLoading = false;
+        });
+      }
     }
   }
 
