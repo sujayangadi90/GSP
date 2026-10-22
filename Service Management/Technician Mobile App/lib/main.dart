@@ -1962,7 +1962,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                       request.fields['nextVisitDate'] = nextVisitDateTime!.toIso8601String();
                       request.fields['remarks'] = remarksController.text.trim();
 
-                      if (sitePhoto != null) {
+                      if (sitePhoto != null && await sitePhoto!.exists()) {
                         request.files.add(await http.MultipartFile.fromPath('photo', sitePhoto!.path));
                       }
 
@@ -2112,27 +2112,35 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         'quantity': p['quantity']
       }).toList());
 
-      if (_billPhoto != null) {
-        request.files.add(await http.MultipartFile.fromPath('bill', _billPhoto!.path));
+      Future<void> addFileIfExists(String fieldName, File? file, String slotKey) async {
+        if (file != null) {
+          if (await file.exists()) {
+            request.files.add(await http.MultipartFile.fromPath(fieldName, file.path));
+          } else {
+            debugPrint('File for $fieldName ($slotKey) at ${file.path} does not exist. Removing stale reference.');
+            await _removePersistedPhoto(slotKey);
+            if (mounted) {
+              setState(() {
+                if (slotKey == 'bill') _billPhoto = null;
+                else if (slotKey == 'installation1') _installation1Photo = null;
+                else if (slotKey == 'installation2') _installation2Photo = null;
+                else if (slotKey == 'serialNumber') _serialNumberPhoto = null;
+                else if (slotKey == 'warrantyCard') _warrantyCardPhoto = null;
+                else if (slotKey == 'before') _beforePhoto = null;
+                else if (slotKey == 'after') _afterPhoto = null;
+              });
+            }
+          }
+        }
       }
-      if (_installation1Photo != null) {
-        request.files.add(await http.MultipartFile.fromPath('installation1', _installation1Photo!.path));
-      }
-      if (_installation2Photo != null) {
-        request.files.add(await http.MultipartFile.fromPath('installation2', _installation2Photo!.path));
-      }
-      if (_serialNumberPhoto != null) {
-        request.files.add(await http.MultipartFile.fromPath('serialNumber', _serialNumberPhoto!.path));
-      }
-      if (_warrantyCardPhoto != null) {
-        request.files.add(await http.MultipartFile.fromPath('warrantyCard', _warrantyCardPhoto!.path));
-      }
-      if (_beforePhoto != null) {
-        request.files.add(await http.MultipartFile.fromPath('before', _beforePhoto!.path));
-      }
-      if (_afterPhoto != null) {
-        request.files.add(await http.MultipartFile.fromPath('after', _afterPhoto!.path));
-      }
+
+      await addFileIfExists('bill', _billPhoto, 'bill');
+      await addFileIfExists('installation1', _installation1Photo, 'installation1');
+      await addFileIfExists('installation2', _installation2Photo, 'installation2');
+      await addFileIfExists('serialNumber', _serialNumberPhoto, 'serialNumber');
+      await addFileIfExists('warrantyCard', _warrantyCardPhoto, 'warrantyCard');
+      await addFileIfExists('before', _beforePhoto, 'before');
+      await addFileIfExists('after', _afterPhoto, 'after');
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
@@ -4783,7 +4791,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
         request.fields['installationDetails[preferredDate]'] = _visitDateController.text;
       }
 
-      if (_selectedInvoice != null) {
+      if (_selectedInvoice != null && await _selectedInvoice!.exists()) {
         request.files.add(await http.MultipartFile.fromPath('invoiceImage', _selectedInvoice!.path));
       }
 

@@ -1028,7 +1028,7 @@ class _TicketFormScreenState extends State<TicketFormScreen> {
         request.fields['installationDetails[preferredDate]'] = _visitDateController.text;
       }
 
-      if (_selectedInvoice != null) {
+      if (_selectedInvoice != null && await _selectedInvoice!.exists()) {
         request.files.add(await http.MultipartFile.fromPath('invoiceImage', _selectedInvoice!.path));
       }
 
